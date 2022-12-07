@@ -1,0 +1,95 @@
+---
+title: "Co-occurrence summary for phecode : `r params$outcome_phecode` at t = `r params$t_threshold`"
+format:
+  html:
+    code-fold: true
+    page-layout: full
+editor: visual
+theme: flatly
+params:
+  outcome_phecode: "155"
+  t_threshold: "5"
+  data_version: "20210318"
+---
+
+```{r libraries-and-stuff, echo = FALSE}
+### libraries ----------
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(plotly)
+  library(ggtext)
+})
+
+### specs ----------
+out_phe <- params$outcome_phecode
+t <- as.numeric(params$t_threshold)
+data_vers <- params$data_version
+
+### source plotting functions ----------
+purrr::walk(
+  list.files("~/Dropbox (University of Michigan)/projects/dissertation/aim_one/fn/"),
+  ~source(paste0("~/Dropbox (University of Michigan)/projects/dissertation/aim_one/fn/", .x))
+)
+```
+
+```{r load-data, echo = FALSE}
+### load data ----------
+d <- data.table::fread(
+  file = paste0("~/Dropbox (University of Michigan)/projects/dissertation/aim_one/results/",
+         data_vers, "/",
+         paste0("X", gsub("X", "", out_phe)),
+         "/mgi_X", gsub("X", "", out_phe),"_t", t,"_", data_vers, "_results.txt")
+  )[, `:=` (
+  phecode = gsub("X", "", phecode),
+  shape = ifelse(beta > 0, "Up", "Down"),
+  log10p = -log10(p_value),
+  phe_num = as.numeric(gsub("X", "", phecode))
+  )][]
+p <- fread("~/Downloads/Phecode_Definitions_FullTable_Modified.txt", colClasses = "character")[, `:=` (
+  groupnum = as.numeric(groupnum)
+)]
+```
+
+```{r prep-data, echo = FALSE}
+### prep data ----------
+merged <- merge.data.table(
+  d,
+  p[, .(phecode, description, group, groupnum, color)],
+  all.x = TRUE,
+  by = "phecode"
+)[order(groupnum, phe_num), num := 1:.N]
+merged[, slide_num := num + ((groupnum - 1)*30)]
+thresh <- -log10(0.05/merged[, .N])
+merged[, sig := ifelse(p_value < 0.05/merged[, .N], "Significant", "Not significant")]
+merged[, group := stringr::str_to_sentence(group)]
+```
+
+The following are cooccurrence analysis results for phecode `r out_phe`: `r p[phecode == out_phe, description]` in MGI at the t = `r t` year(s) threshold. `r format(merged[, .N], big.mark = ",")` phecodes were considered (at least 10 cases in time-restricted phenome). `r format(merged[sig == "Significant", .N], big.mark = ",")` phecodes reached phenome-wide significance.
+
+### Manhattan plot of p-values
+
+```{r}
+plotlyman_log10p(data = merged, phe_data = p, outcome = out_phe)
+```
+
+### Plot of beta coefficients
+
+```{r}
+plotlyman_beta(data = merged, phe_data = p, outcome = out_phe)
+```
+
+### Table of results
+
+```{r}
+DT::datatable(merged[order(p_value), .(Phecode = phecode, Description = description, Beta = round(beta, 3), SEbeta = round(se_beta, 3), `P-value` = formatC(p_value, format = "e", digits = 2), Significant = sig, `Phecode category` = group)],
+              # options = list(
+              #   scrollX = TRUE,
+              #   autowidth = FALSE,
+              #   columnDefs = list(
+              #     list(width = '75px', targets = c(1, 3, 4, 5)),
+              #     list(width = '500px', targets = c(2)),
+              #     list(width = '300px', targets = c(6, 7)))
+              # ),
+              rownames = FALSE)
+```
