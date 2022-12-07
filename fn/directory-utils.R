@@ -7,6 +7,7 @@ check_folder_structure <- function(cohort = "mgi", data_version, outcome_phecode
   # data -----------------------------------------------------------------------
   if (!dir.exists( glue::glue("data/private/{cohort}/{data_version}/X{gsub('X', '', outcome_phecode)}") )) {
     dir.create(glue::glue("data/private/{cohort}/{data_version}/X{gsub('X', '', outcome_phecode)}"), recursive = TRUE)
+    cli::cli_alert_info("data/private/{cohort}/{data_version}/X{gsub('X', '', outcome_phecode)}/ folder created")
     created <- created + 1
   }
   

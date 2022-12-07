@@ -20,7 +20,9 @@ get_full_icd_dsb_phecode <- function(
     icd <- data.table::rbindlist(list(icd, more_icd))
   }
   
-  icd <- icd[, .(id = IID, dsb = DaysSinceBirth, phecode)][, dsb := as.numeric(dsb)]
+  if ("IID" %in% names(icd)) {data.table::setnames(icd, "IID", "id")}
+  if ("DaysSinceBirth" %in% names(icd)) {data.table::setnames(icd, "DaysSinceBirth", "dsb")}
+  icd <- icd[, .(id, dsb, phecode)][, dsb := as.numeric(dsb)]
   
   return(icd)
   

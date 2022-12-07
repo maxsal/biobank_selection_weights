@@ -15,13 +15,14 @@ set.seed(61787)
 for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
 # 2. specifications ------------------------------------------------------------
-cohort          <- "ukb"
-mgi_version     <- "20210318"       # mgi phenome version
-ukb_version     <- "20221117"       # ukb phenome version
-outcome         <- "157"            # outcome phecode (157 - PanCan, 155 - LivCan, 184.1 - OvCan)
-time_thresholds <- c(0, 1, 2, 3, 5) # time thresholds
-matching_ratio  <- 2                # number of noncases per case
-
+mgi_version           <- "20210318"       # mgi phenome version
+ukb_version           <- "20221117"       # ukb phenome version
+outcome               <- "155"            # outcome phecode (157 - PanCan, 155 - LivCan, 184.1 - OvCan)
+time_thresholds       <- c(0, 1, 2, 3, 5) # time thresholds
+nearest_matching_vars <- c("age_at_first_diagnosis", "length_followup")
+exact_matching_vars   <- c("female")
+matching_caliper      <- 0.25
+matching_ratio        <- 2                # number of noncases per case
 
 # 3. extra preparations --------------------------------------------------------
 ## confirm file structure for a given outcome exists - if not, create paths
@@ -52,7 +53,7 @@ data.table::setnames(mgi_pim0,
                      new = c("id", "outcome"))
 
 ### demographics
-mgi_demo <- data.table::fread(file_paths[[cohort]]$demo_file)[, .(
+mgi_demo <- data.table::fread(file_paths[["mgi"]]$demo_file)[, .(
   id       = Deid_ID,
   age      = Age,
   alive    = as.numeric(AliveYN == "Y"),
@@ -80,15 +81,21 @@ data.table::setnames(ukb_pim0,
                      new = c("id", "outcome"))
 ### demographics
 ukb_demo <- data.table::fread(file_paths[["ukb"]]$demo_file,
-                              na.strings = c(""))[, .(
-                                id,
+                              na.strings = c("", "NA", "."), colClass = "character")[, .(
+                                id = as.character(id),
+                                dob = as.Date(dob),
+                                age = floor(as.numeric(as.Date("2022-11-17") - as.Date(dob)) / 365.25),
                                 ethn = ethnicity,
                                 sex)]
+ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
 
 ### icd-phecode data
-ukb_first_phe <- get_full_icd_dsb_phecode(
+ukb_full_phe <- get_full_icd_dsb_phecode(
   icd_file      = file_paths[["ukb"]]$icd_phecode_file
 )
+ukb_first_phe <- ukb_full_phe[
+  ukb_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
+]
 
 # 5. identify cases -------------------------------------------------------------
 ## mgi
@@ -115,9 +122,11 @@ mgi_matching_cov <- merge.data.table(
 cli::cli_alert_info("calculating diagnostic metrics in ukb...")
 ukb_diag_metrics <- get_icd_phecode_metrics(
   full_phe_data = ukb_first_phe
-)
+)[, id := as.character(id)]
 ukb_matching_cov <- merge.data.table(
-  ukb_demo[, .(id, age, female = as.numeric(sex == "F"))]
+  ukb_demo[, .(id, age, female = as.numeric(sex == "Female"))],
+  ukb_diag_metrics,
+  by = "id"
 )[, case := fifelse(id %in% ukb_case_ids, 1, 0)]
 
 # 7. perform matching ----------------------------------------------------------
@@ -212,9 +221,9 @@ names(mgi_pims) <- glue::glue("t{time_thresholds}")
 for (i in 1:length(mgi_pims)) {
   data.table::fwrite(
     x = mgi_pims[[i]],
-    file = glue::glue("data/private/mgi/{version}/X{gsub('X', '', outcome)}",
+    file = glue::glue("data/private/mgi/{mgi_version}/X{gsub('X', '', outcome)}",
                       "/time_restricted_phenomes/mgi_X{gsub('X', '', outcome)}",
-                      "_{names(tr_pims)[i]}_{version}.txt"),
+                      "_{names(mgi_pims)[i]}_{mgi_version}.txt"),
     sep = "\t"
   )
 }
@@ -237,13 +246,9 @@ names(ukb_pims) <- glue::glue("t{time_thresholds}")
 for (i in 1:length(ukb_pims)) {
   data.table::fwrite(
     x = ukb_pims[[i]],
-    file = glue::glue("data/private/ukb/{version}/X{gsub('X', '', outcome)}",
+    file = glue::glue("data/private/ukb/{ukb_version}/X{gsub('X', '', outcome)}",
                       "/time_restricted_phenomes/ukb_X{gsub('X', '', outcome)}",
-                      "_{names(tr_pims)[i]}_{version}.txt"),
+                      "_{names(ukb_pims)[i]}_{ukb_version}.txt"),
     sep = "\t"
   )
 }
-
-
-
-
