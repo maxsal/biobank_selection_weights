@@ -11,6 +11,8 @@ library(haven)
 library(glue)
 library(progress)
 
+source("fn/cleaning-utils.R")
+
 # specifications ---------------------------------------------------------------
 nhanes_data_path   <- "data/public/nhanes/"
 nhanes_data_prefix <- "P"
