@@ -3,7 +3,7 @@
 # author:  max salvatore
 # date:    20221207
 
-# 1. libraries, functions, and options -----------------------------------------
+# 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
 
 library(data.table)
@@ -14,17 +14,17 @@ set.seed(61787)
 
 for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
-# 2. specifications ------------------------------------------------------------
+# 2. specifications (specifies outcome) ----------------------------------------
 mgi_version           <- "20210318"       # mgi phenome version
 ukb_version           <- "20221117"       # ukb phenome version
-outcome               <- "155"            # outcome phecode (157 - PanCan, 155 - LivCan, 184.1 - OvCan)
+outcome               <- "184.1"          # outcome phecode (157 - PanCan, 155 - LivCan, 184.1 - OvCan)
 time_thresholds       <- c(0, 1, 2, 3, 5) # time thresholds
 nearest_matching_vars <- c("age_at_first_diagnosis", "length_followup")
 exact_matching_vars   <- c("female")
 matching_caliper      <- 0.25
 matching_ratio        <- 2                # number of noncases per case
 
-# 3. extra preparations --------------------------------------------------------
+# 3. extra preparations (outcome-specific) -------------------------------------
 ## confirm file structure for a given outcome exists - if not, create paths
 ### mgi
 check_folder_structure(
@@ -202,7 +202,7 @@ data.table::fwrite(ukb_post_match_cov,
                               "X{gsub('X', '', outcome)}/matched_covariates.txt"),
                    sep = "\t")
 
-# create time-restricted phenomes ----------------------------------------------
+# 8. create time-restricted phenomes -------------------------------------------
 ## mgi
 cli::cli_alert_info("constructing time-restricted phenomes in mgi...")
 mgi_matched_phe <- data.table::merge.data.table(

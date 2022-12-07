@@ -17,7 +17,7 @@ set.seed(61787)
 for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
 # specifications ---------------------------------------------------------------
-outcome         <- "184.1"          # 155, liver cancer; 157, pancreatic cancer; 184.1, ovarian cancer
+outcome         <- "157"          # 155, liver cancer; 157, pancreatic cancer; 184.1, ovarian cancer
 mgi_version     <- "20210318"       # mgi version
 ukb_version     <- "20221117"       # ukb  version
 time_thresholds <- c(0, 1, 2, 3, 5) # time thresholds
@@ -31,7 +31,7 @@ file_paths <- get_files(mgi_version = mgi_version, ukb_version = ukb_version)
 mgi_tr_pims <- list()
 for (i in seq_along(time_thresholds)) {
   mgi_tr_pims[[i]] <- data.table::fread(
-    glue::glue("data/{mgi_version}/processed/X","{gsub('X', '', outcome)}/",
+    glue::glue("data/private/mgi/{mgi_version}/X","{gsub('X', '', outcome)}/",
                "time_restricted_phenomes/mgi_X{gsub('X', '', outcome)}_t",
                "{time_thresholds[i]}_{mgi_version}.txt")
     )
@@ -39,16 +39,28 @@ for (i in seq_along(time_thresholds)) {
 names(mgi_tr_pims) <- glue::glue("t{time_thresholds}_threshold")
 
 mgi_covariates <- data.table::fread(
-  glue::glue("data/{mgi_version}/processed/X{gsub('X', '', outcome)}/",
+  glue::glue("data/private/mgi/{mgi_version}/X{gsub('X', '', outcome)}/",
              "matched_covariates.txt")
   )
 
 ## ukb
+ukb_tr_pims <- list()
+for (i in seq_along(time_thresholds)) {
+  ukb_tr_pims[[i]] <- data.table::fread(
+    glue::glue("data/private/ukb/{ukb_version}/X","{gsub('X', '', outcome)}/",
+               "time_restricted_phenomes/ukb_X{gsub('X', '', outcome)}_t",
+               "{time_thresholds[i]}_{ukb_version}.txt")
+  )
+}
+names(ukb_tr_pims) <- glue::glue("t{time_thresholds}_threshold")
+
+ukb_covariates <- data.table::fread(
+  glue::glue("data/private/ukb/{ukb_version}/X{gsub('X', '', outcome)}/",
+             "matched_covariates.txt")
+)
 
 ## phenome
-pheinfo <- fread(
-  glue::glue("data/phecode_mapping/data/",
-             "Phecode_Definitions_FullTable_Modified.txt"),
+pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character")
 
 # cooccurrence analysis --------------------------------------------------------
@@ -67,13 +79,25 @@ for (i in seq_along(time_thresholds)) {
 names(mgi_results) <- glue::glue("t{time_thresholds}")
 
 ## ukb
+ukb_results <- list()
+for (i in seq_along(time_thresholds)) {
+  ukb_results[[i]] <- output_cooccurrence_results(
+    pim_data = ukb_tr_pims[[glue::glue("t{time_thresholds[i]}_threshold")]],
+    t_thresh = time_thresholds[i],
+    cov_data = ukb_covariates,
+    covariates = c("age_at_threshold", "female", "length_followup"),
+    all_phecodes = glue::glue("X{pheinfo[, phecode]}"),
+    model_type = mod_type
+  )
+}
+names(ukb_results) <- glue::glue("t{time_thresholds}")
 
 # save results -----------------------------------------------------------------
 ## mgi
 for (i in seq_along(time_thresholds)) {
   data.table::fwrite(
     x    = mgi_results[[i]],
-    file = glue::glue("results/{mgi_version}/X{gsub('X', '', outcome)}/mgi_X",
+    file = glue::glue("results/mgi/{mgi_version}/X{gsub('X', '', outcome)}/mgi_X",
                       "{gsub('X', '', outcome)}_t{time_thresholds[i]}_",
                       "{mgi_version}_results.txt"),
     sep  = "\t"
@@ -81,3 +105,12 @@ for (i in seq_along(time_thresholds)) {
 }
 
 ## ukb
+for (i in seq_along(time_thresholds)) {
+  data.table::fwrite(
+    x    = ukb_results[[i]],
+    file = glue::glue("results/ukb/{ukb_version}/X{gsub('X', '', outcome)}/ukb_X",
+                      "{gsub('X', '', outcome)}_t{time_thresholds[i]}_",
+                      "{ukb_version}_results.txt"),
+    sep  = "\t"
+  )
+}
