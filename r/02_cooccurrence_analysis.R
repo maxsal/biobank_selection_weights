@@ -7,7 +7,7 @@
 
 # libraries, functions, and options --------------------------------------------
 library(data.table)
-library(purrr)
+library(MatchIt)
 library(logistf)
 library(glue)
 library(progress)
