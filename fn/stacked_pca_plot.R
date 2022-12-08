@@ -1,8 +1,13 @@
 stacked_pca_plot <- function(x, cohort = "mgi") {
+  
+  if (!is.data.table(x)) {
+    x <- as.data.table(x)
+  }
+  
   x[, stat := c("sd", "prop", "cum_prop")]
   
   plot_data <- melt(
-    d,
+    x,
     id.vars = "stat"
   )[, pc := as.numeric(gsub("PC", "", variable))][]
   
