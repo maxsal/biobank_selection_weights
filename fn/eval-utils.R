@@ -213,7 +213,12 @@ calculate_phers <- function(
     pim,
     res,
     method,
-    tophits_n = 50) {
+    tophits_n = 50,
+    phers_name = NULL) {
+  
+  if(is.null(phers_name)) {
+    stop("'phers_name' argument is not specified!")
+  }
   
   ## select significant hits
   if (method == "tophits") {
@@ -225,21 +230,25 @@ calculate_phers <- function(
   
   pim[, phers := 0]
   message("calculating phers...")
-  pb <- progress_bar$new(total = length(phers_hits[, phecode]))
+  pb <- progress_bar$new(total = length(phers_hits[, phecode]),
+                         format = "[:bar] :percent eta: :eta")
   pb$tick(0)
   for (i in phers_hits[, phecode]) {
-    pb$tick()
     pim[, phers := phers + (
       phers_hits[phecode == i, beta] * get(i) * as.numeric(phers_hits[phecode == i, beta] > 0)) - (
         phers_hits[phecode == i, beta] * (1 - get(i)) * as.numeric(phers_hits[phecode == i, beta] < 0)
       )]
+    pb$tick()
   }
   
+  data.table::setnames(pim, old = "phers", new = phers_name)
+  keep_cols <- c("id", phers_name)
+
   return(list(
     n_phecodes = length(phers_hits[, phecode]),
     method     = method,
     phecodes   = phers_hits,
-    data       = pim[, .(id, phers)]
+    data       = pim[, ..keep_cols]
     ))
 }
 
