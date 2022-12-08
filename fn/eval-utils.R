@@ -228,27 +228,29 @@ calculate_phers <- function(
     phers_hits <- res[p_value < 0.05/nrow(pim)]
   }
   
-  pim[, phers := 0]
+  out <- pim
+  
+  out[, phers := 0]
   message("calculating phers...")
   pb <- progress_bar$new(total = length(phers_hits[, phecode]),
                          format = "[:bar] :percent eta: :eta")
   pb$tick(0)
   for (i in phers_hits[, phecode]) {
-    pim[, phers := phers + (
+    out[, phers := phers + (
       phers_hits[phecode == i, beta] * get(i) * as.numeric(phers_hits[phecode == i, beta] > 0)) - (
         phers_hits[phecode == i, beta] * (1 - get(i)) * as.numeric(phers_hits[phecode == i, beta] < 0)
       )]
     pb$tick()
   }
   
-  data.table::setnames(pim, old = "phers", new = phers_name)
+  data.table::setnames(out, old = "phers", new = phers_name)
   keep_cols <- c("id", phers_name)
 
   return(list(
     n_phecodes = length(phers_hits[, phecode]),
     method     = method,
     phecodes   = phers_hits,
-    data       = pim[, ..keep_cols]
+    data       = out[, ..keep_cols]
     ))
 }
 
