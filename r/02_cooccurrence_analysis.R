@@ -11,35 +11,59 @@ library(MatchIt)
 library(logistf)
 library(glue)
 library(progress)
+library(optparse)
 
 set.seed(61787)
 
 for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
+# optparse list ----------------------------------------------------------------
+option_list <- list(
+  make_option("--outcome", type = "character", default = "",
+              help = "Outcome phecode"),
+  make_option("--mgi_version", type = "character", default = "20210318",
+              help = "Version of MGI data [default = 20210318]"),
+  make_option("--ukb_version", type = "character", default = "20221117",
+              help = "Version of UKB data [default = 20221117]"),
+  make_option("--time_thresholds", type = "character", default = "0,1,2,3,5",
+              help = "Time thresholds for the phenome data [default = 0,1,2,3,5]"),
+  make_option("--mod_type", type = "character", default = "logistf",
+              help = "Type of model to use in cooccurrence analysis - logistf for SPAtest [default = logistf]")
+)
+
+parser <- OptionParser(usage="%prog [options]", option_list = option_list)
+
+args <- parse_args(parser, positional_arguments = 0)
+opt <- args$options
+print(opt)
+
+time_thresholds <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
+
+
 # specifications ---------------------------------------------------------------
-outcome         <- "157"          # 155, liver cancer; 157, pancreatic cancer; 184.1, ovarian cancer
-mgi_version     <- "20210318"       # mgi version
-ukb_version     <- "20221117"       # ukb  version
-time_thresholds <- c(0, 1, 2, 3, 5) # time thresholds
-mod_type        <- "logistf"        # model type - use "SPAtest" or "logistf" for cooccur analyses
+# outcome         <- "157"          # 155, liver cancer; 157, pancreatic cancer; 184.1, ovarian cancer
+# mgi_version     <- "20210318"       # mgi version
+# ukb_version     <- "20221117"       # ukb  version
+# time_thresholds <- c(0, 1, 2, 3, 5) # time thresholds
+# mod_type        <- "logistf"        # model type - use "SPAtest" or "logistf" for cooccur analyses
 
 ## extract file paths
-file_paths <- get_files(mgi_version = mgi_version, ukb_version = ukb_version)
+file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_version)
 
 # read data --------------------------------------------------------------------
 ## mgi
 mgi_tr_pims <- list()
 for (i in seq_along(time_thresholds)) {
   mgi_tr_pims[[i]] <- data.table::fread(
-    glue::glue("data/private/mgi/{mgi_version}/X","{gsub('X', '', outcome)}/",
-               "time_restricted_phenomes/mgi_X{gsub('X', '', outcome)}_t",
-               "{time_thresholds[i]}_{mgi_version}.txt")
+    glue::glue("data/private/mgi/{opt$mgi_version}/X","{gsub('X', '', opt$outcome)}/",
+               "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
+               "{time_thresholds[i]}_{opt$mgi_version}.txt")
     )
 }
 names(mgi_tr_pims) <- glue::glue("t{time_thresholds}_threshold")
 
 mgi_covariates <- data.table::fread(
-  glue::glue("data/private/mgi/{mgi_version}/X{gsub('X', '', outcome)}/",
+  glue::glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
              "matched_covariates.txt")
   )
 
@@ -47,7 +71,7 @@ mgi_covariates <- data.table::fread(
 ukb_tr_pims <- list()
 for (i in seq_along(time_thresholds)) {
   ukb_tr_pims[[i]] <- data.table::fread(
-    glue::glue("data/private/ukb/{ukb_version}/X","{gsub('X', '', outcome)}/",
+    glue::glue("data/private/ukb/{opt$ukb_version}/X","{gsub('X', '', opt$outcome)}/",
                "time_restricted_phenomes/ukb_X{gsub('X', '', outcome)}_t",
                "{time_thresholds[i]}_{ukb_version}.txt")
   )
@@ -55,7 +79,7 @@ for (i in seq_along(time_thresholds)) {
 names(ukb_tr_pims) <- glue::glue("t{time_thresholds}_threshold")
 
 ukb_covariates <- data.table::fread(
-  glue::glue("data/private/ukb/{ukb_version}/X{gsub('X', '', outcome)}/",
+  glue::glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
              "matched_covariates.txt")
 )
 
@@ -97,9 +121,9 @@ names(ukb_results) <- glue::glue("t{time_thresholds}")
 for (i in seq_along(time_thresholds)) {
   data.table::fwrite(
     x    = mgi_results[[i]],
-    file = glue::glue("results/mgi/{mgi_version}/X{gsub('X', '', outcome)}/mgi_X",
-                      "{gsub('X', '', outcome)}_t{time_thresholds[i]}_",
-                      "{mgi_version}_results.txt"),
+    file = glue::glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/mgi_X",
+                      "{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
+                      "{opt$mgi_version}_results.txt"),
     sep  = "\t"
   )
 }
@@ -108,8 +132,8 @@ for (i in seq_along(time_thresholds)) {
 for (i in seq_along(time_thresholds)) {
   data.table::fwrite(
     x    = ukb_results[[i]],
-    file = glue::glue("results/ukb/{ukb_version}/X{gsub('X', '', outcome)}/ukb_X",
-                      "{gsub('X', '', outcome)}_t{time_thresholds[i]}_",
+    file = glue::glue("results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/ukb_X",
+                      "{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
                       "{ukb_version}_results.txt"),
     sep  = "\t"
   )

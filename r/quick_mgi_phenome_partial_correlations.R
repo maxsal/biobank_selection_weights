@@ -97,62 +97,6 @@ for (i in 1:(length(phecodes) - 1)) {
   pb$tick()
 }
 
-# for (i in 1:length(phecodes) - 1) {
-#   parallel::mclapply(
-#     X = (i+1):length(phecodes),
-#     FUN = \(j) {
-#       CCA = complete.cases(sub_pim[, .SD, .SDcols = c(i, j)])
-# 
-#       if (sum(CCA) == dim(sub_pim)[1]) {
-#         a <- pcor.test(sub_pim[[i]], sub_pim[[j]], X1_MGI, method = "pearson")
-#         SAVED = rbind(SAVED, c(i, j, a[1, 1]))
-#       } else if (sum(CCA) < dim(sub_pim)[1] & sum(CCA != 0)) {
-#         a <- pcor.test(sub_pim[CCA, .SD, .SDcols = i], sub_pim[CCA, .SD, .SDcols = j], X2_MGI[CCA, ], method = "pearson")
-#         SAVED = rbind(SAVED, c(i, j, a[1, 1]))
-#       }
-#     },
-#     mc.cores = n_cores
-#   )
-#   pb$tick()
-# }
-# 
-# tic()
-# part_cor <- parallel::mclapply(
-#   X = 1:(length(phecodes) - 1),
-#   FUN = \(i) {
-#     for (j in (i+1):length(phecodes)) {
-#       CCA = complete.cases(sub_pim[, .SD, .SDcols = c(i, j)])
-#       
-#       if (sum(CCA) == dim(sub_pim)[1]) {
-#         a <- pcor.test(sub_pim[[i]], sub_pim[[j]], X1_MGI, method = "pearson")
-#         SAVED = rbind(SAVED, c(i, j, a[1, 1]))
-#       } else if (sum(CCA) < dim(sub_pim)[1] & sum(CCA != 0)) {
-#         a <- pcor.test(sub_pim[CCA, .SD, .SDcols = i], sub_pim[CCA, .SD, .SDcols = j], X2_MGI[CCA, ], method = "pearson")
-#         SAVED = rbind(SAVED, c(i, j, a[1, 1]))
-#       }
-#     }
-#   },
-#   mc.cores = n_cores
-# )
-# toc()
-# 
-# tic()
-# future::plan("multicore", workers = n_cores)
-# part_cor <- furrr::future_map(1:(length(phecodes) - 1),
-#                   \(i) {
-#                     for (j in (i+1):length(phecodes)) {
-#                       CCA = complete.cases(sub_pim[, .SD, .SDcols = c(i, j)])
-#                       if (sum(CCA) == dim(sub_pim)[1]) {
-#                         a <- pcor.test(sub_pim[[i]], sub_pim[[j]], X1_MGI, method = "pearson")
-#                         c(i, j, a[1, 1])
-#                       } else if (sum(CCA) < dim(sub_pim)[1] & sum(CCA != 0)) {
-#                         a <- pcor.test(sub_pim[CCA, .SD, .SDcols = i], sub_pim[CCA, .SD, .SDcols = j], X2_MGI[CCA, ], method = "pearson")
-#                         c(i, j, a[1, 1])
-#                       }
-#                     }
-#                   })
-# toc()
-
 SAVED2 = data.frame(to = phecodes[SAVED[,1]], from = phecodes[SAVED[,2]], pcor = SAVED[,3])
 
 output_file_name <- glue::glue("mgi_phenome_partial_correlations_{ifelse(use_geno == TRUE, 'w_geno_pcs_', '')}{mgi_version}.txt")
@@ -160,3 +104,4 @@ output_file_name <- glue::glue("mgi_phenome_partial_correlations_{ifelse(use_gen
 data.table::fwrite(x = SAVED2,
                    file = glue::glue("data/private/mgi/{mgi_version}/{output_file_name}"),
                    sep = "\t")
+
