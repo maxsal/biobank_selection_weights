@@ -72,7 +72,7 @@ ukb_tr_pims <- list()
 for (i in seq_along(time_thresholds)) {
   ukb_tr_pims[[i]] <- data.table::fread(
     glue::glue("data/private/ukb/{opt$ukb_version}/X","{gsub('X', '', opt$outcome)}/",
-               "time_restricted_phenomes/ukb_X{gsub('X', '', outcome)}_t",
+               "time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t",
                "{time_thresholds[i]}_{ukb_version}.txt")
   )
 }
