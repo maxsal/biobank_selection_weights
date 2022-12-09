@@ -244,7 +244,7 @@ for (i in seq_along(time_thresholds)) {
   mgi_pims[[i]] <- generate_restricted_phenome(phe_data    = mgi_matched_phe,
                                                threshold   = time_thresholds[i],
                                                cases       = mgi_case_ids,
-                                               outcome_phe = outcome)
+                                               outcome_phe = opt$outcome)
 }
 names(mgi_pims) <- glue::glue("t{time_thresholds}")
 for (i in 1:length(mgi_pims)) {
@@ -269,7 +269,7 @@ for (i in seq_along(time_thresholds)) {
   ukb_pims[[i]] <- generate_restricted_phenome(phe_data    = ukb_matched_phe,
                                                threshold   = time_thresholds[i],
                                                cases       = ukb_case_ids,
-                                               outcome_phe = outcome)
+                                               outcome_phe = opt$outcome)
 }
 names(ukb_pims) <- glue::glue("t{time_thresholds}")
 for (i in 1:length(ukb_pims)) {
