@@ -128,11 +128,11 @@ ukb_first_phe <- ukb_full_phe[
 
 # 5. identify cases -------------------------------------------------------------
 ## mgi
-mgi_case <- unique(mgi_first_phe[phecode == outcome])
+mgi_case <- unique(mgi_first_phe[phecode == opt$outcome])
 mgi_case_ids <- mgi_case[, unique(id)]
 
 ## ukb
-ukb_case <- unique(ukb_first_phe[phecode == outcome])
+ukb_case <- unique(ukb_first_phe[phecode == opt$outcome])
 ukb_case_ids <- ukb_case[, unique(id)]
 
 # 6. calculate diagnostic metrics -----------------------------------------------
