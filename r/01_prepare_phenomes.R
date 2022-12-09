@@ -162,11 +162,11 @@ ukb_matching_cov <- merge.data.table(
 ## mgi
 cli::cli_alert_info("performing 1:{opt$matching_ratio} case:non-case matching in mgi...")
 mgi_match_text <- glue::glue("MatchIt::matchit(case ~ ",
-                             "{paste0(c(opt$nearest_matching_vars, opt$exact_matching_vars), collapse = ' + ')}, ", 
+                             "{paste0(c(nearest_matching_vars, exact_matching_vars), collapse = ' + ')}, ", 
                              "data = mgi_matching_cov, calclosest = TRUE, ",
-                             "mahvars = c({paste0(sapply(opt$nearest_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+                             "mahvars = c({paste0(sapply(nearest_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                              "caliper = {opt$matching_caliper}, ",
-                             "exact = c({paste0(sapply(opt$exact_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+                             "exact = c({paste0(sapply(exact_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                              "ratio = {opt$matching_ratio})")
 mgi_match <- eval(parse(text = mgi_match_text))
 mgi_matched <- MatchIt::match.data(mgi_match)
@@ -198,11 +198,11 @@ data.table::fwrite(mgi_post_match_cov,
 ## ukb
 cli::cli_alert_info("performing 1:{opt$matching_ratio} case:non-case matching in ukb...")
 ukb_match_text <- glue::glue("MatchIt::matchit(case ~ ",
-                             "{paste0(c(opt$nearest_matching_vars, opt$exact_matching_vars), collapse = ' + ')}, ", 
+                             "{paste0(c(nearest_matching_vars, exact_matching_vars), collapse = ' + ')}, ", 
                              "data = ukb_matching_cov, calclosest = TRUE, ",
-                             "mahvars = c({paste0(sapply(opt$nearest_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+                             "mahvars = c({paste0(sapply(nearest_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                              "caliper = {opt$matching_caliper}, ",
-                             "exact = c({paste0(sapply(opt$exact_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+                             "exact = c({paste0(sapply(exact_matching_vars, function(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                              "ratio = {opt$matching_ratio})")
 ukb_match <- eval(parse(text = ukb_match_text))
 ukb_matched <- MatchIt::match.data(ukb_match)
