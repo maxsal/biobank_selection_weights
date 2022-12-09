@@ -97,7 +97,7 @@ for (i in seq_along(time_thresholds)) {
     cov_data = mgi_covariates,
     covariates = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue::glue("X{pheinfo[, phecode]}"),
-    model_type = mod_type
+    model_type = opt$mod_type
   )
 }
 names(mgi_results) <- glue::glue("t{time_thresholds}")
@@ -111,7 +111,7 @@ for (i in seq_along(time_thresholds)) {
     cov_data = ukb_covariates,
     covariates = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue::glue("X{pheinfo[, phecode]}"),
-    model_type = mod_type
+    model_type = opt$mod_type
   )
 }
 names(ukb_results) <- glue::glue("t{time_thresholds}")
