@@ -134,7 +134,7 @@ for (i in seq_along(time_thresholds)) {
     x    = ukb_results[[i]],
     file = glue::glue("results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/ukb_X",
                       "{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                      "{ukb_version}_results.txt"),
+                      "{opt$ukb_version}_results.txt"),
     sep  = "\t"
   )
 }
