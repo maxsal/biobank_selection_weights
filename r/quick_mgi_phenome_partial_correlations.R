@@ -24,6 +24,7 @@ library(ppcor)
 library(parallel)
 library(progress)
 library(tictoc)
+library(hscovar)
 mytheme <- gridExtra::ttheme_default(
   core = list(fg_params=list(cex = 0.5)),
   colhead = list(fg_params=list(cex = 0.5)),
@@ -104,4 +105,3 @@ output_file_name <- glue::glue("mgi_phenome_partial_correlations_{ifelse(use_gen
 data.table::fwrite(x = SAVED2,
                    file = glue::glue("data/private/mgi/{mgi_version}/{output_file_name}"),
                    sep = "\t")
-
