@@ -263,14 +263,25 @@ evaluate_phers <- function(
 
 # calculate_phers --------------------------------------------------------------
 calculate_phers <- function(
-    pim,
-    res,
-    method,
-    tophits_n = 50,
-    phers_name = NULL) {
+    pim,                 # phecode indicator matrix
+    res,                 # results matrix - phecode, beta, p-value
+    method,              # tophits or pwide_sig
+    tophits_n = 50,      # n of hits to select based on p-value
+    phers_name = NULL,
+    reverse_code = FALSE # reverse code negatives to keep phers above 0?
+    ) {
   
+  # check that phers_name argument is specificed
   if (is.null(phers_name)) {
     stop("'phers_name' argument is not specified!")
+  }
+  
+  # check that columns exist in res data
+  res_data_cols <- c("phecode", "beta", "p_value")
+  if (!any(res_data_cols %in% names(res))) {
+    stop(glue("Missing columns in 'res': ",
+              "{glue_collapse(res_data_cols[!(res_data_cols %in% names(res))]",
+              ", sep = ', ')}"))
   }
   
   ## select significant hits
@@ -287,16 +298,22 @@ calculate_phers <- function(
   message("calculating phers...")
   pb <- progress_bar$new(total = length(phers_hits[, phecode]),
                          format = "[:bar] :percent eta: :eta")
-  pb$tick(0)
+  
+  if (reverse_code == FALSE) {
+    for (i in phers_hits[, phecode]) {
+      out[, phers := phers + (phers_hits[phecode == i, beta] * get(i))]
+      pb$tick()
+    }
+  } else {
   for (i in phers_hits[, phecode]) {
-    ### DO WE REALLY NEED TO KEEP SCORE ABOVE 0???
-    out[, phers := phers + (
-      phers_hits[phecode == i, beta] * get(i) * 
-        as.numeric(phers_hits[phecode == i, beta] > 0)) - (
-        phers_hits[phecode == i, beta] * (1 - get(i)) * 
-          as.numeric(phers_hits[phecode == i, beta] < 0)
-      )]
-    pb$tick()
+      out[, phers := phers + (
+        phers_hits[phecode == i, beta] * get(i) * 
+          as.numeric(phers_hits[phecode == i, beta] > 0)) - (
+          phers_hits[phecode == i, beta] * (1 - get(i)) * 
+            as.numeric(phers_hits[phecode == i, beta] < 0)
+        )]
+      pb$tick()
+    }
   }
   
   setnames(out, old = "phers", new = phers_name)
