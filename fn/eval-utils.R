@@ -267,6 +267,7 @@ calculate_phers <- function(
     res,                 # results matrix - phecode, beta, p-value
     method,              # tophits or pwide_sig
     tophits_n    = 50,   # n of hits to select based on p-value
+    bonf_tests   = NULL, # denominator of bonferroni correction
     phers_name   = NULL,
     reverse_code = FALSE # reverse code negatives to keep phers above 0?
     ) {
@@ -289,7 +290,11 @@ calculate_phers <- function(
     phers_hits <- res[order(p_value)][1:tophits_n]
   }
   if (method == "pwide_sig") {
-    phers_hits <- res[p_value < 0.05/nrow(pim)]
+    if (is.null(bonf_tests)) {
+      phers_hits <- res[p_value < 0.05/nrow(pim)]
+    } else {
+      phers_hits <- res[p_value < 0.05/bonf_tests]
+    }
   }
   
   out <- data.table::copy(pim)
@@ -323,7 +328,8 @@ calculate_phers <- function(
     n_phecodes = length(phers_hits[, phecode]),
     method     = method,
     phecodes   = phers_hits,
-    data       = out[, ..keep_cols]
+    data       = out[, ..keep_cols],
+    phers_name = phers_name
     ))
   
 }

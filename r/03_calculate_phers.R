@@ -86,88 +86,160 @@ exclusionsX <- glue("X{union(exclusions1, exclusions2)}")
 ## naive - pwide significant
 ### using MGI data
 #### mgi
-mgi_phers <- calculate_phers(
+mgi_phers_dm_bn <- calculate_phers(
   pim        = mgi_pim,
   res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
   method     = "pwide_sig",
-  phers_name = glue("pwide_fm_t{time_threshold}_phers")
-  )$data
+  phers_name = glue("phers0_t{time_threshold}_dm_bn")
+  )
 
 #### ukb
-ukb_phers <- calculate_phers(
+ukb_phers_dm_bn <- calculate_phers(
     pim        = ukb_pim,
     res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
     method     = "pwide_sig",
-    phers_name = glue("pwide_fm_t{time_threshold}_phers")
+    phers_name = glue("phers0_t{time_threshold}_dm_bn")
     )$data
 
 ### using UKB data
 #### mgi
-mgi_phers <- merge.data.table(
-  mgi_phers,
-  calculate_phers(
+mgi_phers_du_bn <- calculate_phers(
   pim        = mgi_pim,
   res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
   method     = "pwide_sig",
-  phers_name = glue("pwide_fu_t{time_threshold}_phers")
-)$data )
+  phers_name = glue("phers0_t{time_threshold}_du_bn")
+)
 
 #### ukb
-ukb_phers <- merge.data.table(
-  ukb_phers,
-  calculate_phers(
+ukb_phers_du_bn <- calculate_phers(
   pim        = ukb_pim,
   res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
   method     = "pwide_sig",
-  phers_name = glue("pwide_fu_t{time_threshold}_phers")
-)$data )
+  phers_name = glue("phers0_t{time_threshold}_du_bn")
+)
 
 ## naive - # independent tests (i.e., # PCA explaining 99% of variance)
-############# WHAT'S GOING ON BENEATH HERE #####################################
-
-mgi_keepers <- names(mgi_pim)[!names(mgi_pim) %in%
-                                c("id", "IID", "case",
-                                  glue("X{gsub('X', '', outcome)}"),
-                                  exclusionsX)]
-mgi_tpca <- prcomp(mgi_pim[, ..mgi_keepers], center = FALSE, scale. = FALSE)
-mgi_tpcs <- mgi_tpca$x[, 1:which.min(
-  abs(summary(mgi_tpca)$importance[3, ] - 0.95)
-  )]
-max_mgi_pcs <- apply(abs(mgi_tpcs), 2, max)
-mgi_tpcs_mod <- sweep(mgi_tpcs, MARGIN = 2, max_mgi_pcs, "/")
-mgi_tpcs_mod <- mgi_tpcs_mod + 1
-
-mgi_rotations <- data.table(mgi_tpca$rotation)
-mgi_rotations <- mgi_rotations[,1:which.min(
-  abs(summary(mgi_tpca)$importance[3, ] - 0.95)
-  )]
-#########
+### using mgi data
 mgi_pca <- fread(glue("results/mgi/{mgi_version}/",
                       "mgi_pca_importance_{mgi_version}.txt"))
 mgi_pca[, stat := c("sd", "prop", "cum_prop")]
 mgi_pca <- melt(mgi_pca, id.vars = "stat")[, pc := as.numeric(
   gsub("PC", "", variable)
-  )]
-mgi_pca[stat == "cum_prop"][order(pc), ][value > 0.99, ][1, pc]
+)]
+mgi_m_0.99 <- mgi_pca[stat == "cum_prop"][order(pc), ][value > 0.99, ][1, pc]
 
+#### mgi
+mgi_phers_dm_bm <- calculate_phers(
+  pim        = mgi_pim,
+  res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
+  method     = "pwide_sig",
+  bonf_tests = mgi_m_0.99,
+  phers_name = glue("phers0_t{time_threshold}_dm_bm")
+)
+#### ukb
+ukb_phers_dm_bm <- calculate_phers(
+  pim        = ukb_pim,
+  res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
+  method     = "pwide_sig",
+  bonf_tests = mgi_m_0.99,
+  phers_name = glue("phers0_t{time_threshold}_dm_bm")
+)
+
+### using ukb data
+ukb_pca <- fread(glue("results/ukb/{ukb_version}/",
+                      "ukb_pca_importance_{ukb_version}.txt"))
+ukb_pca[, stat := c("sd", "prop", "cum_prop")]
+ukb_pca <- melt(ukb_pca, id.vars = "stat")[, pc := as.numeric(
+  gsub("PC", "", variable)
+)]
+ukb_m_0.99 <- ukb_pca[stat == "cum_prop"][order(pc), ][value > 0.99, ][1, pc]
+
+#### mgi
+mgi_phers_du_bm <- calculate_phers(
+  pim        = mgi_pim,
+  res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
+  method     = "pwide_sig",
+  bonf_tests = ukb_m_0.99,
+  phers_name = glue("phers0_t{time_threshold}_du_bm")
+)
+#### ukb
+ukb_phers_du_bm <- calculate_phers(
+  pim        = ukb_pim,
+  res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
+  method     = "pwide_sig",
+  bonf_tests = ukb_m_0.99,
+  phers_name = glue("phers0_t{time_threshold}_du_bm")
+)
 ## naive - top 50 hits
-### mgi
-mgi_phers <- merge(
-  mgi_phers,
-  calculate_phers(
+### using mgi data
+#### mgi
+mgi_phers_dm_h50 <- calculate_phers(
   pim        = mgi_pim,
   res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
   method     = "tophits",
   tophits_n  = 50,
-  phers_name = glue("th50_fm_t{time_threshold}_phers")
-)$data) 
-### ukb
-ukb_phers <- merge.data.table(
-  ukb_phers,
-  calculate_phers(
+  phers_name = glue("phers0_t{time_threshold}_dm_h50")
+)
+#### ukb
+ukb_phers_dm_h50 <- calculate_phers(
+    pim        = ukb_pim,
+    res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
+    method     = "tophits",
+    tophits_n  = 50,
+    phers_name = glue("phers0_t{time_threshold}_dm_h50")
+  )
+
+### using ukb data
+#### mgi
+mgi_phers_du_h50 <- calculate_phers(
+    pim        = mgi_pim,
+    res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
+    method     = "tophits",
+    tophits_n  = 50,
+    phers_name = glue("phers0_t{time_threshold}_du_h50")
+  )
+#### ukb
+ukb_phers_du_h50 <- calculate_phers(
     pim        = ukb_pim,
     res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
     method     = "tophits",
     tophits_n  = 50,
-    phers_name = glue("th50_fm_t{time_threshold}_phers")
-  )$data )
+    phers_name = glue("phers0_t{time_threshold}_du_h50")
+  )
+
+# 6. aggregate phers -----------------------------------------------------------
+mgi_phers <- Reduce(merge.data.table,
+       list(
+         mgi_pim[, .(id, case)],
+         mgi_phers_dm_bn$data,
+         mgi_phers_du_bn$data,
+         mgi_phers_dm_h50$data,
+         mgi_phers_du_h50$data,
+         mgi_phers_dm_bm$data,
+         mgi_phers_du_bm$data
+       ))
+
+#########
+out <- data.table()
+for (i in names(mgi_phers)[grepl("phers", names(mgi_phers))]) {
+  out <- rbindlist(list(
+    out,
+    data.table(
+    phers = i,
+    auc = pROC::roc(response = mgi_phers[["case"]],
+              predictor = mgi_phers[[i]],
+              family = binomial(),
+              ci = TRUE)$auc
+  )), fill = TRUE)
+}
+out[order(-auc)]
+
+test <- data.table(
+  a = 1,
+  b = 2,
+  c = list(
+    data.table(
+      d = 3, e = 4
+    )
+  )
+)
