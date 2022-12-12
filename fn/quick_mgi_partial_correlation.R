@@ -1,13 +1,19 @@
 quick_mgi_partial_correlation <- function(x) {
-  CCA = complete.cases(sub_pim[, .SD, .SDcols = c(x[1], x[2])])
-  
-  if (sum(CCA) == dim(sub_pim)[1]) {
-    a <- pcor.test(sub_pim[[x[1]]], sub_pim[[x[2]]], X1_MGI, method = "pearson")
-  } else if (sum(CCA) < dim(sub_pim)[1] & sum(CCA != 0)) {
-    a <- pcor.test(sub_pim[CCA, .SD, .SDcols = x[1]], sub_pim[CCA, .SD, .SDcols = x[2]], X2_MGI[CCA, ], method = "pearson")
+  cca <- complete.cases(sub_pim[, .SD, .SDcols = c(x[1], x[2])])
+
+  if (sum(cca) == dim(sub_pim)[1]) {
+    a <- ppcor::pcor.test(sub_pim[[x[1]]],
+                          sub_pim[[x[2]]],
+                          x1_mgi,
+                          method = "pearson")
+  } else if (sum(cca) < dim(sub_pim)[1] && sum(cca != 0)) {
+    a <- ppcor::pcor.test(sub_pim[cca, .SD, .SDcols = x[1]],
+                          sub_pim[cca, .SD, .SDcols = x[2]],
+                          x2_mgi[cca, ],
+                          method = "pearson")
   }
   cbind(
-    data.table(to = x[1], from = x[2]),
-    as.data.table(a)
+    as.data.table::data.table(to = x[1], from = x[2]),
+    data.table::as.data.table(a)
   )
 }
