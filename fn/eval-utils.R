@@ -266,12 +266,12 @@ calculate_phers <- function(
     pim,                 # phecode indicator matrix
     res,                 # results matrix - phecode, beta, p-value
     method,              # tophits or pwide_sig
-    tophits_n = 50,      # n of hits to select based on p-value
-    phers_name = NULL,
+    tophits_n    = 50,   # n of hits to select based on p-value
+    phers_name   = NULL,
     reverse_code = FALSE # reverse code negatives to keep phers above 0?
     ) {
   
-  # check that phers_name argument is specificed
+  # check that phers_name argument is specified
   if (is.null(phers_name)) {
     stop("'phers_name' argument is not specified!")
   }
@@ -325,5 +325,6 @@ calculate_phers <- function(
     phecodes   = phers_hits,
     data       = out[, ..keep_cols]
     ))
+  
 }
 
