@@ -20,7 +20,7 @@ source("fn/quick_mgi_partial_correlation.R") # load partial correlation function
 # 2. specifications ------------------------------------------------------------
 use_geno    <- TRUE
 mgi_version <- "20210318" # mgi data version
-n_cores     <- detectCores() * 0.5 # use 50% of available cores
+parallelize <- FALSE
 
 file_paths <- get_files(mgi_version = mgi_version)
 
@@ -74,10 +74,21 @@ cli_alert_info("identifying pairwise combinations...")
 combos  <- combn(names(sub_pim), 2, simplify = FALSE)
 
 cli_alert_info("calculating pairwise partial correlations....")
-res_list <- mclapply(combos,
-                     quick_mgi_partial_correlation,
-                     mc.cores       = n_cores,
-                     mc.preschedule = FALSE)
+if (parallelize == TRUE) {
+  n_cores  <- detectCores() * 0.5 # use 50% of available cores
+  res_list <- mclapply(combos,
+                       quick_mgi_partial_correlation,
+                       mc.cores       = n_cores,
+                       mc.preschedule = FALSE)
+} else {
+  res_list <- list()
+  pb       <- progress_bar$new(total = length(combos),
+                               format = "[:bar] :percent eta: :eta")
+  for (i in seq_along(combos)) {
+    res_list[[i]] <- quick_mgi_partial_correlation(combos[[i]])
+    pb$tick()
+  }
+}
 
 cli_alert_success("calculation complete! creating output table...")
 res_table <- rbindlist(res_list)

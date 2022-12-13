@@ -219,6 +219,43 @@ mgi_phers <- Reduce(merge.data.table,
          mgi_phers_du_bm$data
        ))
 
+test_fn <- function(x) {
+  
+  x_arg <- deparse(substitute(x))
+  phers_name <- x[["phers_name"]]
+  
+  disc <- ifelse(
+    str_extract(phers_name, "(?<=_d)[:alpha:]") == "m",
+    "mgi",
+    "ukb")
+  appl       <- substr(x_arg, 1, 3)
+  phers_type <- ifelse(
+    substr(gsub("_d[a-z]{1}_", "", str_extract(x_arg, "_d[a-z]{1}_[a-z]{1}.*")),
+    1, 1) == "h", "top hits", "phenome wide significance")
+  if (phers_type == "top hits") {
+    bonf_tests <- NA
+    top_hits <- as.numeric(gsub("_h", "",
+                                str_extract(phers_name, "_h[0-9]{1,2}")))
+  } else {
+    bonf_tests <- ifelse(
+     str_extract(phers_name, "_b[a-z]{1}") == "n",
+     "no. of models", "estimated ind. tests (based on PCA @ 99%)"
+    )
+    top_hits <- NA
+  }
+  
+  data.table(
+    name = deparse(substitute(x)),
+    discovery_cohort = dis,
+    application_cohort = apple,
+    phers_type = phers_type,
+    n_phecodes = x[["n_phecodes"]],
+    bonferroni_tests = bonf_tests,
+    top_hits = top_hits,
+    weights = x[["phecodes"]]
+  )
+}
+test_fn(x = mgi_phers_dm_bn)
 #########
 out <- data.table()
 for (i in names(mgi_phers)[grepl("phers", names(mgi_phers))]) {
