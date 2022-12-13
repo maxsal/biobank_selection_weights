@@ -2,6 +2,7 @@ library(data.table)
 library(ppcor)
 
 quick_mgi_partial_correlation <- function(x) {
+  
   cca <- complete.cases(sub_pim[, .SD, .SDcols = c(x[1], x[2])])
 
   if (sum(cca) == dim(sub_pim)[1]) {
