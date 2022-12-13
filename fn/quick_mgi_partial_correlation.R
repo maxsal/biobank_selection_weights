@@ -17,7 +17,7 @@ quick_mgi_partial_correlation <- function(x) {
                    method = "pearson")
   }
   
-  if (exists(a)) {
+  if (exists("a")) {
     cbind(
       data.table(to = x[1], from = x[2]),
       as.data.table(a)
