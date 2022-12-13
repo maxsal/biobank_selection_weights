@@ -17,9 +17,12 @@ quick_mgi_partial_correlation <- function(x) {
                    method = "pearson")
   }
   
-  cbind(
-    data.table(to = x[1], from = x[2]),
-    as.data.table(a)
-  )
-  
+  if (exists(a)) {
+    cbind(
+      data.table(to = x[1], from = x[2]),
+      as.data.table(a)
+    )
+  } else {
+    data.table(to = x[1], from = x[2])
+  }
 }

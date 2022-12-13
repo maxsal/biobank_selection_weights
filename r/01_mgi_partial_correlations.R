@@ -92,7 +92,7 @@ if (parallelize == TRUE) {
 }
 
 cli_alert_success("calculation complete! creating output table...")
-res_table <- rbindlist(res_list)
+res_table <- rbindlist(res_list, fill = TRUE)
 
 # save results -----------------------------------------------------------------
 output_file <- glue("data/private/mgi/{mgi_version}/",
