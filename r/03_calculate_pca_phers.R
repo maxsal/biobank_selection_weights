@@ -284,7 +284,7 @@ mgi_phers_vec_std <- (mgi_phers - mean(mgi_phers)) / sd(mgi_phers)
 mgi_phers <- data.frame(
   id        = mgi_pim[, id],
   phers     = mgi_phers_vec,
-  phers_std = mgi_phers_ved_std
+  phers_std = mgi_phers_vec_std
 ) |> as.data.table()
 
 fwrite(
