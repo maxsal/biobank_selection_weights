@@ -203,7 +203,7 @@ p <- results_short |>
                  "{pheinfo[phecode == gsub('X', '', outcome), description]}"),
     caption = glue("Cumulative variation explained by PCs: {pc_var_explain}; ",
                    "n PCs = {format(length(pcs_mod[1, ]), big.mark = ',')}; ",
-                   "t = {t_threshold}; ",
+                   "t = {time_threshold}; ",
                    "derivation cohort: {derivation_cohort}; ",
                    "application cohort: mgi")
   ) +
@@ -255,7 +255,7 @@ p2 <- results |>
                  "{pheinfo[phecode == gsub('X', '', outcome), description]}"),
     caption = glue("Cumulative variation explained by PCs: {pc_var_explain}; ",
                    "n PCs = {format(length(pcs_mod[1, ]), big.mark = ',')}; ",
-                   "t = {t_threshold}; ",
+                   "t = {time_threshold}; ",
                    "derivation cohort: {derivation_cohort}; ",
                    "application cohort: mgi")
   ) +
