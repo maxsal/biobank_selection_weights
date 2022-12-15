@@ -281,4 +281,17 @@ cli_alert_info("calculating phers...")
 mgi_phers <- as.matrix(exclude_mgi_pim) %*% as.matrix(results[, betas_m2sig])
 mgi_phers <- (mgi_phers - mean(mgi_phers)) / sd(mgi_phers)
 
+mgi_phers <- data.frame(
+  id = mgi_pim[, id],
+  phers = mgi_phers
+) |> as.data.table()
+
+fwrite(
+  x = mgi_phers,
+  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
+              "t{time_threshold}_pve{pc_var_explain}_",
+              "pc_phers.txt"),
+  sep = "\t"
+)
+
 cli_alert_success("PCA-PheRS for {outcome} a success!")
