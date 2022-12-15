@@ -173,6 +173,27 @@ results$betas_m2sig <- as.matrix(rotations) %*%
   as.matrix(results_pc[, alphasmod_m2sig])
 
 ### save rotations, results_pc, and results
+fwrite(
+  x = rotations,
+  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
+              "t{time_threshold}_pve{pc_var_explain}_",
+              "pc_rotations.txt"),
+  sep = "\t"
+)
+fwrite(
+  x = results_pc,
+  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
+              "t{time_threshold}_pve{pc_var_explain}_",
+              "pcs.txt"),
+  sep = "\t"
+)
+fwrite(
+  x = results,
+  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
+              "t{time_threshold}_pve{pc_var_explain}_",
+              "pc_results.txt"),
+  sep = "\t"
+)
 
 # manhattan plot ---------------------------------------------------------------
 results_short <- data.table(
