@@ -278,8 +278,9 @@ ggsave(
 
 # calculate phers --------------------------------------------------------------
 cli_alert_info("calculating phers...")
-mgi_phers_vec     <- as.matrix(exclude_mgi_pim) %*% as.matrix(results[, betas_m2sig])
-mgi_phers_vec_std <- (mgi_phers - mean(mgi_phers)) / sd(mgi_phers)
+mgi_phers_vec     <- as.matrix(exclude_mgi_pim) %*%
+  as.matrix(results[, betas_m2sig])
+mgi_phers_vec_std <- (mgi_phers_vec - mean(mgi_phers_vec)) / sd(mgi_phers_vec)
 
 mgi_phers <- data.frame(
   id        = mgi_pim[, id],
