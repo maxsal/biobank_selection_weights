@@ -54,7 +54,7 @@ print(opt)
 
 # specifications ---------------------------------------------------------------
 mgi_version       <- opt$mgi_version
-ukb_verion        <- opt$ukb_version
+ukb_version        <- opt$ukb_version
 outcome           <- opt$outcome
 pc_var_explain    <- opt$pc_var_explain
 time_threshold    <- opt$time_threshold
