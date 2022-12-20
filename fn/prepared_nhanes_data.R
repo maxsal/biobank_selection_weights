@@ -1,44 +1,5 @@
-# clean nhanes data
-# requires: demographic, alcohol, and smoking questionnaire XPT files in
-#           '/data/public/nhanes'
-# outputs:  cleaned nhanes data
-# author:   max salvatore
-# date:     20221220
-
-# libraries, functions, and options --------------------------------------------
 library(data.table)
-library(haven)
-library(glue)
-library(progress)
-library(cli)
-library(betareg)
-library(simplexreg)
 
-source("fn/cleaning-utils.R")
-
-# specifications ---------------------------------------------------------------
-nhanes_data_path   <- "data/public/nhanes/"
-nhanes_data_prefix <- "P"
-output_path        <- "data/public/nhanes/"
-save               <- TRUE
-
-# read data --------------------------------------------------------------------
-datasets  <- c("DEMO", "BMX", "SMQ", "DIQ", "MCQ")
-data_list <- list()
-for (i in seq_along(datasets)) {
-  data_list[[i]] <- read_xpt(glue("{nhanes_data_path}{nhanes_data_prefix}_",
-                                  "{datasets[i]}.XPT")) |>
-    as.data.table()
-}
-
-merged <- Reduce(\(x, y) {
-  merge.data.table(x = x, y = y, by = "SEQN", all = TRUE)
-  },
-  data_list
-  )[, c("SEQN", "RIAGENDR", "WTINTPRP", "RIDAGEYR", "RIDRETH1", "MCQ220",
-        "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMECPRP")]
-
-# prep data --------------------------------------------------------------------
 prepare_nhanes_data <- function(
     nhanes_data,
     age_var        = "RIDAGEYR",
@@ -50,8 +11,8 @@ prepare_nhanes_data <- function(
     smoke_curr_var = "SMQ040",
     diabetes_var   = "DIQ010",
     race_eth_var   = "RIDRETH1"
-    ) {
-    
+) {
+  
   merged <- nhanes_data
   
   merged <- merged[get(age_var) >= 12, ]
@@ -147,20 +108,5 @@ prepare_nhanes_data <- function(
   
   tidy_table[, weight_nhanes := length(weight_nhanes) * weight_nhanes /
                sum(weight_nhanes)][]
-
+  
 }
-
-prepped_nhanes <- prepare_nhanes_data(nhanes_data = merged)
-
-
-##### WEIGHTING ----------------------------------------------------------------
-selection_nhanes_nocan_br <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6)) + chd + diabetes + as.numeric(smoking_current + smoking_former) + bmi_under + bmi_overweight + bmi_obese + nhw,
-         data = prepped_nhanes)
-selection_nhanes_nocan_sr <- simplexreg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6)) + chd + diabetes + as.numeric(smoking_current + smoking_former) + bmi_under + bmi_overweight + bmi_obese + nhw,
-                                     data = prepped_nhanes)
-
-## with cancer
-nhanes_cancer_mod <- glm(cancer ~ as.numeric(age_cat %in% c(5, 6)) + diabetes + chd + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhw,
-                         data = prepped_nhanes,
-                         weights = prepped_nhanes[, weight_nhanes],
-                         family = quasibinomial())
