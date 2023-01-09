@@ -25,9 +25,7 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
       } else if (sum(cca) < nrow(pim) && sum(cca != 0)) {
         cor_out <- pcor.test(pim[cca, ..i],
                              pim[cca, ..j],
-                             fifelse(!is.null(covs2),
-                                     covs2[cca, ],
-                                     covs1[cca, ]),
+                             covs2[cca, ],
                              method = "pearson")
       }
       
