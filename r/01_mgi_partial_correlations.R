@@ -75,10 +75,10 @@ combos  <- combn(names(sub_pim), 2, simplify = FALSE)
 
 cli_alert_info("calculating pairwise partial correlations....")
 res_list <- partial_corr_veloce(
-  pim    = sub_pim,
-  ncores = detectCores()/2,
-  covs1  = x1_mgi,
-  covs2  = x2_mgi
+  pim   = sub_pim,
+  ncore = detectCores()/2,
+  covs1 = x1_mgi,
+  covs2 = x2_mgi
 )
 
 cli_alert_success("calculation complete! creating output table...")
