@@ -15,7 +15,7 @@ library(doMC)
 set.seed(61787)
 
 source("fn/files-utils.R") # load partial correlation function
-source("fn/quick_mgi_partial_correlation.R") # load partial correlation function
+source("fn/partial_corr_veloce.R") # load partial correlation function
 
 # 2. specifications ------------------------------------------------------------
 use_geno    <- TRUE
