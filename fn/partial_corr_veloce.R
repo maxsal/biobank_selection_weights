@@ -16,15 +16,15 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
     for (j in cols) {
       if (j >= i) next
       if (j >= i) next
-      cca <- complete.cases(a[, .SD, .SDcols = c(column[c(i, j)])])
-      if (sum(cca) == nrow(a)) {
-        cor_out <- pcor.test(a[, ..i],
-                             a[, ..j],
+      cca <- complete.cases(pim[, .SD, .SDcols = c(column[c(i, j)])])
+      if (sum(cca) == nrow(pim)) {
+        cor_out <- pcor.test(pim[, ..i],
+                             pim[, ..j],
                              covs1,
                              method = "pearson")
-      } else if (sum(cca) < nrow(a) && sum(cca != 0)) {
-        cor_out <- pcor.test(a[cca, ..i],
-                             a[cca, ..j],
+      } else if (sum(cca) < nrow(pim) && sum(cca != 0)) {
+        cor_out <- pcor.test(pim[cca, ..i],
+                             pim[cca, ..j],
                              fifelse(!is.null(covs2),
                                      covs2[cca, ],
                                      covs1[cca, ]),
