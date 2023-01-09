@@ -1,17 +1,16 @@
 # calculate partial correlations
 # outputs: table of pairwise partial correlations
 # author:  max salvatore
-# date:    20221212
+# date:    20230109
 
 # 1. libraries, functions, and options -----------------------------------------
 options(stringsAsFactors = FALSE)
 
 library(data.table)
 library(ppcor)
-library(parallel)
 library(glue)
 library(cli)
-library(progress)
+library(doMC)
 
 set.seed(61787)
 
@@ -75,21 +74,12 @@ cli_alert_info("identifying pairwise combinations...")
 combos  <- combn(names(sub_pim), 2, simplify = FALSE)
 
 cli_alert_info("calculating pairwise partial correlations....")
-if (parallelize == TRUE) {
-  n_cores  <- detectCores() * 0.5 # use 50% of available cores
-  res_list <- mclapply(combos,
-                       quick_mgi_partial_correlation,
-                       mc.cores       = n_cores,
-                       mc.preschedule = FALSE)
-} else {
-  res_list <- list()
-  pb       <- progress_bar$new(total = length(combos),
-                               format = "[:bar] :percent eta: :eta")
-  for (i in seq_along(combos)) {
-    res_list[[i]] <- quick_mgi_partial_correlation(combos[[i]])
-    pb$tick()
-  }
-}
+res_list <- partial_corr_veloce(
+  pim    = sub_pim,
+  ncores = detectCores()/2,
+  covs1  = x1_mgi,
+  covs2  = x2_mgi
+)
 
 cli_alert_success("calculation complete! creating output table...")
 res_table <- rbindlist(res_list, fill = TRUE)
