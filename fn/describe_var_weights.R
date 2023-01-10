@@ -18,11 +18,15 @@ describe_var_weights <- function(
     if (grepl("nhanes", names(designs)[i])) {
       if (!is.null(nhanes_var_val)) {
         out[[i]] <- as.data.table(
-          svymean(as.numeric(nhanes_data[[nhanes_var_name]] == nhanes_var_val), design = designs[[i]])
+          svymean(as.numeric(nhanes_data[[nhanes_var_name]] == nhanes_var_val),
+                  design = designs[[i]],
+                  na.rm = TRUE)
         )[, weight := names(designs)[i]]
       } else {
         out[[i]] <- as.data.table(
-          svymean(nhanes_data[[nhanes_var_name]], design = designs[[i]])
+          svymean(nhanes_data[[nhanes_var_name]],
+                  design = designs[[i]],
+                  na.rm = TRUE)
         )[, weight := names(designs)[i]]
       }
     } else {
@@ -37,3 +41,4 @@ describe_var_weights <- function(
     fill = TRUE, use.names = TRUE
   )[, variable := mgi_var_name][]
 }
+
