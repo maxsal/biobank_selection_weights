@@ -13,6 +13,7 @@ library(cli)
 library(optparse)
 library(glue)
 library(betareg)
+library(haven)
 
 set.seed(61787)
 
@@ -35,10 +36,14 @@ option_list <- list(
               default = "data/public/nhanes/",
               help = glue("Relative path to directory with NHANES data ",
                           "[default = data/public/nhanes/]")),
-  make_option("--nhanes_data_prefix", type = "character",
-              default = "P",
+  make_option("--nhanes_wave_letter", type = "character",
+              default = "J",
               help = glue("NHANES data prefix corresponding to wave ",
-                          "[default = P]"))
+                          "[default = J]")),
+  make_option("--nhanes_wave_years", type = "character",
+              default = "2017-2018",
+              help = glue("NHANES wave years corresponding to wave ",
+                          "[default = 2017-2018]"))
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -49,7 +54,7 @@ print(opt)
 
 # 2. specifications ------------------------------------------------------------
 nhanes_data_path   <- opt$nhanes_data_path
-nhanes_data_prefix <- op$nhanes_data_prefix
+nhanes_data_prefix <- opt$nhanes_data_prefix
 time_thresholds    <- as.numeric(opt$time_threshold)
 
 ## pull file paths corresponding to the data version specified
@@ -61,20 +66,28 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
 cli_alert_info("loading nhanes data...")
 
 nhanes_datasets  <- c("DEMO", "BMX", "SMQ", "DIQ", "MCQ")
-nhanes_data_list <- list()
-for (i in seq_along(nhanes_datasets)) {
-  nhanes_data_list[[i]] <- read_xpt(glue("{nhanes_data_path}",
-                                         "{nhanes_data_prefix}_",
-                                         "{nhanes_datasets[i]}.XPT")) |>
-    as.data.table()
+nhanes_merged <- download_nhanes_data(
+  wave_letter = opt$nhanes_wave_letter,
+  wave_years  = opt$nhanes_wave_years,
+  datasets    = nhanes_datasets
+)
+
+keep_vars <- c("SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "MCQ220",
+               "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
+               "SDMVSTRA", "SDMVPSU")
+
+if ("WTMECPRP" %in% names(nhanes_merged)) {
+  setnames(nhanes_merged,
+           "WTMECPRP",
+           "WTMEC2YR")
+}
+if ("WTINTPRP" %in% names(nhanes_merged)) {
+  setnames(nhanes_merged,
+           "WTINTPRP",
+           "WTINT2YR")
 }
 
-nhanes_merged <- Reduce(\(x, y) {
-  merge.data.table(x = x, y = y, by = "SEQN", all = TRUE)
-},
-data_list
-)[, c("SEQN", "RIAGENDR", "WTINTPRP", "RIDAGEYR", "RIDRETH1", "MCQ220",
-      "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMECPRP")]
+nhanes_merged <- nhanes_merged[, ..keep_vars]
 
 prepped_nhanes <- prepare_nhanes_data(nhanes_data = nhanes_merged)
 
@@ -118,7 +131,7 @@ cli_alert_info("loading mgi data...")
   )]
 
 ### smoking data
-  mgi_smk <- fread(file_paths[["mgi"]]["smk_file"],
+  mgi_smk <- fread(file = file_paths[["mgi"]][["smk_file"]],
                    select = c("DeID_PatientID", "DaysSinceBirth",
                               "SmokingStatus"))
   setnames(mgi_smk, c("DeID_PatientID", "DaysSinceBirth", "SmokingStatus"),
@@ -132,7 +145,7 @@ cli_alert_info("loading mgi data...")
   )]
 
 ### bmi data
-  mgi_bmi <- fread(file_paths[["mgi"]]["bmi_file"],
+  mgi_bmi <- fread(file_paths[["mgi"]][["bmi_file"]],
                    select = c("DeID_PatientID", "DaysSinceBirth", "BMI"))
   setnames(mgi_bmi, c("DeID_PatientID", "DaysSinceBirth", "BMI"),
            c("id", "dsb", "bmi"))
@@ -164,7 +177,7 @@ list(mgi_covs, mgi_dis, mgi_smk, mgi_bmi)
 
 stacked <- rbindlist(list(
   prepped_nhanes,
-  mgi_merged[, !c("id")][, dataset := "MGI"]
+  mgi_merged[][, dataset := "MGI"]
 ), use.names = TRUE, fill = TRUE)
 
 # 5. calculate weights ---------------------------------------------------------
@@ -221,11 +234,48 @@ cancer_nhanes_uncorrected <- ((num[stacked[, dataset] == "MGI"]) /
                                 (denom[stacked[, dataset] == "MGI"])) *
   weights_nhanes_nocan
 cancer_nhanes_uncorrected <- Nobs * cancer_nhanes_uncorrected /
-  sim(cancer_nhanes_uncorrected, na.rm = TRUE)
+  sum(cancer_nhanes_uncorrected, na.rm = TRUE)
 
 # 6. output --------------------------------------------------------------------
-data.table(
+weight_data <- data.table(
   id                        = stacked[dataset == "MGI", id],
   weight_nhanes_nocan       = weights_nhanes_nocan,
   cancer_nhanes_uncorrected = cancer_nhanes_uncorrected
 )
+
+### SAVE WEIGHTS SOMEWHERE
+
+# 7. summary -------------------------------------------------------------------
+mgi_sum <- merge.data.table(mgi_covs, weight_data)
+mgi_sum <- mgi_sum[!is.na(weight_nhanes_nocan), ]
+table(is.na(mgi_sum[, weight_nhanes_nocan]))
+
+## describe weight distribution
+
+### CHECK FOR EXTREMES
+
+## survey designs
+### CHECK DESIGN
+mgi_dsn <- svydesign(ids = ~1,
+                     weights = ~weight_nhanes_nocan,
+                     data = mgi_sum)
+### CHECK DESIGN
+nhanes_design <- svydesign(data    = nhanes_merged,
+                           id      = ~SDMVPSU,
+                           strata  = ~SDMVSTRA,
+                           weights = ~WTMECPRP,
+                           nest    = TRUE)
+
+## compare means
+### age
+mean(mgi_sum[, age], na.rm = TRUE)                         # unweighted
+svymean(mgi_sum[, age], design = mgi_dsn)                  # no_can weighted
+svymean(nhanes_merged[, RIDAGEYR], design = nhanes_design) # nhanes
+
+### gender
+
+### race/ethnicity?
+
+### bmi?
+
+### cancer?
