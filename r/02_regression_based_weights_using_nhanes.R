@@ -14,6 +14,7 @@ library(optparse)
 library(glue)
 library(betareg)
 library(haven)
+library(survey)
 
 set.seed(61787)
 
@@ -89,7 +90,9 @@ if ("WTINTPRP" %in% names(nhanes_merged)) {
 
 nhanes_merged <- nhanes_merged[, ..keep_vars]
 
-prepped_nhanes <- prepare_nhanes_data(nhanes_data = nhanes_merged)
+prepped_nhanes <- prepare_nhanes_data(
+  nhanes_data = nhanes_merged,
+  mec_wt_var = "WTMEC2YR")
 
 ## mgi
 cli_alert_info("loading mgi data...")
@@ -188,28 +191,42 @@ select_nhanes_nocan <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6))
                                  + bmi_obese + nhw +
                                  as.numeric(smoking_current + smoking_former),
                                data = stacked[dataset == "NHANES", ])
+select_nhanes_can <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6))
+                               + chd + diabetes + bmi_under + bmi_overweight +
+                                 + bmi_obese + nhw + cancer + 
+                                 as.numeric(smoking_current + smoking_former),
+                               data = stacked[dataset == "NHANES", ])
 
 mgiselect_nocan <- glm(as.numeric(dataset == "MGI") ~
                          as.numeric(age_cat %in% c(5, 6)) + chd + diabetes +
                          bmi_under + bmi_overweight + bmi_obese +
                          smoking_current + smoking_former + nhw,
                        data = stacked, family = quasibinomial())
+mgiselect_can <- glm(as.numeric(dataset == "MGI") ~
+                         as.numeric(age_cat %in% c(5, 6)) + chd + diabetes +
+                         bmi_under + bmi_overweight + bmi_obese + cancer +
+                         smoking_current + smoking_former + nhw,
+                       data = stacked, family = quasibinomial())
 
 p_Sext <- predict(select_nhanes_nocan, newdata = stacked[dataset == "MGI", ],
                   type = "response")
+p_Sext_can <- predict(select_nhanes_can, newdata = stacked[dataset == "MGI", ],
+                      type = "response")
 p_MGI <- predict(mgiselect_nocan, newdata = stacked[dataset == "MGI", ],
                  type = "response")
-
-# tmp <- rep(0, times = length(p_MGI))
-# tmp[which(rownames(p_Sext) %in% rownames(data.frame(p_MGI)) == TRUE)] <- p_Sext
-# tmp[which(rownames(p_Sext) %in% rownames(data.frame(p_MGI)) == TRUE)] <- NA
-# p_Sext <- tmp
-# p_Sext[which(p_Sext == 0)] <- 1.921e-05
+p_MGI_can <- predict(mgiselect_can, newdata = stacked[dataset == "MGI", ],
+                 type = "response")
 
 select_nhanes_nocan <- p_Sext * (p_MGI / (1 - p_MGI))
+select_nhanes_can <- p_Sext_can * (p_MGI_can / (1 - p_MGI_can))
+
 weights_nhanes_nocan <- 1/select_nhanes_nocan
+weights_nhanes_can <- 1/select_nhanes_can
+
 weights_nhanes_nocan <- Nobs * weights_nhanes_nocan /
   sum(weights_nhanes_nocan, na.rm = TRUE)
+weights_nhanes_can <- Nobs * weights_nhanes_can /
+  sum(weights_nhanes_can, na.rm = TRUE)
 
 ## with cancer
 nhanes_cancer_model <- glm(cancer ~ as.numeric(age_cat %in% c(5, 6)) + diabetes
@@ -240,18 +257,22 @@ cancer_nhanes_uncorrected <- Nobs * cancer_nhanes_uncorrected /
 weight_data <- data.table(
   id                        = stacked[dataset == "MGI", id],
   weight_nhanes_nocan       = weights_nhanes_nocan,
+  weight_nhanes_can         = weights_nhanes_can,
   cancer_nhanes_uncorrected = cancer_nhanes_uncorrected
 )
 
 ### SAVE WEIGHTS SOMEWHERE
 
 # 7. summary -------------------------------------------------------------------
-mgi_sum <- merge.data.table(mgi_covs, weight_data)
+mgi_sum <- merge.data.table(mgi_merged, weight_data)
 mgi_sum <- mgi_sum[!is.na(weight_nhanes_nocan), ]
 table(is.na(mgi_sum[, weight_nhanes_nocan]))
+table(is.na(mgi_sum[, weight_nhanes_can]))
 
 ## describe weight distribution
 
+summary(mgi_sum[, weight_nhanes_nocan])
+summary(mgi_sum[, weight_nhanes_can])
 ### CHECK FOR EXTREMES
 
 ## survey designs
@@ -259,23 +280,85 @@ table(is.na(mgi_sum[, weight_nhanes_nocan]))
 mgi_dsn <- svydesign(ids = ~1,
                      weights = ~weight_nhanes_nocan,
                      data = mgi_sum)
+mgi_can_dsn <- svydesign(ids = ~1,
+                         weights = ~weight_nhanes_can,
+                         data = mgi_sum)
+mgi_ncan_cor_dsn <- svydesign(ids = ~1,
+                         weights = ~cancer_nhanes_uncorrected,
+                         data = mgi_sum)
 ### CHECK DESIGN
 nhanes_design <- svydesign(data    = nhanes_merged,
                            id      = ~SDMVPSU,
                            strata  = ~SDMVSTRA,
-                           weights = ~WTMECPRP,
+                           weights = ~WTMEC2YR,
                            nest    = TRUE)
 
 ## compare means
-### age
-mean(mgi_sum[, age], na.rm = TRUE)                         # unweighted
-svymean(mgi_sum[, age], design = mgi_dsn)                  # no_can weighted
-svymean(nhanes_merged[, RIDAGEYR], design = nhanes_design) # nhanes
+age_sum <- describe_var_weights(
+  mgi_data = mgi_sum,
+  nhanes_data = nhanes_merged,
+  mgi_var_name = c("age"),
+  nhanes_var_name = "RIDAGEYR",
+  designs = list(
+    "mgi_dsn" = mgi_dsn,
+    "mgi_can_dsn" = mgi_can_dsn,
+    "mgi_ncan_cor_dsn" = mgi_ncan_cor_dsn,
+    "nhanes_design" = nhanes_design)
+)
 
-### gender
+female_sum <- describe_var_weights(
+  mgi_data = mgi_sum,
+  nhanes_data = nhanes_merged,
+  mgi_var_name = "female",
+  nhanes_var_name = "RIAGENDR",
+  nhanes_var_val = "2",
+  designs = list(
+    "mgi_dsn" = mgi_dsn,
+    "mgi_can_dsn" = mgi_can_dsn,
+    "mgi_ncan_cor_dsn" = mgi_ncan_cor_dsn,
+    "nhanes_design" = nhanes_design)
+)
 
-### race/ethnicity?
+nhw_sum <- describe_var_weights(
+  mgi_data = mgi_sum,
+  nhanes_data = nhanes_merged,
+  mgi_var_name = "nhw",
+  nhanes_var_name = "RIDRETH1",
+  nhanes_var_val = "3",
+  designs = list(
+    "mgi_dsn" = mgi_dsn,
+    "mgi_can_dsn" = mgi_can_dsn,
+    "mgi_ncan_cor_dsn" = mgi_ncan_cor_dsn,
+    "nhanes_design" = nhanes_design)
+)
 
-### bmi?
+bmi_sum <- describe_var_weights(
+  mgi_data = mgi_sum,
+  nhanes_data = nhanes_merged,
+  mgi_var_name = "bmi",
+  nhanes_var_name = "BMXBMI",
+  designs = list(
+    "mgi_dsn" = mgi_dsn,
+    "mgi_can_dsn" = mgi_can_dsn,
+    "mgi_ncan_cor_dsn" = mgi_ncan_cor_dsn,
+    "nhanes_design" = nhanes_design)
+)
 
-### cancer?
+cancer_sum <- describe_var_weights(
+  mgi_data = mgi_sum,
+  nhanes_data = nhanes_merged,
+  mgi_var_name = "cancer",
+  nhanes_var_name = "MCQ220",
+  nhanes_var_val = "1",
+  designs = list(
+    "mgi_dsn" = mgi_dsn,
+    "mgi_can_dsn" = mgi_can_dsn,
+    "mgi_ncan_cor_dsn" = mgi_ncan_cor_dsn,
+    "nhanes_design" = nhanes_design)
+)
+
+rbindlist(list(
+  age_sum, female_sum, nhw_sum, bmi_sum, cancer_sum
+))
+
+fwrite()
