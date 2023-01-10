@@ -3,7 +3,7 @@ library(data.table)
 prepare_nhanes_data <- function(
     nhanes_data,
     age_var        = "RIDAGEYR",
-    mec_wt_var     = "WTMECPRP",
+    mec_wt_var     = "WTMEC2YR",
     sex_var        = "RIAGENDR",
     cancer_var     = "MCQ220",
     chd_var        = "MCQ160C",
