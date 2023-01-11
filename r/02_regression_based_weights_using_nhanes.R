@@ -2,19 +2,21 @@
 # requires: mgi pim, demo, smk, and bmi files; nhanes data
 # outputs:  nhanes and uncorrected cancer weights
 # author:   max salvatore
-# date:     20221220
+# date:     20230110
 
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
 
 library(data.table)
-library(MatchIt)
+# library(MatchIt)
 library(cli)
 library(optparse)
 library(glue)
 library(betareg)
 library(haven)
 library(survey)
+library(ggplot2)
+library(colorblindr)
 
 set.seed(61787)
 
@@ -54,8 +56,6 @@ opt <- args$options
 print(opt)
 
 # 2. specifications ------------------------------------------------------------
-nhanes_data_path   <- opt$nhanes_data_path
-nhanes_data_prefix <- opt$nhanes_data_prefix
 time_thresholds    <- as.numeric(opt$time_threshold)
 
 ## pull file paths corresponding to the data version specified
@@ -191,44 +191,47 @@ select_nhanes_nocan <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6))
                                  + bmi_obese + nhw +
                                  as.numeric(smoking_current + smoking_former),
                                data = stacked[dataset == "NHANES", ])
-select_nhanes_can <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6))
-                               + chd + diabetes + bmi_under + bmi_overweight +
-                                 + bmi_obese + nhw + cancer + 
-                                 as.numeric(smoking_current + smoking_former),
-                               data = stacked[dataset == "NHANES", ])
-
 mgiselect_nocan <- glm(as.numeric(dataset == "MGI") ~
                          as.numeric(age_cat %in% c(5, 6)) + chd + diabetes +
                          bmi_under + bmi_overweight + bmi_obese +
                          smoking_current + smoking_former + nhw,
                        data = stacked, family = quasibinomial())
+
+p_Sext <- predict(select_nhanes_nocan, newdata = stacked[dataset == "MGI", ],
+                  type = "response")
+p_MGI <- predict(mgiselect_nocan, newdata = stacked[dataset == "MGI", ],
+                 type = "response")
+
+select_nhanes_nocan <- p_Sext * (p_MGI / (1 - p_MGI))
+weights_nhanes_nocan <- 1/select_nhanes_nocan
+
+weights_nhanes_nocan <- Nobs * weights_nhanes_nocan /
+  sum(weights_nhanes_nocan, na.rm = TRUE)
+
+## with cancer - as exposure?
+select_nhanes_can <- betareg(samp_nhanes ~ as.numeric(age_cat %in% c(5, 6))
+                             + chd + diabetes + bmi_under + bmi_overweight +
+                               + bmi_obese + nhw + cancer + 
+                               as.numeric(smoking_current + smoking_former),
+                             data = stacked[dataset == "NHANES", ])
 mgiselect_can <- glm(as.numeric(dataset == "MGI") ~
                          as.numeric(age_cat %in% c(5, 6)) + chd + diabetes +
                          bmi_under + bmi_overweight + bmi_obese + cancer +
                          smoking_current + smoking_former + nhw,
                        data = stacked, family = quasibinomial())
 
-p_Sext <- predict(select_nhanes_nocan, newdata = stacked[dataset == "MGI", ],
-                  type = "response")
 p_Sext_can <- predict(select_nhanes_can, newdata = stacked[dataset == "MGI", ],
                       type = "response")
-p_MGI <- predict(mgiselect_nocan, newdata = stacked[dataset == "MGI", ],
-                 type = "response")
 p_MGI_can <- predict(mgiselect_can, newdata = stacked[dataset == "MGI", ],
                  type = "response")
 
-select_nhanes_nocan <- p_Sext * (p_MGI / (1 - p_MGI))
 select_nhanes_can <- p_Sext_can * (p_MGI_can / (1 - p_MGI_can))
-
-weights_nhanes_nocan <- 1/select_nhanes_nocan
 weights_nhanes_can <- 1/select_nhanes_can
 
-weights_nhanes_nocan <- Nobs * weights_nhanes_nocan /
-  sum(weights_nhanes_nocan, na.rm = TRUE)
 weights_nhanes_can <- Nobs * weights_nhanes_can /
   sum(weights_nhanes_can, na.rm = TRUE)
 
-## with cancer
+## with cancer - separate
 nhanes_cancer_model <- glm(cancer ~ as.numeric(age_cat %in% c(5, 6)) + diabetes
                            + chd + bmi_under + bmi_overweight + bmi_obese +
                              smoking_current + smoking_former + nhw,
@@ -255,36 +258,72 @@ cancer_nhanes_uncorrected <- Nobs * cancer_nhanes_uncorrected /
 
 # 6. output --------------------------------------------------------------------
 weight_data <- data.table(
-  id                        = stacked[dataset == "MGI", id],
-  weight_nhanes_nocan       = weights_nhanes_nocan,
-  weight_nhanes_can         = weights_nhanes_can,
-  cancer_nhanes_uncorrected = cancer_nhanes_uncorrected
+  id                     = stacked[dataset == "MGI", id],
+  weights_no_cancer      = weights_nhanes_nocan,
+  weights_cancer_direct   = weights_nhanes_can,
+  weights_cancer_indirect = cancer_nhanes_uncorrected
 )
 
-### SAVE WEIGHTS SOMEWHERE
+# truncate weights at 10
+weight_data[weights_no_cancer > 10]       <- 10
+weight_data[weights_cancer_direct > 10]   <- 10
+weight_data[weights_cancer_indirect > 10] <- 10
+
+# save weights
+fwrite(weight_data,
+       glue("results/mgi/{opt$mgi_version}/cancer_weights.txt"))
+
+# transform to long data for plotting
+weight_data_long <- melt(weight_data, id.vars = c("id"))
+weight_data_long[variable == "weights_no_cancer", name := "No cancer"]
+weight_data_long[variable == "weights_cancer_direct", name := "Cancer - direct"]
+weight_data_long[variable == "weights_cancer_indirect", name := "Cancer - indirect"]
+weight_data_long[, name := factor(name, levels = c("No cancer", "Cancer - indirect", "Cancer - direct"))]
 
 # 7. summary -------------------------------------------------------------------
 mgi_sum <- merge.data.table(mgi_merged, weight_data)
-mgi_sum <- mgi_sum[!is.na(weight_nhanes_nocan), ]
-table(is.na(mgi_sum[, weight_nhanes_nocan]))
-table(is.na(mgi_sum[, weight_nhanes_can]))
+mgi_sum <- mgi_sum[!is.na(weights_no_cancer), ]
+table(is.na(mgi_sum[, weights_no_cancer]))
+table(is.na(mgi_sum[, weights_cancer_indirect]))
 
 ## describe weight distribution
-
-summary(mgi_sum[, weight_nhanes_nocan])
-summary(mgi_sum[, weight_nhanes_can])
-### CHECK FOR EXTREMES
+vw_plot <- weight_data_long |>
+  ggplot(aes(name, value)) +
+  geom_violin(aes(fill = name),
+              draw_quantiles = c(0.25, 0.5, 0.75)) +
+  labs(
+    title   = "Estimated selection adjustment weights",
+    x       = "",
+    y       = "Estimated selection weights",
+    caption = glue("All weights were trimmed at 10. Horizontal black lines correspond to the 25th, 50ths, and 75th quantiles.\n",
+                   "'No cancer' weights were calculated using a Beta regression model adjusted for age, coronary heart diease,\ndiabetes, BMI, smoking, and non-Hispanic White.\n",
+                   "'Cancer - indirect' are the 'no cancer' weights multiplied by a ratio of predicted cancer in MGI and NHANES.\n",
+                   "'Cancer - direct' uses the same model as 'cnao cancer' but additionally adjusts for cancer.car")
+  ) +
+  scale_fill_OkabeIto() +
+  theme_minimal() +
+  theme(
+    plot.title      = element_text(hjust = 0, face = "bold"),
+    plot.caption    = element_text(hjust = 0),
+    legend.position = "none"
+  )
+ggsave(
+ filename = glue("results/mgi/{opt$mgi_version}/cancer_weights_violin_plot.pdf"),
+ plot = vw_plot,
+ height = 5, width = 7,
+ device = cairo_pdf
+)
 
 ## survey designs
 ### CHECK DESIGN
 mgi_dsn <- svydesign(ids = ~1,
-                     weights = ~weight_nhanes_nocan,
+                     weights = ~weights_no_cancer,
                      data = mgi_sum)
 mgi_can_dsn <- svydesign(ids = ~1,
-                         weights = ~weight_nhanes_can,
+                         weights = ~weights_cancer_direct,
                          data = mgi_sum)
 mgi_ncan_cor_dsn <- svydesign(ids = ~1,
-                         weights = ~cancer_nhanes_uncorrected,
+                         weights = ~weights_cancer_indirect,
                          data = mgi_sum)
 ### CHECK DESIGN
 nhanes_design <- svydesign(data    = nhanes_merged,
@@ -357,8 +396,11 @@ cancer_sum <- describe_var_weights(
     "nhanes_design" = nhanes_design)
 )
 
-rbindlist(list(
+summary_results <- rbindlist(list(
   age_sum, female_sum, nhw_sum, bmi_sum, cancer_sum
 ))
 
-fwrite()
+fwrite(
+  summary_results,
+  glue("results/mgi/{opt$mgi_version}/cancer_weighted_summary_means.txt")
+)
