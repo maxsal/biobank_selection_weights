@@ -300,9 +300,8 @@ calculate_phers <- function(
   out <- data.table::copy(pim)
   
   out[, phers := 0]
-  message("calculating phers...")
-  pb <- cli_progress_bar(name = "calculating phers...",
-                         total = length(phers_hits[, phecode]))
+  cli_progress_bar(name = "calculating phers...",
+                   total = length(phers_hits[, phecode]))
   
   if (reverse_code == FALSE) {
     for (i in phers_hits[, phecode]) {
