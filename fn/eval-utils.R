@@ -301,13 +301,13 @@ calculate_phers <- function(
   
   out[, phers := 0]
   message("calculating phers...")
-  pb <- progress_bar$new(total = length(phers_hits[, phecode]),
-                         format = "[:bar] :percent eta: :eta")
+  pb <- cli_progress_bar(name = "calculating phers...",
+                         total = length(phers_hits[, phecode]))
   
   if (reverse_code == FALSE) {
     for (i in phers_hits[, phecode]) {
       out[, phers := phers + (phers_hits[phecode == i, beta] * get(i))]
-      pb$tick()
+      cli_progress_update()
     }
   } else {
   for (i in phers_hits[, phecode]) {
@@ -317,9 +317,10 @@ calculate_phers <- function(
           phers_hits[phecode == i, beta] * (1 - get(i)) * 
             as.numeric(phers_hits[phecode == i, beta] < 0)
         )]
-      pb$tick()
+      cli_progress_update()
     }
   }
+  cli_progress_done()
   
   setnames(out, old = "phers", new = phers_name)
   keep_cols <- c("id", phers_name)
