@@ -57,15 +57,38 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
 
 # read data --------------------------------------------------------------------
-tr_pims <- purrr::map(time_thresholds,
-                      ~fread(paste0("./data/", version, "/processed/X", gsub("X", "", outcome), "/time_restricted_phenomes/mgi_X", gsub("X", "", outcome), "_t", .x, "_", version, ".txt")))
-names(tr_pims) <- paste0("t", time_thresholds, "_threshold")
+## mgi
+mgi_tr_pims <- list()
+for (i in seq_along(time_thresholds)) {
+  mgi_tr_pims[[i]] <- fread(
+    glue("data/private/mgi/{opt$mgi_version}/X","{gsub('X', '', opt$outcome)}/",
+         "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
+         "{time_thresholds[i]}_{opt$mgi_version}.txt")
+  )
+}
+names(mgi_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-cooccur_res <- purrr::map(time_thresholds,
-                          ~fread(paste0("./results/", version, "/X", gsub("X", "", outcome), "/mgi_X", gsub("X", "", outcome), "_t", .x, "_", version, "_results.txt")))
-names(cooccur_res) <- paste0("t", time_thresholds, "_threshold")
+mgi_covariates <- fread(
+  glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+       "matched_covariates.txt")
+)
 
-covariates <- fread(paste0("./data/", version, "/processed/X", gsub("X", "", outcome), "/matched_covariates.txt"))
+## ukb
+ukb_pim0    <- fread(file_paths[["ukb"]]$pim0_file)
+ukb_pim     <- fread(glue("data/private/ukb/{ukb_version}/",
+                          "X{gsub('X', '', outcome)}/",
+                          "time_restricted_phenomes/",
+                          "ukb_X{gsub('X', '', outcome)}_",
+                          "t{time_threshold}_{ukb_version}.txt"))
+ukb_cooccur <- fread(glue("results/ukb/{ukb_version}/",
+                          "X{gsub('X', '', outcome)}/",
+                          "ukb_X{gsub('X', '', outcome)}_",
+                          "t{time_threshold}_{ukb_version}_results.txt"))
+ukb_covariates <- fread(glue("data/private/ukb/{ukb_version}/",
+                             "X{gsub('X', '', outcome)}/",
+                             "matched_covariates.txt"))
+
+## phenome
 pheinfo    <- fread("./data/phecode_mapping/data/Phecode_Definitions_FullTable_Modified.txt", colClasses = "character")
 
 ########################

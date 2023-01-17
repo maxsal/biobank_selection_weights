@@ -271,12 +271,3 @@ for (i in names(mgi_phers)[grepl("phers", names(mgi_phers))]) {
 }
 out[order(-auc)]
 
-test <- data.table(
-  a = 1,
-  b = 2,
-  c = list(
-    data.table(
-      d = 3, e = 4
-    )
-  )
-)
