@@ -346,5 +346,9 @@ ukb_phers <- Reduce(merge.data.table,
                       ukb_phers_dm_bm$data,
                       ukb_phers_du_bm$data
                     ))
+fwrite(x = ukb_phers,
+       file = glue("results/ukb/{opt$ukb_version}/",
+                   "X{gsub('X', '', opt$outcome)}/phers/",
+                   "ukb_naive_phers_t{opt$time_threshold}.txt"))
 cli_alert_info("UKB PheRS naive AUCs")
 quick_naive_aucs(x = ukb_phers)
