@@ -30,12 +30,6 @@ option_list <- list(
   make_option("--time_threshold", type = "numeric", default = "0",
               help = glue("Time threshold for the phenome data ",
                           "[default = 0]")),
-  make_option("--mod_type", type = "character", default = "logistf",
-              help = glue("Type of model to use in cooccurrence analysis - ",
-                          "logistf for SPAtest [default = logistf]")),
-  make_option("--method", type = "character", default = "pwide_sig",
-              help = glue("Method of PheRS construction to use ",
-                          "pwide_sig or tophits [default = pwide_sig]")),
   make_option("--tophits_n", type = "numeric", default = "50",
               help = glue("Number of top hits to use in top hits PheRS ",
                           "[default = 50]"))
@@ -52,7 +46,6 @@ mgi_version    <- opt$mgi_version  # mgi phenome version
 ukb_version    <- opt$ukb_version  # ukb phenome version
 outcome        <- opt$outcome      # outcome phecode
 time_threshold <- opt$time_threshold
-method         <- opt$method       ### !!! this is irrelevant now?
 
 ## extract file paths
 file_paths <- get_files(mgi_version = opt$mgi_version,
@@ -73,6 +66,7 @@ if (!dir.exists(glue("results/ukb/{opt$ukb_version}/",
 }
 
 # 3. read data -----------------------------------------------------------------
+cli_alert_info("loading data...")
 ## mgi
 mgi_pim0    <- fread(file_paths[["mgi"]]$pim0_file)
 mgi_pim     <- fread(glue("data/private/mgi/{mgi_version}/",
@@ -123,6 +117,7 @@ exclusions2 <- pheinfo[!(phecode %in% gsub("X", "",
 exclusionsX <- glue("X{union(exclusions1, exclusions2)}")
 
 # 5. calculate naive phers -----------------------------------------------------
+cli_alert_info("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
 ## naive - pwide significant
 ### using MGI data
 #### mgi
