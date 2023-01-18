@@ -10,6 +10,7 @@ suppressPackageStartupMessages({
   library(ResourceSelection)
   library(DescTools)
   library(pROC)
+  library(cli)
 })
 
 # log10toP: converts log10 p-values to decimal format --------------------------
@@ -305,11 +306,19 @@ calculate_phers <- function(
   
   if (reverse_code == FALSE) {
     for (i in phers_hits[, phecode]) {
+      if (!(i %in% names(pim))) {
+        cli_alert_warning("{i} not in phecode indicator matrix, skipping")
+        next
+      }
       out[, phers := phers + (phers_hits[phecode == i, beta] * get(i))]
       cli_progress_update()
     }
   } else {
   for (i in phers_hits[, phecode]) {
+    if (!(i %in% names(pim))) {
+      cli_alert_warning("{i} not in phecode indicator matrix, skipping")
+      next
+      }
       out[, phers := phers + (
         phers_hits[phecode == i, beta] * get(i) * 
           as.numeric(phers_hits[phecode == i, beta] > 0)) - (
