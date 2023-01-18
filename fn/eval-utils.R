@@ -343,3 +343,21 @@ calculate_phers <- function(
   
 }
 
+# quick AUCs -------------------------------------------------------------------
+quick_naive_aucs <- function(x) {
+  out <- data.table()
+  cli_progress_bar(name = "AUC")
+  for (i in names(x)[grepl("phers", names(x))]) {
+    out <- rbindlist(list(
+      out,
+      data.table(
+        phers = i,
+        auc = suppressMessages(pROC::roc(response = x[["case"]],
+                                         predictor = x[[i]],
+                                         family = binomial(),
+                                         ci = TRUE)$auc
+        ))), fill = TRUE)
+    cli_progress_update()
+  }
+  out[order(-auc)]
+}

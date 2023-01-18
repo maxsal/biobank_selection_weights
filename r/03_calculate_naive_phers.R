@@ -58,6 +58,20 @@ method         <- opt$method       ### !!! this is irrelevant now?
 file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
 
+## make sure output directories exist
+if (!dir.exists(glue("results/mgi/{opt$mgi_version}/",
+                "X{gsub('X', '', opt$outcome)}/phers/"))) {
+  dir.create(glue("results/mgi/{opt$mgi_version}/",
+                  "X{gsub('X', '', opt$outcome)}/phers/"),
+             recursive = TRUE)
+}
+if (!dir.exists(glue("results/ukb/{opt$ukb_version}/",
+                     "X{gsub('X', '', opt$outcome)}/phers/"))) {
+  dir.create(glue("results/ukb/{opt$ukb_version}/",
+                  "X{gsub('X', '', opt$outcome)}/phers/"),
+             recursive = TRUE)
+}
+
 # 3. read data -----------------------------------------------------------------
 ## mgi
 mgi_pim0    <- fread(file_paths[["mgi"]]$pim0_file)
@@ -118,6 +132,12 @@ mgi_phers_dm_bn <- calculate_phers(
   method     = "pwide_sig",
   phers_name = glue("phers0_t{time_threshold}_dm_bn")
 )
+saveRDS(
+  mgi_phers_dm_bn,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_dm_bn.rds")
+)
 
 #### ukb
 ukb_phers_dm_bn <- calculate_phers(
@@ -125,7 +145,13 @@ ukb_phers_dm_bn <- calculate_phers(
   res        = mgi_cooccur[!(phecode %in% exclusionsX), ],
   method     = "pwide_sig",
   phers_name = glue("phers0_t{time_threshold}_dm_bn")
-)$data
+)
+saveRDS(
+  ukb_phers_dm_bn,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_dm_bn.rds")
+)
 
 ### using UKB data
 #### mgi
@@ -135,6 +161,12 @@ mgi_phers_du_bn <- calculate_phers(
   method     = "pwide_sig",
   phers_name = glue("phers0_t{time_threshold}_du_bn")
 )
+saveRDS(
+  mgi_phers_du_bn,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_du_bn.rds")
+)
 
 #### ukb
 ukb_phers_du_bn <- calculate_phers(
@@ -142,6 +174,12 @@ ukb_phers_du_bn <- calculate_phers(
   res        = ukb_cooccur[!(phecode %in% exclusionsX), ],
   method     = "pwide_sig",
   phers_name = glue("phers0_t{time_threshold}_du_bn")
+)
+saveRDS(
+  ukb_phers_du_bn,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_du_bn.rds")
 )
 
 ## naive - # independent tests (i.e., # PCA explaining 99% of variance)
@@ -162,6 +200,13 @@ mgi_phers_dm_bm <- calculate_phers(
   bonf_tests = mgi_m_0.99,
   phers_name = glue("phers0_t{time_threshold}_dm_bm")
 )
+saveRDS(
+  mgi_phers_dm_bm,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_dm_bm.rds")
+)
+
 #### ukb
 ukb_phers_dm_bm <- calculate_phers(
   pim        = ukb_pim,
@@ -169,6 +214,12 @@ ukb_phers_dm_bm <- calculate_phers(
   method     = "pwide_sig",
   bonf_tests = mgi_m_0.99,
   phers_name = glue("phers0_t{time_threshold}_dm_bm")
+)
+saveRDS(
+  ukb_phers_dm_bm,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_dm_bm.rds")
 )
 
 ### using ukb data
@@ -188,6 +239,13 @@ mgi_phers_du_bm <- calculate_phers(
   bonf_tests = ukb_m_0.99,
   phers_name = glue("phers0_t{time_threshold}_du_bm")
 )
+saveRDS(
+  mgi_phers_du_bm,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_du_bm.rds")
+)
+
 #### ukb
 ukb_phers_du_bm <- calculate_phers(
   pim        = ukb_pim,
@@ -196,6 +254,13 @@ ukb_phers_du_bm <- calculate_phers(
   bonf_tests = ukb_m_0.99,
   phers_name = glue("phers0_t{time_threshold}_du_bm")
 )
+saveRDS(
+  ukb_phers_du_bm,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_du_bm.rds")
+)
+
 ## naive - top 50 hits
 ### using mgi data
 #### mgi
@@ -206,6 +271,13 @@ mgi_phers_dm_h50 <- calculate_phers(
   tophits_n  = opt$tophits_n,
   phers_name = glue("phers0_t{time_threshold}_dm_h{opt$tophits_n}")
 )
+saveRDS(
+  mgi_phers_du_bn,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_dm_h50.rds")
+)
+
 #### ukb
 ukb_phers_dm_h50 <- calculate_phers(
   pim        = ukb_pim,
@@ -213,6 +285,12 @@ ukb_phers_dm_h50 <- calculate_phers(
   method     = "tophits",
   tophits_n  = opt$tophits_n,
   phers_name = glue("phers0_t{time_threshold}_dm_h{opt$tophits_n}")
+)
+saveRDS(
+  ukb_phers_dm_h50,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_dm_h50.rds")
 )
 
 ### using ukb data
@@ -224,6 +302,12 @@ mgi_phers_du_h50 <- calculate_phers(
   tophits_n  = opt$tophits_n,
   phers_name = glue("phers0_t{time_threshold}_du_h{opt$tophits_n}")
 )
+saveRDS(
+  mgi_phers_du_h50,
+  file = glue("results/mgi/{opt$mgi_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "mgi_phers_t{opt$time_threshold}_du_bh50.rds")
+)
 #### ukb
 ukb_phers_du_h50 <- calculate_phers(
   pim        = ukb_pim,
@@ -231,6 +315,12 @@ ukb_phers_du_h50 <- calculate_phers(
   method     = "tophits",
   tophits_n  = opt$tophits_n,
   phers_name = glue("phers0_t{time_threshold}_du_h{opt$tophits_n}")
+)
+saveRDS(
+  ukb_phers_du_h50,
+  file = glue("results/ukb/{opt$ukb_version}/",
+              "X{gsub('X', '', opt$outcome)}/phers/",
+              "ukb_phers_t{opt$time_threshold}_du_h{opt$tophits_n}.rds")
 )
 
 # 6. aggregate phers -----------------------------------------------------------
@@ -244,6 +334,12 @@ mgi_phers <- Reduce(merge.data.table,
                       mgi_phers_dm_bm$data,
                       mgi_phers_du_bm$data
                     ))
+fwrite(x = mgi_phers,
+       file = glue("results/mgi/{opt$mgi_version}/",
+                   "X{gsub('X', '', opt$outcome)}/phers/",
+                   "mgi_naive_phers_t{opt$time_threshold}.txt"))
+cli_alert_info("MGI PheRS naive AUCs")
+quick_naive_aucs(x = mgi_phers)
 
 ukb_phers <- Reduce(merge.data.table,
                     list(
@@ -255,3 +351,5 @@ ukb_phers <- Reduce(merge.data.table,
                       ukb_phers_dm_bm$data,
                       ukb_phers_du_bm$data
                     ))
+cli_alert_info("UKB PheRS naive AUCs")
+quick_naive_aucs(x = ukb_phers)
