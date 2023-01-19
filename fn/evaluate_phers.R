@@ -151,12 +151,12 @@ evaluate_phers <- function(
                             "{format(round(tmp_lars$or_hi, 2), nsmall = 2)})")
   tmp_lars$log10p <- lars_log10p
   
-  lars_auc <- roc(
+  lars_auc <- suppressMessages(roc(
     response  = merged_data[["case"]],
     predictor = merged_data[["linearpredictor"]],
     family    = binomial(),
     ci        = TRUE
-  )
+  ))
   
   tmp_lars$auc    <- lars_auc$auc
   tmp_lars$auc_lo <- lars_auc$ci[1]
@@ -191,9 +191,9 @@ evaluate_phers <- function(
   if (pctile_or == TRUE) {
     # OR of extreme PRS
     # TOP 1, 2, 5, 10 and 25%
-    print(glue("Calculating OR of extreme PheRS:"))
+    cli_alert_info("calculating or of extreme phers:")
     for (prob in c(0.01, 0.02, 0.05, 0.1, 0.25)) {
-      print(glue("Percentile = {prob}..."))
+      cli_alert("Percentile = {prob}...")
       tmp_lars <- c(tmp_lars, getTopEffects(prob, pred = phers_name,
                                             cov = covars, dat = merged_data))
     }
