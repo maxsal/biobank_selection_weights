@@ -301,7 +301,7 @@ saveRDS(
   mgi_phers_du_h50,
   file = glue("results/mgi/{opt$mgi_version}/",
               "X{gsub('X', '', opt$outcome)}/phers/",
-              "mgi_phers_t{opt$time_threshold}_du_bh50.rds")
+              "mgi_phers_t{opt$time_threshold}_du_h50.rds")
 )
 #### ukb
 ukb_phers_du_h50 <- calculate_phers(
