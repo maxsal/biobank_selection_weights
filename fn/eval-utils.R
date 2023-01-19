@@ -89,9 +89,10 @@ getValues <- function(fitAsso, predictor) {
   OR         <- round(exp(fitAsso$coefficient[predictor]),4)
   CI1        <- round(exp(fitAsso$ci.lower[predictor]),4)
   CI2	       <- round(exp(fitAsso$ci.upper[predictor]),4)
-  out        <- c(BETA,SEBETA,P,OR,CI1,CI2,signif(LOG10P,4))
+  or_print   <- glue("{format(round(OR, 2), nsmall = 2)} ({format(round(CI1, 2), nsmall = 2)}, {format(round(CI2, 2), nsmall = 2)})")
+  out        <- c(BETA,SEBETA,P,OR,CI1,CI2,or_print, signif(LOG10P,4))
   names(out) <- paste0(predictor, "_" ,
-                       c("BETA", "SEBETA", "P", "OR", "CI1", "CI2", "LOG10P"))
+                       c("beta", "sebeta", "p_val", "or", "or_lo", "or_hi", "or_print", "log10p"))
   return(out)
 }
 
