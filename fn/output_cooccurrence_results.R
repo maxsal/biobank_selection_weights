@@ -1,11 +1,16 @@
 ### quick_mod -----------
 # function for obtaining beta and p-values using either SPAtest or logistf
 # SPAtest is *much* faster but logistf allows for inclusion of weights
-quick_cooccur_mod <- function(dat, covs = c("age_at_threshold", "female", "length_followup"), ex_code = "X157", mod_type = "logistf") {
+quick_cooccur_mod <- function(dat,
+                              covs = c("age_at_threshold", "female", "length_followup"),
+                              ex_code = "X157",
+                              mod_type = "logistf",
+                              weight_dat = NULL,
+                              weight_var = NULL) {
   
   ### SPAtest
   if (mod_type == "SPAtest") {
-    mod <- SPAtest::ScoreTest_SPA(
+    mod <- ScoreTest_SPA(
       genos       = t(dat[[ex_code]]),
       pheno       = dat[["case"]],
       cov         = dat[, ..covs],
@@ -15,7 +20,7 @@ quick_cooccur_mod <- function(dat, covs = c("age_at_threshold", "female", "lengt
       beta.Cutoff = 1
     )
     
-    data.table::data.table(
+    data.table(
       phecode = ex_code,
       beta    = mod$beta,
       se_beta = mod$SEbeta,
@@ -25,9 +30,17 @@ quick_cooccur_mod <- function(dat, covs = c("age_at_threshold", "female", "lengt
   
   ### logistf
   if (mod_type == "logistf") {
-    mod <- logistf::logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat)
+    if (!is.null(weight_dat) && !is.null(weight_var)) {
+      mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")),
+                     data = merge(dat,
+                                  weight_dat,
+                                  by = "id"),
+                     weights = weight_var)
+    } else {
+      mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat)
+    }
     
-    data.table::data.table(
+    data.table(
       phecode = ex_code,
       beta    = mod$coefficients[[ex_code]],
       se_beta = sqrt(diag(vcov(mod)))[[ex_code]],
