@@ -31,9 +31,9 @@ option_list <- list(
   make_option("--mod_type", type = "character", default = "logistf",
               help = glue("Type of model to use in cooccurrence analysis - ",
                           "logistf for SPAtest [default = logistf]")),
-  make_option("--weighted", type = "logical", default = "",
+  make_option("--weights", type = "character", default = "",
               help = glue("Weighting variable to use for weighted analyses - ",
-                          "weights_no_can [default = logistf]"))
+                          "weights_no_cancer, weights_cancer_direct, weights_cancer_indirect [default = '']"))
 )
 
 parser <- OptionParser(usage="%prog [options]", option_list = option_list)
@@ -64,6 +64,12 @@ mgi_covariates <- fread(
   glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
              "matched_covariates.txt")
   )
+
+if (opt$weights != "") {
+  mgi_weights <- fread(
+    glue("results/mgi/{opt$mgi_version}/cancer_weights.txt")
+  )
+}
 
 ## ukb
 ukb_tr_pims <- list()
@@ -99,6 +105,22 @@ for (i in seq_along(time_thresholds)) {
   )
 }
 names(mgi_results) <- glue("t{time_thresholds}")
+
+if (opt$weights != "") {
+  mgi_weighted_results <- list()
+  for (i in seq_along(time_thresholds)) {
+    mgi_weighted_results <- output_cooccurrence_results(
+      pim_data = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
+      t_thresh = time_thresholds[i],
+      cov_data = mgi_covariates,
+      covariates = c("age_at_threshold", "female", "length_followup"),
+      all_phecodes = glue("X{pheinfo[, phecode]}"),
+      model_type = opt$mod_type,
+      w_data = mgi_weights,
+      w_var = opt$weights
+    )
+  }
+}
 
 ## ukb
 ukb_results <- list()

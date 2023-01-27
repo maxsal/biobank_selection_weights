@@ -5,7 +5,6 @@ quick_cooccur_mod <- function(dat,
                               covs = c("age_at_threshold", "female", "length_followup"),
                               ex_code = "X157",
                               mod_type = "logistf",
-                              weight_dat = NULL,
                               weight_var = NULL) {
   
   ### SPAtest
@@ -30,11 +29,9 @@ quick_cooccur_mod <- function(dat,
   
   ### logistf
   if (mod_type == "logistf") {
-    if (!is.null(weight_dat) && !is.null(weight_var)) {
+    if (!is.null(weight_var)) {
       mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")),
-                     data = merge(dat,
-                                  weight_dat,
-                                  by = "id"),
+                     data = dat,
                      weights = weight_var)
     } else {
       mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat)
@@ -62,7 +59,7 @@ output_cooccurrence_results <- function(
     t_thresh,
     all_phecodes = paste0("X", pheinfo[, phecode]),
     model_type = "logistf",
-    w_dat = NULL,
+    w_data = NULL,
     w_var = NULL) {
   
   # 1. identify analytic phecodes
@@ -70,12 +67,18 @@ output_cooccurrence_results <- function(
   phecodes_to_consider <- melt(pim_data[, ..possible_phecodes][, lapply(.SD, \(x) sum(x, na.rm = TRUE))], variable.name = "phecode", value.name = "n", id.vars = character())[n >= 10, as.character(phecode)]
   
   # 2. merge covariates
-  merged <- merge.data.table(
-    pim_data[, !c("case")],
-    cov_data,
-    by = "id",
-    all.x = TRUE
-  )[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
+  if (is.null(w_data) | is.null(w_var)) {
+    merged <- merge.data.table(
+      pim_data[, !c("case")],
+      cov_data,
+      by = "id",
+      all.x = TRUE
+    )[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
+  } else {
+    merged <- Reduce(f = \(x, y) merge.data.table(x, y, by = "id", all.x = TRUE),
+                     x = list(pim_data[, !c("case")], cov_data, w_data)
+                     )[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
+  }
   
   # 3. run analyses
   out <- list()
@@ -83,11 +86,10 @@ output_cooccurrence_results <- function(
                                    format = ":what [:bar] :percent eta: :eta")
   for (i in seq_along(phecodes_to_consider)) {
     out[[i]] <- quick_cooccur_mod(
-      dat      = merged,
-      covs     = covariates,
-      ex_code  = phecodes_to_consider[i],
-      mod_type = model_type,
-      weight_dat = w_dat,
+      dat        = merged,
+      covs       = covariates,
+      ex_code    = phecodes_to_consider[i],
+      mod_type   = model_type,
       weight_var = w_var
     )
     pb$tick(tokens = list(what = glue::glue("t = {t_thresh} threshold")))
@@ -98,3 +100,4 @@ output_cooccurrence_results <- function(
   return(out)
   
 }
+
