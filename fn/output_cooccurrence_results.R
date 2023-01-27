@@ -55,7 +55,15 @@ quick_cooccur_mod <- function(dat,
 # matrix (developed using MGI data)
 # provides options for using SPAtest and logistf
 # SPAtest is *much* faster but logistf allows for inclusion of weights
-output_cooccurrence_results <- function(pim_data, cov_data, covariates, t_thresh, all_phecodes = paste0("X", pheinfo[, phecode]), model_type = "logistf") {
+output_cooccurrence_results <- function(
+    pim_data,
+    cov_data,
+    covariates,
+    t_thresh,
+    all_phecodes = paste0("X", pheinfo[, phecode]),
+    model_type = "logistf",
+    w_dat = NULL,
+    w_var = NULL) {
   
   # 1. identify analytic phecodes
   possible_phecodes    <- names(pim_data)[names(pim_data) %in% all_phecodes]
@@ -78,7 +86,9 @@ output_cooccurrence_results <- function(pim_data, cov_data, covariates, t_thresh
       dat      = merged,
       covs     = covariates,
       ex_code  = phecodes_to_consider[i],
-      mod_type = model_type
+      mod_type = model_type,
+      weight_dat = w_dat,
+      weight_var = w_var
     )
     pb$tick(tokens = list(what = glue::glue("t = {t_thresh} threshold")))
   }
