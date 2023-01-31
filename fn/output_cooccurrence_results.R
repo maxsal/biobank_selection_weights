@@ -2,9 +2,9 @@
 # function for obtaining beta and p-values using either SPAtest or logistf
 # SPAtest is *much* faster but logistf allows for inclusion of weights
 quick_cooccur_mod <- function(dat,
-                              covs = c("age_at_threshold", "female", "length_followup"),
-                              ex_code = "X157",
-                              mod_type = "logistf",
+                              covs       = c("age_at_threshold", "female", "length_followup"),
+                              ex_code    = "X157",
+                              mod_type   = "logistf",
                               weight_var = NULL) {
   
   ### SPAtest
@@ -30,9 +30,11 @@ quick_cooccur_mod <- function(dat,
   ### logistf
   if (mod_type == "logistf") {
     if (!is.null(weight_var)) {
+      wgts <- dat[[weight_var]]
+      head(wgts)
       mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")),
-                     data = dat,
-                     weights = weight_var)
+                     data    = dat,
+                     weights = wgts)
     } else {
       mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat)
     }
@@ -58,11 +60,12 @@ output_cooccurrence_results <- function(
     covariates,
     t_thresh,
     all_phecodes = paste0("X", pheinfo[, phecode]),
-    model_type = "logistf",
-    w_data = NULL,
-    w_var = NULL,
-    ncore = parallel::detectCores() / 2,
-    parallel = FALSE) {
+    model_type   = "logistf",
+    w_data       = NULL,
+    w_var        = NULL,
+    ncore        = parallel::detectCores() / 2,
+    parallel     = TRUE
+    ) {
   
   # 1. identify analytic phecodes
   possible_phecodes    <- names(pim_data)[names(pim_data) %in% all_phecodes]
@@ -108,10 +111,11 @@ output_cooccurrence_results <- function(
     cols    <- seq_along(phecodes_to_consider)
     output  <- foreach(i = cols) %dopar% {
       quick_cooccur_mod(
-        dat      = merged,
-        covs     = covariates,
-        ex_code  = phecodes_to_consider[i],
-        mod_type = model_type
+        dat        = merged,
+        covs       = covariates,
+        ex_code    = phecodes_to_consider[i],
+        mod_type   = model_type,
+        weight_var = w_var
       )
     }
     out <- rbindlist(output, use.names = TRUE, fill = TRUE)

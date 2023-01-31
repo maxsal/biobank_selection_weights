@@ -19,8 +19,8 @@ for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "",
-              help = "Outcome phecode"),
+  make_option("--outcome", type = "character", default = "157",
+              help = "Outcome phecode [default = 157]"),
   make_option("--mgi_version", type = "character", default = "20210318",
               help = "Version of MGI data [default = 20210318]"),
   make_option("--ukb_version", type = "character", default = "20221117",
@@ -31,9 +31,9 @@ option_list <- list(
   make_option("--mod_type", type = "character", default = "logistf",
               help = glue("Type of model to use in cooccurrence analysis - ",
                           "logistf for SPAtest [default = logistf]")),
-  make_option("--weights", type = "character", default = "",
+  make_option("--weights", type = "character", default = "weights_cancer_indirect",
               help = glue("Weighting variable to use for weighted analyses - ",
-                          "weights_no_cancer, weights_cancer_direct, weights_cancer_indirect [default = '']"))
+                          "weights_no_cancer, weights_cancer_direct, weights_cancer_indirect [default = 'weights_cancer_indirect']"))
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -96,12 +96,13 @@ pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
 mgi_results <- list()
 for (i in seq_along(time_thresholds)) {
   mgi_results[[i]] <- output_cooccurrence_results(
-    pim_data = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-    t_thresh = time_thresholds[i],
-    cov_data = mgi_covariates,
-    covariates = c("age_at_threshold", "female", "length_followup"),
+    pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
+    t_thresh     = time_thresholds[i],
+    cov_data     = mgi_covariates,
+    covariates   = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue("X{pheinfo[, phecode]}"),
-    model_type = opt$mod_type
+    model_type   = opt$mod_type,
+    parallel     = TRUE
   )
 }
 names(mgi_results) <- glue("t{time_thresholds}")
@@ -109,15 +110,16 @@ names(mgi_results) <- glue("t{time_thresholds}")
 if (opt$weights != "") {
   mgi_weighted_results <- list()
   for (i in seq_along(time_thresholds)) {
-    mgi_weighted_results <- output_cooccurrence_results(
-      pim_data = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-      t_thresh = time_thresholds[i],
-      cov_data = mgi_covariates,
-      covariates = c("age_at_threshold", "female", "length_followup"),
+    mgi_weighted_results[[i]] <- output_cooccurrence_results(
+      pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
+      t_thresh     = time_thresholds[i],
+      cov_data     = mgi_covariates,
+      covariates   = c("age_at_threshold", "female", "length_followup"),
       all_phecodes = glue("X{pheinfo[, phecode]}"),
-      model_type = opt$mod_type,
-      w_data = mgi_weights,
-      w_var = opt$weights
+      model_type   = opt$mod_type,
+      w_data       = mgi_weights,
+      w_var        = opt$weights,
+      parallel     = TRUE
     )
   }
 }
