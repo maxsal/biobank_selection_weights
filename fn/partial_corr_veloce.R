@@ -15,7 +15,6 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
     out <- list()
     for (j in cols) {
       if (j >= i) next
-      if (j >= i) next
       cca <- complete.cases(pim[, .SD, .SDcols = c(column[c(i, j)])])
       if (sum(cca) == nrow(pim)) {
         cor_out <- pcor.test(pim[, ..i],

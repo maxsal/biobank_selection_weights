@@ -56,7 +56,9 @@ output_mgi_cooccur_results <- function(
     covariates,
     t_thresh,
     all_phecodes = paste0("X", pheinfo[, phecode]),
-    model_type   = "logistf"
+    model_type   = "logistf",
+    ncore        = parallel::detectCores() / 2,
+    parallel     = FALSE
     ) {
 
   # 1. identify analytic phecodes
@@ -74,25 +76,48 @@ output_mgi_cooccur_results <- function(
     by = "id",
     all.x = TRUE
   )[, age_at_threshold := round(
-    get(glue::glue("t{t_thres}_threshold")) / 365.25,
+    get(glue::glue("t{t_thresh}_threshold")) / 365.25,
     1)][]
 
   # 3. run analyses
-  out <- list()
-  pb <- progress::progress_bar$new(total = length(phecodes_to_consider),
-                                   format = ":what [:bar] :percent eta: :eta")
-  for (i in seq_along(phecodes_to_consider)) {
-    out[[i]] <- quick_cooccur_mod(
-      dat      = merged,
-      covs     = covariates,
-      ex_code  = phecodes_to_consider[i],
-      mod_type = model_type
-    )
-    pb$tick(tokens = list(what = glue::glue("t = {t_thresh} threshold")))
+  if (parallel == FALSE) {
+    out <- list()
+    pb <- progress::progress_bar$new(total = length(phecodes_to_consider),
+                                     format = ":what [:bar] :percent eta: :eta")
+    for (i in seq_along(phecodes_to_consider)) {
+      out[[i]] <- quick_cooccur_mod(
+        dat      = merged,
+        covs     = covariates,
+        ex_code  = phecodes_to_consider[i],
+        mod_type = model_type
+      )
+      pb$tick(tokens = list(what = glue::glue("t = {t_thresh} threshold")))
+    }
+    out <- rbindlist(out)
   }
-
-  out <- data.table::rbindlist(out)
-
+  
+  # NEW 3. run analyses
+  if (parallel == TRUE) {
+    require(doMC)
+    registerDoMC(cores = ncore)
+    columns <- phecodes_to_consider
+    cols    <- length(phecodes_to_consider)
+    output  <- foreach(i = cols) %dopar% {
+      out <- list()
+      for (j in cols) {
+        ## MODEL HERE
+        out[[j]] <- quick_cooccur_mod(
+          dat      = merged,
+          covs     = covariates,
+          ex_code  = phecodes_to_consider[j],
+          mod_type = model_type
+        )
+      }
+      rbindlist(out, use.names = TRUE, fill = TRUE)
+    }
+    out <- output
+  }
+  
   return(out)
 
 }

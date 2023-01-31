@@ -235,7 +235,7 @@ ukb_post_match_cov <- merge.data.table(
 )
 for (i in time_thresholds) {
   ukb_post_match_cov[, (glue("t{i}_threshold")) :=
-                       floor(case_dsb - (365.25 *i))]
+                       floor(case_dsb - (365.25 * i))]
 }
 for (i in time_thresholds) {
   ukb_post_match_cov[, (glue("t{i}_indicator")) :=

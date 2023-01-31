@@ -36,7 +36,7 @@ option_list <- list(
                           "weights_no_cancer, weights_cancer_direct, weights_cancer_indirect [default = '']"))
 )
 
-parser <- OptionParser(usage="%prog [options]", option_list = option_list)
+parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 
 args <- parse_args(parser, positional_arguments = 0)
 opt <- args$options
