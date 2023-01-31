@@ -1,11 +1,13 @@
 ### quick_mod -----------
 # function for obtaining beta and p-values using either SPAtest or logistf
 # SPAtest is *much* faster but logistf allows for inclusion of weights
-quick_cooccur_mod <- function(dat,
-                              covs       = c("age_at_threshold", "female", "length_followup"),
-                              ex_code    = "X157",
-                              mod_type   = "logistf",
-                              weight_var = NULL) {
+quick_cooccur_mod <- function(
+    dat,
+    covs       = c("age_at_threshold", "female", "length_followup"),
+    ex_code    = "X157",
+    mod_type   = "logistf",
+    weight_var = NULL
+) {
   
   ### SPAtest
   if (mod_type == "SPAtest") {
@@ -31,8 +33,7 @@ quick_cooccur_mod <- function(dat,
   if (mod_type == "logistf") {
     if (!is.null(weight_var)) {
       wgts <- dat[[weight_var]]
-      head(wgts)
-      mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")),
+      mod <- logistf(as.formula(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + "))),
                      data    = dat,
                      weights = wgts)
     } else {
@@ -100,7 +101,6 @@ output_cooccurrence_results <- function(
       )
       cli_progress_update()
     }
-    
     out <- rbindlist(out)
   }
   

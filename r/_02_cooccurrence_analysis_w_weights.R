@@ -133,7 +133,8 @@ for (i in seq_along(time_thresholds)) {
     cov_data = ukb_covariates,
     covariates = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue("X{pheinfo[, phecode]}"),
-    model_type = opt$mod_type
+    model_type = opt$mod_type,
+    parallel     = TRUE
   )
 }
 names(ukb_results) <- glue("t{time_thresholds}")
