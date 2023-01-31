@@ -105,7 +105,7 @@ output_cooccurrence_results <- function(
     require(doMC)
     registerDoMC(cores = ncore)
     columns <- phecodes_to_consider
-    cols    <- length(phecodes_to_consider)
+    cols    <- seq_along(phecodes_to_consider)
     output  <- foreach(i = cols) %dopar% {
       out <- list()
       for (j in cols) {
