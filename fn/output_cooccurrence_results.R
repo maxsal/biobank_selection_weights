@@ -60,7 +60,9 @@ output_cooccurrence_results <- function(
     all_phecodes = paste0("X", pheinfo[, phecode]),
     model_type = "logistf",
     w_data = NULL,
-    w_var = NULL) {
+    w_var = NULL,
+    ncore = parallel::detectCores() / 2,
+    parallel = FALSE) {
   
   # 1. identify analytic phecodes
   possible_phecodes    <- names(pim_data)[names(pim_data) %in% all_phecodes]
@@ -81,21 +83,44 @@ output_cooccurrence_results <- function(
   }
   
   # 3. run analyses
-  out <- list()
-  pb <- progress::progress_bar$new(total = length(phecodes_to_consider),
-                                   format = ":what [:bar] :percent eta: :eta")
-  for (i in seq_along(phecodes_to_consider)) {
-    out[[i]] <- quick_cooccur_mod(
-      dat        = merged,
-      covs       = covariates,
-      ex_code    = phecodes_to_consider[i],
-      mod_type   = model_type,
-      weight_var = w_var
-    )
-    pb$tick(tokens = list(what = glue::glue("t = {t_thresh} threshold")))
+  if (parallel == FALSE) {
+    out <- list()
+    pb <- cli_progress_bar(name = glue("t = {t_thresh} threshold"),
+                           total = length(phecodes_to_consider))
+    for (i in seq_along(phecodes_to_consider)) {
+      out[[i]] <- quick_cooccur_mod(
+        dat        = merged,
+        covs       = covariates,
+        ex_code    = phecodes_to_consider[i],
+        mod_type   = model_type,
+        weight_var = w_var
+      )
+      cli_progress_update()
+    }
+    
+    out <- rbindlist(out)
   }
   
-  out <- rbindlist(out)
+  if (parallel == TRUE) {
+    require(doMC)
+    registerDoMC(cores = ncore)
+    columns <- phecodes_to_consider
+    cols    <- length(phecodes_to_consider)
+    output  <- foreach(i = cols) %dopar% {
+      out <- list()
+      for (j in cols) {
+        ## MODEL HERE
+        out[[j]] <- quick_cooccur_mod(
+          dat      = merged,
+          covs     = covariates,
+          ex_code  = phecodes_to_consider[j],
+          mod_type = model_type
+        )
+      }
+      rbindlist(out, use.names = TRUE, fill = TRUE)
+    }
+    out <- output
+  }
   
   return(out)
   
