@@ -405,6 +405,25 @@
       "Hash": "019388fc48e48b3da0d3a76ff94608a8",
       "Requirements": []
     },
+    "colorblindr": {
+      "Package": "colorblindr",
+      "Version": "0.1.0",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "colorblindr",
+      "RemoteUsername": "clauswilke",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "e6730be34255e2c38698f5aaf5673b9423db9aa2",
+      "Hash": "307a3825493bad5c639a631dab107e27",
+      "Requirements": [
+        "colorspace",
+        "cowplot",
+        "ggplot2",
+        "scales",
+        "shiny"
+      ]
+    },
     "colorspace": {
       "Package": "colorspace",
       "Version": "2.0-3",
@@ -428,6 +447,19 @@
       "Repository": "CRAN",
       "Hash": "fcf11a91936fd5047b2ee9bc00595e36",
       "Requirements": []
+    },
+    "cowplot": {
+      "Package": "cowplot",
+      "Version": "1.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "b418e8423699d11c7f2087c2bfd07da2",
+      "Requirements": [
+        "ggplot2",
+        "gtable",
+        "rlang",
+        "scales"
+      ]
     },
     "cpp11": {
       "Package": "cpp11",
