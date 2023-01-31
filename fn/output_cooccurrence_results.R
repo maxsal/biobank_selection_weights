@@ -108,18 +108,16 @@ output_cooccurrence_results <- function(
     cols    <- seq_along(phecodes_to_consider)
     output  <- foreach(i = cols) %dopar% {
       out <- list()
-      for (j in cols) {
-        ## MODEL HERE
-        out[[j]] <- quick_cooccur_mod(
-          dat      = merged,
-          covs     = covariates,
-          ex_code  = phecodes_to_consider[j],
-          mod_type = model_type
-        )
-      }
-      rbindlist(out, use.names = TRUE, fill = TRUE)
+      ## MODEL HERE
+      out[[i]] <- quick_cooccur_mod(
+        dat      = merged,
+        covs     = covariates,
+        ex_code  = phecodes_to_consider[i],
+        mod_type = model_type
+      )
+      out
     }
-    out <- output
+    out <- rbindlist(output, use.names = TRUE, fill = TRUE)
   }
   
   return(out)
