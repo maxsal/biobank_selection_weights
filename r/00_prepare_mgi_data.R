@@ -65,6 +65,27 @@ MGIcohort[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0
 
 MGIcohort[, nhanes_nhw := fifelse(Ethnicity != "Hispanic" & Race == "Caucasian", 1, 0)]
 
+MGIcohort[, age_cat := between(AgeLastEntry, 0, 5) +
+                       2 * between(AgeLastEntry, 6, 11) +
+                       3 * between(AgeLastEntry, 12, 19) +
+                       4 * between(AgeLastEntry, 20, 39) +
+                       5 * between(AgeLastEntry, 40, 59) +
+                       6 * between(AgeLastEntry, 60, 150)]
+
+setnames(MGIcohort, "BMI", "bmi")
+MGIcohort[, bmi_cat := fcase(
+  between(bmi, 0, 18.499), 1,        # underweight
+  between(bmi, 18.5, 24.999), 2,     # "normal"
+  between(bmi, 25.0, 29.999), 3,     # overweight
+  between(bmi, 30, 120), 4)          # obese
+  )][, `:=`(
+    bmi_under       = as.numeric(bmi_cat == 1),
+    bmi_overweight  = as.numeric(bmi_cat == 3),
+    bmi_obese       = as.numeric(bmi_cat == 4),
+    smoking_current = as.numeric(SmokingStatus == "Current"),
+    smoking_former  = as.numeric(SmokingStatus == "Past")
+  )]
+
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
 saveRDS(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.rds"))
