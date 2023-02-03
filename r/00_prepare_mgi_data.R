@@ -61,7 +61,7 @@ for (i in names(comorbid)) {
   cli_progress_update()
 }
 
-MGIcohort[, Triglycerides := fifelse(Hypertension == 0 & `Mixed Hypertension` == 0, 0, 1)]
+MGIcohort[, Triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
 MGIcohort[, nhanes_nhw := fifelse(Ethnicity != "Hispanic" & Race == "Caucasian", 1, 0)]
 
