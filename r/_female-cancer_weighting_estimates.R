@@ -50,12 +50,13 @@ merged <- Reduce(merge, list(
   mgi_demo[, .(id = Deid_ID, female = as.numeric(Sex == "F"), age = Age)],
   mgi_weights))
 
-extract_coef <- function(var_name, mod) {
+extract_coef <- function(var_name, mod, mod_name = "Unweighted") {
   tmp <- suppressWarnings(suppressMessages(confint(mod)))
   data.table(
     est = coef(mod)[[var_name]],
     lo = tmp[var_name, 1],
-    hi = tmp[var_name, 2]
+    hi = tmp[var_name, 2],
+    name = mod_name
   )
 }
 
@@ -64,7 +65,11 @@ m2 <- glm(cancers ~ female, data = merged[!is.na(weights_no_cancer)], family = b
 m3 <- glm(cancers ~ female + age, data = merged[!is.na(weights_cancer_indirect)], family = binomial, weights = weights_cancer_indirect)
 m4 <- glm(cancers ~ female, data = merged, family = binomial, weights = weights_cancer_direct)
 
-extract_coef(var_name = "female", mod = m1)
-extract_coef(var_name = "female", mod = m2)
-extract_coef(var_name = "female", mod = m3)
-extract_coef(var_name = "female", mod = m4)
+out <- rbindlist(list(
+  extract_coef(var_name = "female", mod = m1),
+  extract_coef(var_name = "female", mod = m2, mod_name = "No cancer weights"),
+  extract_coef(var_name = "female", mod = m3, mod_name = "Cancer weights - indirect"),
+  extract_coef(var_name = "female", mod = m4, mod_name = "Cancer weights - direct")
+))
+
+# fwrite(out, "bin/female_cancer_logodds_est.csv")
