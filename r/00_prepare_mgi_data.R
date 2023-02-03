@@ -78,7 +78,7 @@ MGIcohort[, bmi_cat := fcase(
   between(bmi, 18.5, 24.999), 2,     # "normal"
   between(bmi, 25.0, 29.999), 3,     # overweight
   between(bmi, 30, 120), 4)          # obese
-  )][, `:=`(
+  ][, `:=` (
     bmi_under       = as.numeric(bmi_cat == 1),
     bmi_overweight  = as.numeric(bmi_cat == 3),
     bmi_obese       = as.numeric(bmi_cat == 4),
