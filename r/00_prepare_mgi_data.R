@@ -67,9 +67,9 @@ MGIcohort[, nhanes_nhw := fifelse(Ethnicity != "Hispanic" & Race == "Caucasian",
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
-saveRDS(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data{opt$cohort_version}_bb.rds"))
-saveRDS(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data{opt$cohort_version}_mhb.rds"))
-saveRDS(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data{opt$cohort_version}_mipact.rds"))
-saveRDS(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data{opt$cohort_version}_mend.rds"))
+saveRDS(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.rds"))
+saveRDS(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.rds"))
+saveRDS(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.rds"))
+saveRDS(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.rds"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
