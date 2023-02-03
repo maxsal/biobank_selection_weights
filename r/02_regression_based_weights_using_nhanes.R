@@ -17,6 +17,7 @@ library(haven)
 library(survey)
 library(ggplot2)
 library(colorblindr)
+library(simplexreg)
 
 set.seed(61787)
 
