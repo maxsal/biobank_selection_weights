@@ -213,8 +213,8 @@ if ( !dir.exists( glue("data/private/mgi/{opt$mgi_version}/",
               recursive = TRUE )
 }
 ### save mgi matching data
-write_fst(mgi_post_match_cov,
-       glue("data/private/mgi/{opt$mgi_version}/",
+write_fst(x = mgi_post_match_cov,
+          path = glue("data/private/mgi/{opt$mgi_version}/",
             "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
 
 ## ukb
@@ -259,8 +259,8 @@ if ( !dir.exists( glue("data/private/ukb/{opt$ukb_version}/",
               recursive = TRUE )
 }
 ### save ukb matching data
-write_fst(ukb_post_match_cov,
-       glue("data/private/ukb/{opt$ukb_version}/",
+write_fst(x = ukb_post_match_cov,
+          path = glue("data/private/ukb/{opt$ukb_version}/",
             "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
 
 # 8. create time-restricted phenomes -------------------------------------------
@@ -282,7 +282,7 @@ names(mgi_pims) <- glue("t{time_thresholds}")
 for (i in 1:length(mgi_pims)) {
   write_fst(
     x = mgi_pims[[i]],
-    file = glue("data/private/mgi/{opt$mgi_version}/",
+    path = glue("data/private/mgi/{opt$mgi_version}/",
                 "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                 "mgi_X{gsub('X', '', opt$outcome)}",
                 "_{names(mgi_pims)[i]}_{opt$mgi_version}.fst")
@@ -307,7 +307,7 @@ names(ukb_pims) <- glue("t{time_thresholds}")
 for (i in 1:length(ukb_pims)) {
   write_fst(
     x = ukb_pims[[i]],
-    file = glue("data/private/ukb/{opt$ukb_version}/",
+    path = glue("data/private/ukb/{opt$ukb_version}/",
                 "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                 "ukb_X{gsub('X', '', opt$outcome)}",
                 "_{names(ukb_pims)[i]}_{opt$ukb_version}.fst"),
