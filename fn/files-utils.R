@@ -1,7 +1,7 @@
 library(glue)
 
 ## extract file paths based on data version
-get_files <- function(mgi_version = "20210318", ukb_version = "20221117") {
+get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
   
   if (mgi_version == "20210318") {
     mgi_icd9_file  <- "/net/junglebook/magic_data/MGI_Phenome_20210318/MGI_20210318_ICD9_Phecodes_Birthyears.Rsav"
