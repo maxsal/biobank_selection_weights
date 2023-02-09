@@ -11,10 +11,12 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     mgi_smk_file   <- "/net/junglebook/magic_data/ehr_data_20210318/HPI5635_SocialHx_DEIDENTIFIED.txt"
     mgi_bmi_file   <- "/net/junglebook/magic_data/ehr_data_20210318/HPI5635_Anthropometrics_DEIDENTIFIED.txt"
   } else {
-    mgi_icd9_file        <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD9_Phecodes_Birthyears.Rsav")
-    mgi_icd10_file       <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD10_Phecodes_Birthyears.Rsav")
-    mgi_phecode_dsb_file <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phecodes_Birthyears.Rsav")
-    mgi_pim0_file        <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_20220802_PEDMASTER_0.txt")
+    mgi_path             <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/")
+    mgi_icd9_file        <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD9_Phecodes_Birthyears.Rsav")
+    mgi_icd10_file       <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD10_Phecodes_Birthyears.Rsav")
+    mgi_phecode_dsb_file <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phecodes_Birthyears.Rsav")
+    mgi_pim0_file        <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_20220802_PEDMASTER_0.txt")
+    mgi_cov_file         <- glue("{mgi_path}MGI_{mgi_version}.txt")
     mgi_demo_file        <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Demographics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
     mgi_smk_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/SocialHx_{as.Date(mgi_version, '%Y%m%d'')}.txt")
     mgi_bmi_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Anthropometrics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
@@ -35,7 +37,10 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     bmi_file   = mgi_bmi_file
   )
   
-  if (mgi_version != "20210318") {mgi_out[["phecode_dsb_file"]] <- mgi_phecode_dsb_file}
+  if (mgi_version != "20210318") {
+    mgi_out[["phecode_dsb_file"]] <- mgi_phecode_dsb_file
+    mgi_out[["cov_file"]]         <- mgi_cov_file
+  }
   
   return(list(
     "mgi" = mgi_out,
