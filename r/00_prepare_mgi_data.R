@@ -2,9 +2,10 @@
 library(data.table)
 library(glue)
 library(cli)
+library(fst)
 library(optparse)
 
-# optparse list ---
+# optparse list ----
 option_list <- list(
   make_option("--cohort_version", type = "character", default = "20220822",
               help = "Cohort version in /net/junglebook/magic_data/EHRdata/ [default = '20220822']")
@@ -88,9 +89,10 @@ MGIcohort[, bmi_cat := fcase(
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
-saveRDS(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.rds"))
-saveRDS(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.rds"))
-saveRDS(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.rds"))
-saveRDS(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.rds"))
+write_fst(MGIcohort, file = glue("{out_path}data_{opt$cohort_version}_comb.rds"))
+write_fst(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.rds"))
+write_fst(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.rds"))
+write_fst(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.rds"))
+write_fst(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.rds"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
