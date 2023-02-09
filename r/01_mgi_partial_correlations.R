@@ -22,12 +22,10 @@ source("fn/partial_corr_veloce.R") # load partial correlation function
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--use_geno", type = "logical", default = "TRUE",
+  make_option("--use_geno", type = "logical", default = TRUE,
               help = "Adjust for genotype PCs [default = TRUE]"),
   make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Version of MGI data [default = 20220822]"),
-  make_option("--parallelize", type = "logical", default = "TRUE",
-              help = "Parallelize calculations [default = TRUE]")
+              help = "Version of MGI data [default = 20220822]")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
