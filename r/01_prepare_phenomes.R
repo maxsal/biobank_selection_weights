@@ -114,10 +114,7 @@ setnames(mgi_cov,
 mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
 if ("IID" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "IID", "id") }
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "DaysSinceBirth", "dsb") }
-# mgi_full_phe <- get_full_icd_dsb_phecode(
-#   icd_file      = file_paths[["mgi"]]$icd9_file,
-#   more_icd_file = file_paths[["mgi"]]$icd10_file
-# )
+
 mgi_first_phe <- mgi_full_phe[
   mgi_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
   ]
@@ -157,19 +154,10 @@ ukb_case_ids <- ukb_case[, unique(id)]
 # 6. calculate diagnostic metrics ----------------------------------------------
 ## mgi
 cli_alert_info("calculating diagnostic metrics in mgi...")
-# mgi_diag_metrics <- get_icd_phecode_metrics(
-#   full_phe_data = mgi_full_phe
-# )
-
 mgi_cov[, `:=` (
   female = as.numeric(sex == "F"),
   case = fifelse(id %in% mgi_case_ids, 1, 0)
   )]
-# mgi_matching_cov <- merge.data.table(
-#   mgi_demo[, .(id, age, female = as.numeric(sex == "F"))],
-#   mgi_diag_metrics,
-#   by = "id"
-# )[, case := fifelse(id %in% mgi_case_ids, 1, 0)]
 
 ## ukb
 cli_alert_info("calculating diagnostic metrics in ukb...")
@@ -196,8 +184,8 @@ mgi_match_text <- glue("MatchIt::matchit(case ~ ",
                        "exact = c({paste0(sapply(exact_matching_vars, ",
                        "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                        "ratio = {opt$matching_ratio})")
-mgi_match <- eval(parse(text = mgi_match_text))
-mgi_matched <- MatchIt::match.data(mgi_match)
+mgi_match          <- eval(parse(text = mgi_match_text))
+mgi_matched        <- MatchIt::match.data(mgi_match)
 mgi_post_match_cov <- merge.data.table(
   mgi_matched,
   merge.data.table(
@@ -242,8 +230,8 @@ ukb_match_text <- glue("matchit(case ~ ",
                        "exact = c({paste0(sapply(exact_matching_vars,",
                        "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
                        "ratio = {opt$matching_ratio})")
-ukb_match <- eval(parse(text = ukb_match_text))
-ukb_matched <- match.data(ukb_match)
+ukb_match          <- eval(parse(text = ukb_match_text))
+ukb_matched        <- match.data(ukb_match)
 ukb_post_match_cov <- merge.data.table(
   ukb_matched,
   merge.data.table(
