@@ -310,7 +310,6 @@ for (i in 1:length(ukb_pims)) {
     path = glue("data/private/ukb/{opt$ukb_version}/",
                 "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                 "ukb_X{gsub('X', '', opt$outcome)}",
-                "_{names(ukb_pims)[i]}_{opt$ukb_version}.fst"),
-    sep = "\t"
+                "_{names(ukb_pims)[i]}_{opt$ukb_version}.fst")
   )
 }
