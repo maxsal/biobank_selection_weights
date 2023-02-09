@@ -26,7 +26,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version)
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
 study     <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
-MGIcohort <- fread(file_paths[["mgi"]]$cov_file)
+MGIcohort <- fread(file_paths[["mgi"]][["cov_file"]])
 load(file = file_paths[["mgi"]][["phe_overview_file"]])
 load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
