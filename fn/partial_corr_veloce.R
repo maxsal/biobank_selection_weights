@@ -8,11 +8,15 @@ require(data.table)
 partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NULL) {
   require(data.table)
   require(doMC)
+  require(progressr)
+  handlers(global = TRUE, default = "cli")
   registerDoMC(cores = ncore)
   column <- colnames(pim)
   cols   <- 1:ncol(pim)
+  p <- progressr::progressor(along = cols)
   output <- foreach(i = cols) %dopar% {
     out <- list()
+    p()
     for (j in cols) {
       if (j >= i) next
       cca <- complete.cases(pim[, .SD, .SDcols = c(column[c(i, j)])])
