@@ -313,3 +313,5 @@ for (i in 1:length(ukb_pims)) {
                 "_{names(ukb_pims)[i]}_{opt$ukb_version}.fst")
   )
 }
+
+cli_alert_success("script success!")
