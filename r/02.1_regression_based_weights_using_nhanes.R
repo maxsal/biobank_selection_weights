@@ -103,9 +103,9 @@ lauren_nhanes <- function(stacked_data) {
   SELECT_NHANES_NOCAN <- p_Sext * (p_MGI / (1 - p_MGI))
   
   chopr <- function(x) {
-    quant2.5 <- quantile(x, probs = 0.025, na.rm = TRUE)
+    quant2.5  <- quantile(x, probs = 0.025, na.rm = TRUE)
     quant97.5 <- quantile(x, probs = 0.975, na.rm = TRUE)
-    x[x < quant2.5] <- quant2.5
+    x[x < quant2.5]  <- quant2.5
     x[x > quant97.5] <- quant97.5
     return(x)
   }
