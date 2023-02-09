@@ -7,43 +7,58 @@
 options(stringsAsFactors = FALSE)
 
 library(data.table)
+library(fst)
 library(ppcor)
 library(glue)
 library(cli)
 library(doMC)
+library(optparse)
+library(progressr)
 
 set.seed(61787)
 
 source("fn/files-utils.R") # load partial correlation function
 source("fn/partial_corr_veloce.R") # load partial correlation function
 
-# 2. specifications ------------------------------------------------------------
-use_geno    <- TRUE
-mgi_version <- "20210318" # mgi data version
-parallelize <- FALSE
+# optparse list ----------------------------------------------------------------
+option_list <- list(
+  make_option("--use_geno", type = "logical", default = "TRUE",
+              help = "Adjust for genotype PCs [default = TRUE]"),
+  make_option("--mgi_version", type = "character", default = "20220822",
+              help = "Version of MGI data [default = 20220822]"),
+  make_option("--parallelize", type = "logical", default = "TRUE",
+              help = "Parallelize calculations [default = TRUE]")
+)
 
-file_paths <- get_files(mgi_version = mgi_version)
+parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
+print(opt)
+
+file_paths <- get_files(mgi_version = opt$mgi_version)
+
+handlers(global = TRUE)
 
 # 3. read data -----------------------------------------------------------------
 cli_alert_info("reading data...")
 ## phecode indicator matrix (PEDMASTER_0)
-pim0 <- fread(file_paths[["mgi"]]$pim0_file)
+pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
 setnames(pim0, old = "IID", new = "id")
 
 ## demographics data
-demo <- fread(file_paths[["mgi"]]$demo_file)[, .(
-  id       = Deid_ID,
+demo <- fread(file_paths[["mgi"]][["cov_file"]])[, .(
+  id       = DeID_PatientID,
   age      = Age,
   alive    = as.numeric(AliveYN == "Y"),
   dead_dsb = Deceased_DaysSinceBirth,
-  ethn     = EthnicityName,
+  ethn     = Ethnicity,
   marital  = MaritalStatusCode,
   sex      = Sex,
-  race     = RaceName
+  race     = Race
   )]
 
 ## pc data
-if (use_geno == TRUE) {
+if (opt$use_geno == TRUE) {
   pcs <- fread(glue("/net/junglebook/magic_data/MGI_GenotypeData_Freeze4/",
                     "MGI_Freeze4_Sample_Info_60215samples.txt"))
   setnames(pcs, old = "Deid_ID", new = "id")
@@ -57,7 +72,7 @@ sub_pim <- pim0[id %in% merged[, id]]    # subset pim
 merged  <- merged[id %in% sub_pim[, id]] # subset merged
 
 # covariates -------------------------------------------------------------------
-if (use_geno == TRUE) {
+if (opt$use_geno == TRUE) {
   x1_mgi <- merged[, .(
     Age = age,
     FEMALE = as.numeric(sex == "F"),
@@ -70,10 +85,10 @@ if (use_geno == TRUE) {
 
 # MGI Partial Correlations -----------------------------------------------------
 sub_pim <- sub_pim[, 2:ncol(sub_pim)]
-cli_alert_info("identifying pairwise combinations...")
+cli_alert("identifying pairwise combinations...")
 combos  <- combn(names(sub_pim), 2, simplify = FALSE)
 
-cli_alert_info("calculating pairwise partial correlations....")
+cli_alert("calculating pairwise partial correlations....")
 res_list <- partial_corr_veloce(
   pim   = sub_pim,
   ncore = detectCores()/2,
@@ -85,13 +100,13 @@ cli_alert_success("calculation complete! creating output table...")
 res_table <- rbindlist(res_list, fill = TRUE)
 
 # save results -----------------------------------------------------------------
-output_file <- glue("data/private/mgi/{mgi_version}/",
+output_file <- glue("data/private/mgi/{opt$mgi_version}/",
                     "mgi_phenome_partial_correlations_",
-                    "{ifelse(use_geno == TRUE, 'w_geno_pcs_', '')}",
-                    "{mgi_version}.txt")
-cli_alert_info("saving results to: {output_file}...")
+                    "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
+                    "{opt$mgi_version}.fst")
+cli_alert_info("saving results to: {.path {output_file}}")
 
-fwrite(x    = res_table,
-       file = output_file,
-       sep  = "\t")
-cli_alert_success("file saved and script complete!")
+write_fst(x    = res_table,
+          path = output_file)
+
+cli_alert_success("script success! see {.path {output_file}}")
