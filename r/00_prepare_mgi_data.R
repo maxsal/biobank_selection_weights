@@ -17,22 +17,18 @@ print(opt)
 
 cli_alert_info("using cohort version {opt$mgi_version}; see {.path /net/junglebook/magic_data/EHRdata/}")
 
-data_path <- glue("/net/junglebook/magic_data/EHRdata/{opt$mgi_version}/")
-out_path  <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$cohort_version}/")
+out_path  <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$mgi_version}/")
+if (!dir.exists(out_path)) { dir.create(out_path, recursive = TRUE) }
 
 source("fn/files-utils.R")
-
-if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
-
-file_paths <- get_files(mgi_version = opt$cohort_version)
+file_paths <- get_files(mgi_version = opt$mgi_version)
 
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
 study     <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
-MGIcohort <- fread()
-load(file = glue("{data_path}MGI_20220822.Rsav"))
-load(file = glue("{data_path}phenomes/UNFILTERED_20220822/UNFILTERED_20220822_Phenotype_Overview_All_Phecodes1plus.Rsav"))
-load(file = glue("{data_path}phenomes/UNFILTERED_20220822/UNFILTERED_20220822_Phecodes_Birthyears.Rsav"))
+MGIcohort <- fread(file_paths[["mgi"]]$cov_file)
+load(file = file_paths[["mgi"]][["phe_overview_file"]])
+load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
                          colClasses = "character")[[1]]
 
@@ -96,10 +92,10 @@ MGIcohort[, bmi_cat := fcase(
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
-write_fst(MGIcohort, path = glue("{out_path}data_{opt$cohort_version}_comb.fst"))
-write_fst(MGIcohort[StudyName == "MGI", ], path = glue("{out_path}data_{opt$cohort_version}_bb.fst"))
-write_fst(MGIcohort[StudyName == "MHB2", ], path = glue("{out_path}data_{opt$cohort_version}_mhb.fst"))
-write_fst(MGIcohort[StudyName == "MIPACT", ], path = glue("{out_path}data_{opt$cohort_version}_mipact.fst"))
-write_fst(MGIcohort[StudyName == "MGI-MEND", ], path = glue("{out_path}data_{opt$cohort_version}_mend.fst"))
+write_fst(MGIcohort, path = glue("{out_path}data_{opt$mgi_version}_comb.fst"))
+write_fst(MGIcohort[StudyName == "MGI", ], path = glue("{out_path}data_{opt$mgi_version}_bb.fst"))
+write_fst(MGIcohort[StudyName == "MHB2", ], path = glue("{out_path}data_{opt$mgi_version}_mhb.fst"))
+write_fst(MGIcohort[StudyName == "MIPACT", ], path = glue("{out_path}data_{opt$mgi_version}_mipact.fst"))
+write_fst(MGIcohort[StudyName == "MGI-MEND", ], path = glue("{out_path}data_{opt$mgi_version}_mend.fst"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
