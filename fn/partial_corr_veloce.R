@@ -7,10 +7,9 @@ require(data.table)
 
 partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NULL) {
   require(data.table)
-  require(doFuture)
+  require(doMC)
   require(progressr)
-  registerDoFuture()
-  plan(strategy = "multisession", workers = ncore)
+  registerDoMC(cores = ncore)
   column <- colnames(pim)
   cols   <- 1:ncol(pim)
   p <- progressor(along = cols)
