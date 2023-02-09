@@ -10,7 +10,7 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
   # require(doMC)
   require(doFuture)
   require(progressr)
-  registry(doFuture)
+  registerDoFuture()
   plan(strategy = "multisession", workers = ncore)
   # registerDoMC(cores = ncore)
   column <- colnames(pim)
