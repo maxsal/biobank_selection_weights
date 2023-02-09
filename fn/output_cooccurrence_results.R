@@ -89,8 +89,8 @@ output_cooccurrence_results <- function(
   # 3. run analyses
   if (parallel == FALSE) {
     out <- list()
-    pb <- cli_progress_bar(name = glue("t = {t_thresh} threshold"),
-                           total = length(phecodes_to_consider))
+    cli_progress_bar(name = glue("t = {t_thresh} threshold"),
+                     total = length(phecodes_to_consider))
     for (i in seq_along(phecodes_to_consider)) {
       out[[i]] <- quick_cooccur_mod(
         dat        = merged,

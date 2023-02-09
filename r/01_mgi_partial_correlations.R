@@ -23,9 +23,9 @@ source("fn/partial_corr_veloce.R") # load partial correlation function
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--use_geno", type = "logical", default = TRUE,
-              help = "Adjust for genotype PCs [default = TRUE]"),
+              help = "Adjust for genotype PCs [default = %default]"),
   make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Version of MGI data [default = 20220822]")
+              help = "Version of MGI data [default = %default]")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -38,7 +38,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version)
 handlers(global = TRUE)
 
 # 3. read data -----------------------------------------------------------------
-cli_alert_info("reading data...")
+cli_alert("reading data...")
 ## phecode indicator matrix (PEDMASTER_0)
 pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
 setnames(pim0, old = "IID", new = "id")

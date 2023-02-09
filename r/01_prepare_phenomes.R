@@ -120,7 +120,7 @@ mgi_first_phe <- mgi_full_phe[
   ]
 
 ## ukb
-cli_alert_info("loading ukb data...")
+cli_alert("loading ukb data...")
 ### demographics
 ukb_demo <- fread(file_paths[["ukb"]]$demo_file,
                               na.strings = c("", "NA", "."),
@@ -153,14 +153,14 @@ ukb_case_ids <- ukb_case[, unique(id)]
 
 # 6. calculate diagnostic metrics ----------------------------------------------
 ## mgi
-cli_alert_info("calculating diagnostic metrics in mgi...")
+cli_alert("calculating diagnostic metrics in mgi...")
 mgi_cov[, `:=` (
   female = as.numeric(sex == "F"),
   case = fifelse(id %in% mgi_case_ids, 1, 0)
   )]
 
 ## ukb
-cli_alert_info("calculating diagnostic metrics in ukb...")
+cli_alert("calculating diagnostic metrics in ukb...")
 ukb_diag_metrics <- get_icd_phecode_metrics(
   full_phe_data = ukb_first_phe
 )[, id := as.character(id)]
@@ -172,8 +172,8 @@ ukb_matching_cov <- merge.data.table(
 
 # 7. perform matching ----------------------------------------------------------
 ## mgi
-cli_alert_info(glue("performing 1:{opt$matching_ratio} case:non-case ",
-                         "matching in mgi..."))
+cli_alert(glue("performing 1:{opt$matching_ratio} case:non-case ",
+               "matching in mgi..."))
 mgi_match_text <- glue("MatchIt::matchit(case ~ ",
                        "{glue_collapse(c(nearest_matching_vars, ",
                        "exact_matching_vars), sep = ' + ')}, ",
@@ -218,8 +218,8 @@ write_fst(x = mgi_post_match_cov,
             "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
 
 ## ukb
-cli_alert_info(glue("performing 1:{opt$matching_ratio} case:non-case ",
-                    "matching in ukb..."))
+cli_alert(glue("performing 1:{opt$matching_ratio} case:non-case ",
+               "matching in ukb..."))
 ukb_match_text <- glue("matchit(case ~ ",
                        "{glue_collapse(c(nearest_matching_vars, ",
                        "exact_matching_vars), sep = ' + ')}, ",
@@ -265,7 +265,7 @@ write_fst(x = ukb_post_match_cov,
 
 # 8. create time-restricted phenomes -------------------------------------------
 ## mgi
-cli_alert_info("constructing time-restricted phenomes in mgi...")
+cli_alert("constructing time-restricted phenomes in mgi...")
 mgi_matched_phe <- merge.data.table(
   mgi_first_phe[id %in% mgi_post_match_cov[, id]],
   mgi_post_match_cov,
@@ -290,7 +290,7 @@ for (i in 1:length(mgi_pims)) {
 }
 
 ## ukb
-cli_alert_info("constructing time-restricted phenomes in ukb...")
+cli_alert("constructing time-restricted phenomes in ukb...")
 ukb_matched_phe <- merge.data.table(
   ukb_first_phe[id %in% ukb_post_match_cov[, id]],
   ukb_post_match_cov,
