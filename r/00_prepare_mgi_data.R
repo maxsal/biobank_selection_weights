@@ -13,6 +13,7 @@ option_list <- list(
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
+print(opt)
 
 cli_alert_info("using cohort version {opt$cohort_version}; see {.path /net/junglebook/magic_data/EHRdata/}")
 
@@ -89,10 +90,10 @@ MGIcohort[, bmi_cat := fcase(
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
-write_fst(MGIcohort, file = glue("{out_path}data_{opt$cohort_version}_comb.rds"))
-write_fst(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.rds"))
-write_fst(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.rds"))
-write_fst(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.rds"))
-write_fst(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.rds"))
+write_fst(MGIcohort, file = glue("{out_path}data_{opt$cohort_version}_comb.fst"))
+write_fst(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.fst"))
+write_fst(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.fst"))
+write_fst(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.fst"))
+write_fst(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.fst"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
