@@ -17,9 +17,9 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     mgi_phecode_dsb_file <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phecodes_Birthyears.Rsav")
     mgi_pim0_file        <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_20220802_PEDMASTER_0.txt")
     mgi_cov_file         <- glue("{mgi_path}MGI_{mgi_version}.txt")
-    mgi_demo_file        <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Demographics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
-    mgi_smk_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/SocialHx_{as.Date(mgi_version, '%Y%m%d'')}.txt")
-    mgi_bmi_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Anthropometrics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
+    mgi_demo_file        <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Demographics_{as.Date(mgi_version, '%Y%m%d')}.txt")
+    mgi_smk_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/SocialHx_{as.Date(mgi_version, '%Y%m%d')}.txt")
+    mgi_bmi_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Anthropometrics_{as.Date(mgi_version, '%Y%m%d')}.txt")
   }
   
   if (ukb_version == "20221117") {

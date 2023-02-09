@@ -7,7 +7,7 @@ library(optparse)
 
 # optparse list ----
 option_list <- list(
-  make_option("--cohort_version", type = "character", default = "20220822",
+  make_option("--mgi_version", type = "character", default = "20220822",
               help = "Cohort version in /net/junglebook/magic_data/EHRdata/ [default = '20220822']")
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -15,16 +15,21 @@ args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
 
-cli_alert_info("using cohort version {opt$cohort_version}; see {.path /net/junglebook/magic_data/EHRdata/}")
+cli_alert_info("using cohort version {opt$mgi_version}; see {.path /net/junglebook/magic_data/EHRdata/}")
 
-data_path <- glue("/net/junglebook/magic_data/EHRdata/{opt$cohort_version}/")
+data_path <- glue("/net/junglebook/magic_data/EHRdata/{opt$mgi_version}/")
 out_path  <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$cohort_version}/")
 
+source("fn/files-utils.R")
+
 if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
+
+file_paths <- get_files(mgi_version = opt$cohort_version)
 
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
 study     <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
+MGIcohort <- fread()
 load(file = glue("{data_path}MGI_20220822.Rsav"))
 load(file = glue("{data_path}phenomes/UNFILTERED_20220822/UNFILTERED_20220822_Phenotype_Overview_All_Phecodes1plus.Rsav"))
 load(file = glue("{data_path}phenomes/UNFILTERED_20220822/UNFILTERED_20220822_Phecodes_Birthyears.Rsav"))
