@@ -19,7 +19,8 @@ cli_alert_info("using cohort version {opt$cohort_version}; see {.path /net/jungl
 
 data_path <- glue("/net/junglebook/magic_data/EHRdata/{opt$cohort_version}/")
 out_path  <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$cohort_version}/")
-dir.create(out_path, recursive = TRUE)
+
+if (!dir.exists(outpath)) dir.create(out_path, recursive = TRUE)
 
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")

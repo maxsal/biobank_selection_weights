@@ -2,10 +2,12 @@
 #   and datasets
 # author: max salvatore
 # date:   20230110
-require(data.table)
-require(haven)
-require(glue)
-require(cli)
+suppressPackageStartupMessages({
+  require(data.table)
+  require(haven)
+  require(glue)
+  require(cli)
+})
 
 download_nhanes_data <- function(
     wave_letter = "J",
