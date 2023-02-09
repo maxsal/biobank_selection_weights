@@ -90,10 +90,10 @@ MGIcohort[, bmi_cat := fcase(
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
-write_fst(MGIcohort, file = glue("{out_path}data_{opt$cohort_version}_comb.fst"))
-write_fst(MGIcohort[StudyName == "MGI", ], file = glue("{out_path}data_{opt$cohort_version}_bb.fst"))
-write_fst(MGIcohort[StudyName == "MHB2", ], file = glue("{out_path}data_{opt$cohort_version}_mhb.fst"))
-write_fst(MGIcohort[StudyName == "MIPACT", ], file = glue("{out_path}data_{opt$cohort_version}_mipact.fst"))
-write_fst(MGIcohort[StudyName == "MGI-MEND", ], file = glue("{out_path}data_{opt$cohort_version}_mend.fst"))
+write_fst(MGIcohort, path = glue("{out_path}data_{opt$cohort_version}_comb.fst"))
+write_fst(MGIcohort[StudyName == "MGI", ], path = glue("{out_path}data_{opt$cohort_version}_bb.fst"))
+write_fst(MGIcohort[StudyName == "MHB2", ], path = glue("{out_path}data_{opt$cohort_version}_mhb.fst"))
+write_fst(MGIcohort[StudyName == "MIPACT", ], path = glue("{out_path}data_{opt$cohort_version}_mipact.fst"))
+write_fst(MGIcohort[StudyName == "MGI-MEND", ], path = glue("{out_path}data_{opt$cohort_version}_mend.fst"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
