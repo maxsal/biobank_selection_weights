@@ -59,7 +59,7 @@ for (i in names(comorbid)) {
 
 cli_progress_bar("comorbid vars", total = length(names(comorbid)))
 for (i in names(comorbid)) {
-  MGIcohort[[i]] <- fifelse(MGIcohort[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0)
+  set(MGIcohort, j = i, value = fifelse(MGIcohort[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
   cli_progress_update()
 }
 
