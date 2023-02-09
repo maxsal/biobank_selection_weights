@@ -1,3 +1,5 @@
+library(glue)
+
 ## extract file paths based on data version
 get_files <- function(mgi_version = "20210318", ukb_version = "20221117") {
   
@@ -8,6 +10,14 @@ get_files <- function(mgi_version = "20210318", ukb_version = "20221117") {
     mgi_demo_file  <- "/net/junglebook/magic_data/ehr_data_20210318/HPI5635_Demographics.txt"
     mgi_smk_file   <- "/net/junglebook/magic_data/ehr_data_20210318/HPI5635_SocialHx_DEIDENTIFIED.txt"
     mgi_bmi_file   <- "/net/junglebook/magic_data/ehr_data_20210318/HPI5635_Anthropometrics_DEIDENTIFIED.txt"
+  } else {
+    mgi_icd9_file        <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD9_Phecodes_Birthyears.Rsav")
+    mgi_icd10_file       <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD10_Phecodes_Birthyears.Rsav")
+    mgi_phecode_dsb_file <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phecodes_Birthyears.Rsav")
+    mgi_pim0_file        <- glue("/net/junglebook/magic_data/EHRdata/{mgi_version}/phenomes/UNFILTERED_{mgi_version}/UNFILTERED_20220802_PEDMASTER_0.txt")
+    mgi_demo_file        <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Demographics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
+    mgi_smk_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/SocialHx_{as.Date(mgi_version, '%Y%m%d'')}.txt")
+    mgi_bmi_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Anthropometrics_{as.Date(mgi_version, '%Y%m%d'')}.txt")
   }
   
   if (ukb_version == "20221117") {
@@ -16,15 +26,19 @@ get_files <- function(mgi_version = "20210318", ukb_version = "20221117") {
     ukb_demo_file        <- "/net/junglebook/home/mmsalva/createUKBphenome/results/UKB_SEX_20221117.txt"
   }
   
+  mgi_out <- list(
+    icd9_file  = mgi_icd9_file,
+    icd10_file = mgi_icd10_file,
+    demo_file  = mgi_demo_file,
+    pim0_file  = mgi_pim0_file,
+    smk_file   = mgi_smk_file,
+    bmi_file   = mgi_bmi_file
+  )
+  
+  if (mgi_version != "20210318") {mgi_out[["phecode_dsb_file"]] <- mgi_phecode_dsb_file}
+  
   return(list(
-    "mgi" = list(
-      icd9_file  = mgi_icd9_file,
-      icd10_file = mgi_icd10_file,
-      demo_file  = mgi_demo_file,
-      pim0_file  = mgi_pim0_file,
-      smk_file   = mgi_smk_file,
-      bmi_file   = mgi_bmi_file
-    ),
+    "mgi" = mgi_out,
     "ukb" = list(
       pim0_file        = ukb_pim0_file,
       icd_phecode_file = ukb_phecode_dsb_file,
