@@ -163,6 +163,132 @@ rbindlist(list(
 )) |>
   fwrite(file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
 
+## poststratification weights --------------------------------------------------
+poststratification <- function(
+    mgi_data,
+    last_entry_age_var = "AgeLastEntry",
+    cancer_var         = "cancer",
+    chd_var            = "cad",
+    smoke_var          = "smoking_current",
+    diabetes_var       = "diabetes"
+    ) {
+  
+  Nobs      <- nrow(mgi_data)
+  age_var_2 <- as.numeric(mgi_data[[last_entry_age_var]])
+  ages      <- seq(18, 85, 1)
+  which_between <- function(vec, mat) {
+    between(x = vec, lower = mat[["lower"]], upper = mat[["upper"]])
+  }
+  
+  # cancer prevalence by age (US) 
+  # https://seer.cancer.gov/csr/1975_2016/results_merged/topic_prevalence.pdf
+  cancer_prevalence <- age_grp_table(
+    lower_ages   = c(0, 10, 20, 30, 40, 50, 60, 70, 80),
+    num_vec      = c(0.0899, 0.2023, 0.3922, 0.8989, 2.1532, 4.9326, 10.4420, 18.3168, 21.5939) / 100,
+    num_var_name = "prevalence"
+  )
+  
+  cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]], y = c(0, cancer_prevalence[["prevalence"]]), right = FALSE)
+  b <- aggregate(as.formula(paste0(cancer_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
+  
+  # diabetes prevalence by age (US)
+  # https://www.cdc.gov/diabetes/pdfs/data/statistics/national-diabetes-statistics-report.pdf 
+  # youngest group will have no people, no number provided in documentation
+  diabetes_prevalence <- age_grp_table(
+    lower_ages   = c(0, 18, 45, 65),
+    num_vec      = c(0.01, 0.030, 0.138, 0.214),
+    num_var_name = "prevalence"
+  )
+  
+  diabetes_func_pop <- stepfun(x = diabetes_prevalence[["lower"]], y = c(0, diabetes_prevalence[["prevalence"]]), right = FALSE)
+  d_b <- aggregate(as.formula(paste0(diabetes_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  diabetes_func_mgi <- stepfun(x = d_b[, 1], y = c(0, d_b[, 2]), right = FALSE)
+  
+  # chd prevalence by age (us)
+  # https://www.cdc.gov/nchs/fastats/heart-disease.htm
+  # youngest group will have no people, no number provided in documentation
+  chd_prevalence <- age_grp_table(
+    lower_ages   = c(0,18,45,65,75),
+    num_vec      = c(0.01, 0.01, 0.060, 0.155, 0.239),
+    num_var_name = "prevalence"
+  )
+  
+  chd_func_pop <- stepfun(x = chd_prevalence[["lower"]], y = c(0, chd_prevalence[["prevalence"]]), right = FALSE)
+  chd_b <- aggregate(as.formula(paste0(chd_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  chd_func_mgi <- stepfun(x = chd_b[, 1], y = c(0, chd_b[, 2]), right = FALSE)
+
+  # smoking prevalence by age (us)
+  # https://www.cdc.gov/nchs/fastats/heart-disease.htm
+  # youngest group will have no people, no number provided in documentation
+  smoke_prevalence <- age_grp_table(
+    lower_ages   = c(0,18,25,45,65),
+    num_vec      = c(0.01, 0.074, 0.141, 0.149, 0.09),
+    num_var_name = "prevalence"
+  )
+  
+  smoke_func_pop <- stepfun(x = smoke_prevalence[["lower"]], y = c(0, smoke_prevalence[["prevalence"]]), right = FALSE)
+  smoke_b        <- aggregate(as.formula(paste0(smoke_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  smoke_func_mgi <- stepfun(x = smoke_b[, 1], y = c(0, smoke_b[, 2]), right = FALSE)
+  
+  # age distribution (us)
+  # https://www.census.gov/data/tables/2000/dec/phc-t-09.html
+  total_population  <- 281421906
+  male_population   <- 138053563
+  female_population <- total_population - male_population
+  
+  low_ages <- seq(0, 85, 5)
+  age_counts_male <- age_grp_table(
+    lower_ages   = low_ages,
+    num_vec      = c(9810733,10523277,10520197,10391004,9687814,9798760,10321769,11318696,
+                11129102,9889506,8607724,6508729,5136627,4400362,3902912,3044456,1834897,1226998),
+    num_var_name = "counts"
+  )
+  age_counts_female <- age_grp_table(
+    lower_ages   = low_ages,
+    num_vec      = c(9365065,10026228,10007875,9828886,9276187,9582576,10188619,11387968,11312761,10202898,
+                     8977824,6960508,5668820,5133183,4954529,4371357,3110470,3012589),
+    num_var_name = "counts"
+  )
+  age_prevalence <- age_grp_table(
+    lower_ages   = low_ages,
+    num_vec      = (age_counts_male[["counts"]] + age_counts_female[["counts"]]) / total_population,
+    num_var_name = "prevalence"
+  )
+  age_func_pop <- stepfun(x = age_prevalence[["lower"]], y = c(0, age_prevalence[["prevalence"]]), right = FALSE)
+  age_func_mgi <- stepfun(x = age_prevalence[["lower"]], y = as.numeric(c(0, table(cut(age_var_2, breaks = c(0, age_prevalence[["upper"]]), labels = age_prevalence[["group"]])) / Nobs)), right = FALSE)
+  
+  # with cancer
+  population <- fifelse(mgi_data[[cancer_var]] == 1, cancer_func_pop(age_var_2), 1 - cancer_func_pop(age_var_2))
+  population <- population * fifelse(mgi_data[[diabetes_var]] == 1, diabetes_func_pop(age_var_2), 1 - diabetes_func_pop(age_var_2))
+  population <- population * fifelse(mgi_data[[chd_var]] == 1, chd_func_pop(age_var_2), 1 - chd_func_pop(age_var_2))
+  population <- population * fifelse(mgi_data[[smoke_var]] == 1, smoke_func_pop(age_var_2), 1 - smoke_func_pop(age_var_2))
+  population <- population * age_func_pop(age_var_2)
+
+  mgi <- fifelse(mgi_data[[cancer_var]] == 1, cancer_func_mgi(age_var_2), 1 - cancer_func_mgi(age_var_2))  
+  mgi <- mgi * fifelse(mgi_data[[diabetes_var]] == 1, diabetes_func_mgi(age_var_2), 1 - diabetes_func_mgi(age_var_2))
+  mgi <- mgi * fifelse(mgi_data[[chd_var]] == 1, chd_func_mgi(age_var_2), 1 - chd_func_mgi(age_var_2))
+  mgi <- mgi * fifelse(mgi_data[[smoke_var]] == 1, smoke_func_mgi(age_var_2), 1 - smoke_func_mgi(age_var_2))
+  mgi <- mgi * age_func_mgi(age_var_2)
+  
+  post <- population / mgi
+  post <- (Nobs * post) / sum(post, na.rm = TRUE)
+  
+  return(
+    data.table(
+      cancer_post_uncorrected = post
+    )
+  )
+
+}
+
+poststratification(mgi_data = mgi)
+
+tmp <- cbind(mgi_data, post)
+
+glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = tmp) |> coef()
+glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = tmp, weights = post) |> coef()
+
 # save -------------------------------------------------------------------------
 write_fst(
   x = merged[, .(id = DeID_PatientID, no_cancer_weights = WEIGHT_NHANES_NOCAN, cancer_indirect_weights = CANCER_NHANES_UNCORRECTED)],
