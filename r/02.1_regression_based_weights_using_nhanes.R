@@ -40,10 +40,9 @@ opt    <- args$options
 
 data_path <- glue("data/private/mgi/{opt$cohort_version}/")
 
-isource <- function(fn_path) {
-  lapply(list.files(fn_path, full.names = TRUE), source) |> invisible()
-}
-isource("fn")
+lapply(list.files("fn", full.names = TRUE), source) |> # load functions
+  invisible()
+
 
 
 # load data --------------------------------------------------------------------
