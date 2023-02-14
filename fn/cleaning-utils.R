@@ -44,3 +44,12 @@ age_grp_table <- function(
   setnames(out, "num_var", num_var_name)
   return(out)
 }
+
+## helper for truncating probabilities
+chopr <- function(x) {
+  quant2.5  <- quantile(x, probs = 0.025, na.rm = TRUE)
+  quant97.5 <- quantile(x, probs = 0.975, na.rm = TRUE)
+  x[x < quant2.5]  <- quant2.5
+  x[x > quant97.5] <- quant97.5
+  return(x)
+}
