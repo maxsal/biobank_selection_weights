@@ -81,18 +81,8 @@ stacked <- rbindlist(list(
 ), use.names = TRUE, fill = TRUE)
 
 # weight estimation function ---------------------------------------------------
-## helper for truncating probabilities
-chopr <- function(x) {
-  quant2.5  <- quantile(x, probs = 0.025, na.rm = TRUE)
-  quant97.5 <- quantile(x, probs = 0.975, na.rm = TRUE)
-  x[x < quant2.5]  <- quant2.5
-  x[x > quant97.5] <- quant97.5
-  return(x)
-}
-
-
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
-lauren_nhanes <- function(stacked_data) {
+ipw <- function(stacked_data) {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes / sum(weight_nhanes, na.rm = TRUE)]
 
@@ -135,7 +125,7 @@ lauren_nhanes <- function(stacked_data) {
 
 }
 
-estimated_weights <- lauren_nhanes(stacked_data = stacked)
+estimated_weights <- ipw(stacked_data = stacked)
 
 merged <- cbind(mgi, estimated_weights)
 
@@ -143,25 +133,6 @@ merged <- cbind(mgi, estimated_weights)
 m0 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged)
 m1 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = WEIGHT_NHANES_NOCAN)
 m2 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = CANCER_NHANES_UNCORRECTED)
-
-extractr <- function(x, weight_name) {
-  suppressMessages({y <- confint(x)})
-  data.table(
-    "weights" = weight_name,
-    "est"     = coef(x)[[2]],
-    "lower"   = y[2, 1],
-    "upper"   = y[2, 2],
-    "var"     = diag(summary(x)$cov.scaled)[[2]]
-  )
-}
-
-# summarize estimates cancer~female log(OR)
-rbindlist(list(
-  extractr(x = m0, weight_name = "None"),
-  extractr(x = m1, weight_name = "No cancer"),
-  extractr(x = m2, weight_name = "Cancer (uncorrected)")
-)) |>
-  fwrite(file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
 
 ## poststratification weights --------------------------------------------------
 poststratification <- function(
@@ -209,7 +180,7 @@ poststratification <- function(
   # https://www.cdc.gov/nchs/fastats/heart-disease.htm
   # youngest group will have no people, no number provided in documentation
   chd_prevalence <- age_grp_table(
-    lower_ages   = c(0,18,45,65,75),
+    lower_ages   = c(0, 18, 45, 65, 75),
     num_vec      = c(0.01, 0.01, 0.060, 0.155, 0.239),
     num_var_name = "prevalence"
   )
@@ -222,7 +193,7 @@ poststratification <- function(
   # https://www.cdc.gov/nchs/fastats/heart-disease.htm
   # youngest group will have no people, no number provided in documentation
   smoke_prevalence <- age_grp_table(
-    lower_ages   = c(0,18,25,45,65),
+    lower_ages   = c(0, 18, 25, 45, 65),
     num_vec      = c(0.01, 0.074, 0.141, 0.149, 0.09),
     num_var_name = "prevalence"
   )
@@ -255,6 +226,7 @@ poststratification <- function(
     num_vec      = (age_counts_male[["counts"]] + age_counts_female[["counts"]]) / total_population,
     num_var_name = "prevalence"
   )
+  
   age_func_pop <- stepfun(x = age_prevalence[["lower"]], y = c(0, age_prevalence[["prevalence"]]), right = FALSE)
   age_func_mgi <- stepfun(x = age_prevalence[["lower"]], y = as.numeric(c(0, table(cut(age_vec, breaks = c(0, age_prevalence[["upper"]]), labels = age_prevalence[["group"]])) / Nobs)), right = FALSE)
   
@@ -302,13 +274,27 @@ merged <- cbind(merged, post)
 m1_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = weight_post_no_cancer)
 m2_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_post_uncorrected)
 
-rbindlist(list(
+extractr <- function(x, weight_name) {
+  suppressMessages({y <- confint(x)})
+  data.table(
+    "weights" = weight_name,
+    "est"     = coef(x)[[2]],
+    "lower"   = y[2, 1],
+    "upper"   = y[2, 2],
+    "var"     = diag(summary(x)$cov.scaled)[[2]]
+  )
+}
+
+log_or_est <- rbindlist(list(
   extractr(x = m0, weight_name = "None"),
   extractr(x = m1, weight_name = "No cancer"),
   extractr(x = m2, weight_name = "Cancer (uncorrected)"),
   extractr(x = m1_ps, weight_name = "Poststrat: without cancer"),
   extractr(x = m2_ps, weight_name = "Poststrat: with cancer")
 ))
+log_or_est
+
+# fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
 
 # save -------------------------------------------------------------------------
 write_fst(
