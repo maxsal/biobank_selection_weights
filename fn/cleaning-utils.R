@@ -31,6 +31,7 @@ make_missing = function(data, cols = NULL, old_value = "Unknown") {
 age_grp_table <- function(
     lower_ages,
     upper_char = "+",
+    upper_offset = 0,
     upper_val = 150,
     num_vec,
     num_var_name = "prevalences"
@@ -38,7 +39,7 @@ age_grp_table <- function(
   out <- data.table(
     group      = paste0(lower_ages, c(paste0("-", lower_ages[-1] - 1), upper_char)),
     lower      = lower_ages,
-    upper      = c(lower_ages[-1] - 1, upper_val),
+    upper      = c(lower_ages[-1] - upper_offset, upper_val),
     num_var    = num_vec
   )
   setnames(out, "num_var", num_var_name)

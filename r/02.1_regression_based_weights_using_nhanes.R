@@ -46,6 +46,7 @@ lapply(list.files("fn", full.names = TRUE), source) |> # load functions
 # load data --------------------------------------------------------------------
 mgi <- read_fst(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.fst"),
                as.data.table = TRUE)
+setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
 nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
 nhanes_merged <- download_nhanes_data(
@@ -82,7 +83,7 @@ stacked <- rbindlist(list(
 
 # weight estimation function ---------------------------------------------------
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
-ipw <- function(stacked_data) {
+ipw <- function(stacked_data, id_var = "id") {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes / sum(weight_nhanes, na.rm = TRUE)]
 
@@ -119,24 +120,19 @@ ipw <- function(stacked_data) {
   CANCER_NHANES_UNCORRECTED  = stacked_data[dataset == "MGI", .N] * CANCER_NHANES_UNCORRECTED / sum(CANCER_NHANES_UNCORRECTED, na.rm = TRUE)
   
   data.table(
-    "WEIGHT_NHANES_NOCAN"       = WEIGHT_NHANES_NOCAN,
-    "CANCER_NHANES_UNCORRECTED" = CANCER_NHANES_UNCORRECTED
+    "id"                  = stacked_data[dataset == "MGI", ][[id_var]],
+    "no_cancer_ipw"       = WEIGHT_NHANES_NOCAN,
+    "cancer_indirect_ipw" = CANCER_NHANES_UNCORRECTED
     )
 
 }
 
 estimated_weights <- ipw(stacked_data = stacked)
 
-merged <- cbind(mgi, estimated_weights)
-
-# estimate cancer~female log(OR) -----------------------------------------------
-m0 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged)
-m1 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = WEIGHT_NHANES_NOCAN)
-m2 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = CANCER_NHANES_UNCORRECTED)
-
 ## poststratification weights --------------------------------------------------
 poststratification <- function(
     mgi_data,
+    id_var             = "id",
     last_entry_age_var = "AgeLastEntry",
     cancer_var         = "cancer",
     chd_var            = "cad",
@@ -148,7 +144,7 @@ poststratification <- function(
   Nobs    <- nrow(mgi_data)
   age_vec <- as.numeric(mgi_data[[last_entry_age_var]])
   which_between <- function(vec, mat) {
-    between(x = vec, lower = mat[["lower"]], upper = mat[["upper"]])
+    which(data.table::between(x = vec, lower = mat[["lower"]], upper = mat[["upper"]]))
   }
   
   # cancer prevalence by age (US) 
@@ -160,7 +156,7 @@ poststratification <- function(
   )
   
   cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]], y = c(0, cancer_prevalence[["prevalence"]]), right = FALSE)
-  b <- aggregate(as.formula(paste0(cancer_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  b               <- aggregate(as.formula(paste0(cancer_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
   cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
   
   # diabetes prevalence by age (US)
@@ -173,7 +169,7 @@ poststratification <- function(
   )
   
   diabetes_func_pop <- stepfun(x = diabetes_prevalence[["lower"]], y = c(0, diabetes_prevalence[["prevalence"]]), right = FALSE)
-  d_b <- aggregate(as.formula(paste0(diabetes_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  d_b               <- aggregate(as.formula(paste0(diabetes_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
   diabetes_func_mgi <- stepfun(x = d_b[, 1], y = c(0, d_b[, 2]), right = FALSE)
   
   # chd prevalence by age (us)
@@ -186,7 +182,7 @@ poststratification <- function(
   )
   
   chd_func_pop <- stepfun(x = chd_prevalence[["lower"]], y = c(0, chd_prevalence[["prevalence"]]), right = FALSE)
-  chd_b <- aggregate(as.formula(paste0(chd_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  chd_b        <- aggregate(as.formula(paste0(chd_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
   chd_func_mgi <- stepfun(x = chd_b[, 1], y = c(0, chd_b[, 2]), right = FALSE)
 
   # smoking prevalence by age (us)
@@ -223,12 +219,16 @@ poststratification <- function(
   )
   age_prevalence <- age_grp_table(
     lower_ages   = low_ages,
+    upper_offset = 0,
     num_vec      = (age_counts_male[["counts"]] + age_counts_female[["counts"]]) / total_population,
     num_var_name = "prevalence"
   )
   
-  age_func_pop <- stepfun(x = age_prevalence[["lower"]], y = c(0, age_prevalence[["prevalence"]]), right = FALSE)
-  age_func_mgi <- stepfun(x = age_prevalence[["lower"]], y = as.numeric(c(0, table(cut(age_vec, breaks = c(0, age_prevalence[["upper"]]), labels = age_prevalence[["group"]])) / Nobs)), right = FALSE)
+  age_vals      <- age_prevalence[, group]
+  mgi_age_group <- age_vals[as.vector(unlist(apply(as.matrix(age_vec), 1, FUN = which_between, mat = age_prevalence)))]
+  age_func_pop  <- stepfun(x = age_prevalence[["lower"]], y = c(0, age_prevalence[["prevalence"]]), right = FALSE)
+  age_func_mgi  <- stepfun(x = age_prevalence[["lower"]], y = as.numeric(c(0, table(cut(age_vec, breaks = c(0, age_prevalence[["upper"]]), labels = age_prevalence[["group"]], right = FALSE), useNA = "ifany") / Nobs)), right = FALSE)
+  age_func_mgi2 <- stepfun(x = age_prevalence[["lower"]], y = c(0, as.numeric(table(factor(mgi_age_group, levels = age_vals))) / Nobs), right = FALSE)
   
   # without cancer
   population <- fifelse(mgi_data[[diabetes_var]] == 1, diabetes_func_pop(age_vec), 1 - diabetes_func_pop(age_vec))
@@ -250,7 +250,7 @@ poststratification <- function(
   
   # with cancer
   population <- population * fifelse(mgi_data[[cancer_var]] == 1, cancer_func_pop(age_vec), 1 - cancer_func_pop(age_vec))
-  mgi        <- population * fifelse(mgi_data[[cancer_var]] == 1, cancer_func_mgi(age_vec), 1 - cancer_func_mgi(age_vec))
+  mgi        <- mgi * fifelse(mgi_data[[cancer_var]] == 1, cancer_func_mgi(age_vec), 1 - cancer_func_mgi(age_vec))
   
   if (chop == TRUE) {
     post_cancer <- chopr(population / mgi)
@@ -261,18 +261,35 @@ poststratification <- function(
   
   return(
     data.table(
-      weight_post_no_cancer   = post_no_cancer,
-      cancer_post_uncorrected = post_cancer
+      id              = mgi_data[[id_var]],
+      no_cancer_postw = post_no_cancer,
+      cancer_postw    = post_cancer
     )
   )
 
 }
 
-post   <- poststratification(mgi_data = merged, chop = TRUE)
-merged <- cbind(merged, post)
+post   <- poststratification(mgi_data = mgi, chop = TRUE)
+merged <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, estimated_weights, post))
 
-m1_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = weight_post_no_cancer)
-m2_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_post_uncorrected)
+# estimate cancer~female log(OR) -----------------------------------------------
+## ipw
+m0 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged)
+m1 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = no_cancer_ipw)
+m2 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_indirect_ipw)
+
+m0_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ])
+m1_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = no_cancer_ipw)
+m2_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = cancer_indirect_ipw)
+##
+
+## poststrat
+m1_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = no_cancer_postw)
+m2_ps <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_postw)
+
+m1_ps_bb <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = no_cancer_postw)
+m2_ps_bb <- glm(cancer ~ as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = cancer_postw)
+##
 
 extractr <- function(x, weight_name) {
   suppressMessages({y <- confint(x)})
@@ -289,22 +306,21 @@ log_or_est <- rbindlist(list(
   extractr(x = m0, weight_name = "None"),
   extractr(x = m1, weight_name = "No cancer"),
   extractr(x = m2, weight_name = "Cancer (uncorrected)"),
+  extractr(x = m0_bb, weight_name = "None [BB]"),
+  extractr(x = m1_bb, weight_name = "No cancer [BB]"),
+  extractr(x = m2_bb, weight_name = "Cancer (uncorrected) [BB]"),
   extractr(x = m1_ps, weight_name = "Poststrat: without cancer"),
-  extractr(x = m2_ps, weight_name = "Poststrat: with cancer")
+  extractr(x = m2_ps, weight_name = "Poststrat: with cancer"),
+  extractr(x = m1_ps_bb, weight_name = "Poststrat: without cancer [BB]"),
+  extractr(x = m2_ps_bb, weight_name = "Poststrat: with cancer [BB]")
 ))
 log_or_est
 
-# fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
+fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
 
 # save -------------------------------------------------------------------------
 write_fst(
-  x = merged[, .(
-    id = DeID_PatientID,
-    no_cancer_ipw       = WEIGHT_NHANES_NOCAN,
-    cancer_indirect_ipw = CANCER_NHANES_UNCORRECTED,
-    no_cancer_postw     = weight_post_no_cancer,
-    cancer_postw        = cancer_post_uncorrected
-    )],
+  x = merged[, .(id, no_cancer_ipw, cancer_indirect_ipw, no_cancer_postw, cancer_postw)],
   path = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.fst")
   )
 
