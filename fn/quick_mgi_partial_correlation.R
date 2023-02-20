@@ -1,5 +1,7 @@
-library(data.table)
-library(ppcor)
+suppressPackageStartupMessages({
+  require(data.table)
+  require(ppcor)
+})
 
 quick_mgi_partial_correlation <- function(x) {
   

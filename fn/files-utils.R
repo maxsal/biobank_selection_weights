@@ -1,4 +1,6 @@
-library(glue)
+suppressPackageStartupMessages({
+  require(glue)
+})
 
 ## extract file paths based on data version
 get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {

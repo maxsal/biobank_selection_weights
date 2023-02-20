@@ -1,4 +1,6 @@
-library(data.table)
+suppressPackageStartupMessages({
+  require(data.table)
+})
 
 prepare_nhanes_data <- function(
     nhanes_data,

@@ -1,3 +1,8 @@
+suppressPackageStartupMessages({
+  require(SPAtest)
+  require(logistf)
+})
+
 ### quick_mod -----------
 # function for obtaining beta and p-values using either SPAtest or logistf
 # SPAtest is *much* faster but logistf allows for inclusion of weights

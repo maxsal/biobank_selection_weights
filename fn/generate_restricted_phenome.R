@@ -1,3 +1,7 @@
+suppressPackageStartupMessages({
+  require(data.table)
+  require(glue)
+})
 generate_restricted_phenome <- function(phe_data, threshold, cases, outcome_phe) {
   
   if (!grepl("X", outcome_phe)) {

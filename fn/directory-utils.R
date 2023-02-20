@@ -1,5 +1,10 @@
 ## function that checks for presence of folders corresponding to data date
 ## and, optionally, outcome phecode and makes missing folders if absent
+suppressPackageStartupMessages({
+  require(glue)
+  require(cli)
+})
+
 check_folder_structure <- function(cohort = "mgi", data_version, outcome_phecode) {
   
   created <- 0

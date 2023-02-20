@@ -3,12 +3,13 @@
 # author: max salvatore
 # date:   20230109
 
-require(data.table)
-
-partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NULL) {
+suppressPackageStartupMessages({
   require(data.table)
   require(doMC)
   require(progressr)
+})
+
+partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NULL) {
   registerDoMC(cores = ncore)
   column <- colnames(pim)
   cols   <- 1:ncol(pim)

@@ -5,15 +5,17 @@
 # date:     20230203
 
 # libraries --------------------------------------------------------------------
-library(haven)
-library(survey)
-library(dplyr)
-library(pracma)
-library(simplexreg)
-library(data.table)
-library(glue)
-library(fst)
-library(optparse)
+suppressPackageStartupMessages({
+  library(haven)
+  library(survey)
+  library(dplyr)
+  library(pracma)
+  library(simplexreg)
+  library(data.table)
+  library(glue)
+  library(fst)
+  library(optparse)
+})
 
 # optparse list ---
 option_list <- list(
