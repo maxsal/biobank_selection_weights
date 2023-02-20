@@ -1364,6 +1364,14 @@
       "Hash": "01f28d4278f15c76cddbea05899c5d6f",
       "Requirements": []
     },
+    "plotrix": {
+      "Package": "plotrix",
+      "Version": "3.8-2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2ebe8c2ec200da649738b0fc35a9b1a1",
+      "Requirements": []
+    },
     "plyr": {
       "Package": "plyr",
       "Version": "1.8.8",
@@ -1383,6 +1391,14 @@
       "Requirements": [
         "MASS"
       ]
+    },
+    "pracma": {
+      "Package": "pracma",
+      "Version": "2.4.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "69f905ec128691ff7108de88fc5a4964",
+      "Requirements": []
     },
     "prettyunits": {
       "Package": "prettyunits",
@@ -1710,6 +1726,17 @@
         "sourcetools",
         "withr",
         "xtable"
+      ]
+    },
+    "simplexreg": {
+      "Package": "simplexreg",
+      "Version": "1.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a500512f2521e46fd071924ae57df4b1",
+      "Requirements": [
+        "Formula",
+        "plotrix"
       ]
     },
     "sna": {
