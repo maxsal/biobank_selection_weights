@@ -38,7 +38,7 @@ age_grp_table <- function(
   out <- data.table(
     group      = paste0(lower_ages, c(paste0("-", lower_ages[-1] - 1), upper_char)),
     lower      = lower_ages,
-    upper      = c(lower_ages[-1], upper_val),
+    upper      = c(lower_ages[-1] - 1, upper_val),
     num_var    = num_vec
   )
   setnames(out, "num_var", num_var_name)
