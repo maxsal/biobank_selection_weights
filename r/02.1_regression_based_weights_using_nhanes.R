@@ -39,6 +39,7 @@ option_list <- list(
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
+print(opt)
 
 data_path <- glue("data/private/mgi/{opt$cohort_version}/")
 
