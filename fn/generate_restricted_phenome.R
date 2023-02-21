@@ -9,7 +9,7 @@ generate_restricted_phenome <- function(phe_data, threshold, cases, outcome_phe)
   }
   
   out <- data.table::dcast(
-    unique(phe_data[get(glue::glue("t{threshold}_indicator")) == 1][dsb < get(glue::glue("t{threshold}_threshold"))][, .(id, phecode = paste0("X", phecode))]),
+    unique(phe_data[get(glue::glue("t{threshold}_indicator")) == 1, ][dsb < get(glue::glue("t{threshold}_threshold")), ][, .(id, phecode = paste0("X", phecode))]),
     id ~ phecode,
     value.var     = "phecode",
     fun.aggregate = length,

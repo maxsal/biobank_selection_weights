@@ -8,7 +8,7 @@ library(optparse)
 # optparse list ----
 option_list <- list(
   make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Cohort version in /net/junglebook/magic_data/EHRdata/ [default = '20220822']")
+              help = "Cohort version in /net/junglebook/magic_data/EHRdata/ [default = %default]")
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
@@ -31,6 +31,18 @@ load(file = file_paths[["mgi"]][["phe_overview_file"]])
 load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
                          colClasses = "character")[[1]]
+
+### replace FirstDaySinceBirth and LastDaySinceBirth
+# following a Slack conversation with Lars on 2/21/23, the original values for
+# these variables include ICD codes that cannot be mapped to a phecode and
+# non-ICD code records (e.g., OrderDate_DaysSinceBirth from LabResults)
+MGIcohort <- MGIcohort[, !c("FirstDaySinceBirth", "LastDaySinceBirth")]
+
+first_dsb <- unique(diagnoses_Phecodes[ diagnoses_Phecodes[, .I[which.min(DaysSinceBirth)], "IID"][["V1"]] ][, .(DeID_PatientID = IID, FirstDaySinceBirth = DaysSinceBirth)])
+last_dsb  <- unique(diagnoses_Phecodes[ diagnoses_Phecodes[, .I[which.max(DaysSinceBirth)], "IID"][["V1"]] ][, .(DeID_PatientID = IID, LastDaySinceBirth = DaysSinceBirth)])
+
+MGIcohort <- Reduce(\(x, y) merge.data.table(x, y, by = "DeID_PatientID"), list(MGIcohort, first_dsb, last_dsb))
+###
 
 MGIcohort <- merge.data.table(
   MGIcohort,

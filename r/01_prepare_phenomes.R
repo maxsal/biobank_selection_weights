@@ -6,12 +6,14 @@
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
 
-library(data.table)
-library(fst)
-library(MatchIt)
-library(cli)
-library(optparse)
-library(glue)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(fst)
+  library(MatchIt)
+  library(cli)
+  library(optparse)
+  library(glue)
+})
 
 set.seed(61787)
 
@@ -20,27 +22,26 @@ lapply(list.files("fn/", full.names = TRUE), source) |>  # load functions
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "",
-              help = "Outcome phecode"),
+  make_option("--outcome", type = "character", default = "157",
+              help = "Outcome phecode [default = %default]"),
   make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Version of MGI data [default = 20220822]"),
+              help = "Version of MGI data [default = %default]"),
   make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = 20221117]"),
+              help = "Version of UKB data [default = %default]"),
   make_option("--time_thresholds", type = "character", default = "0,1,2,3,5",
               help = glue("Time thresholds for the phenome data ",
-              "[default = 0,1,2,3,5]")),
+              "[default = %default]")),
   make_option("--nearest_matching_var", type = "character",
               default = "age_at_first_diagnosis,length_followup",
               help = glue("Matching variables by nearest  [default = ",
-                          "age_at_first_diagnosis,length_followup]")),
+                          "%default]")),
   make_option("--exact_matching_var", type = "character", default = "female",
-              help = "Matching variables by exact [default = female]"),
+              help = "Matching variables by exact [default = %default]"),
   make_option("--matching_caliper", type = "numeric", default = "0.25",
-              help = "Matching caliper [default = 0.25]"),
+              help = "Matching caliper [default = %default]"),
   make_option("--matching_ratio", type = "numeric", default = "2",
-              help = "Number of non-cases to match per case [default = 2]")
+              help = "Number of non-cases to match per case [default = %default]")
 )
-
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
@@ -122,7 +123,7 @@ mgi_first_phe <- mgi_full_phe[
 ## ukb
 cli_alert("loading ukb data...")
 ### demographics
-ukb_demo <- fread(file_paths[["ukb"]]$demo_file,
+ukb_demo <- fread(file_paths[["ukb"]][["demo_file"]],
                               na.strings = c("", "NA", "."),
                               colClass = "character")
 ukb_demo <- ukb_demo[, .(
@@ -196,15 +197,25 @@ mgi_post_match_cov <- merge.data.table(
   )[, .(subclass, case_dsb = dsb)],
   by = "subclass"
 )
-for (i in time_thresholds) {
-  mgi_post_match_cov[, (glue("t{i}_threshold")) :=
-                       floor(case_dsb - (365.25 * i))]
-}
-for (i in time_thresholds) {
-  mgi_post_match_cov[, (glue("t{i}_indicator")) :=
-                       as.numeric(all(get(glue("t{i}_threshold")) > first_dsb)),
-                     by = subclass]
-}
+
+lapply(
+  time_thresholds,
+  \(i) {
+    mgi_post_match_cov[, (glue("t{i}_threshold")) :=
+                            floor(case_dsb - (365.25 * i))]
+  }
+) |> invisible()
+
+lapply(
+  time_thresholds,
+  \(i) {
+    mgi_post_match_cov[, (glue("t{i}_indicator")) :=
+                         as.numeric(all(get(glue("t{i}_threshold")) > first_dsb)),
+                       by = subclass]
+  } 
+) |> invisible()
+
+
 if ( !dir.exists( glue("data/private/mgi/{opt$mgi_version}/",
                        "X{gsub('X','', opt$outcome)}/",
                        "time_restricted_phenomes/") ) ) {
@@ -215,7 +226,7 @@ if ( !dir.exists( glue("data/private/mgi/{opt$mgi_version}/",
 ### save mgi matching data
 write_fst(x = mgi_post_match_cov,
           path = glue("data/private/mgi/{opt$mgi_version}/",
-            "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
+                      "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
 
 ## ukb
 cli_alert(glue("performing 1:{opt$matching_ratio} case:non-case ",
@@ -271,14 +282,15 @@ mgi_matched_phe <- merge.data.table(
   mgi_post_match_cov,
   by = "id"
 )
-mgi_pims <- list()
-for (i in seq_along(time_thresholds)) {
-  mgi_pims[[i]] <- generate_restricted_phenome(phe_data    = mgi_matched_phe,
-                                               threshold   = time_thresholds[i],
-                                               cases       = mgi_case_ids,
-                                               outcome_phe = opt$outcome)
-}
+mgi_pims <- lapply(
+  seq_along(time_thresholds),
+  \(i) generate_restricted_phenome(phe_data    = mgi_matched_phe,
+                                   threshold   = time_thresholds[i],
+                                   cases       = mgi_case_ids,
+                                   outcome_phe = opt$outcome)
+)
 names(mgi_pims) <- glue("t{time_thresholds}")
+
 for (i in 1:length(mgi_pims)) {
   write_fst(
     x = mgi_pims[[i]],

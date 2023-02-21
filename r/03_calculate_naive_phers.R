@@ -23,10 +23,10 @@ for (i in list.files("fn/", full.names = TRUE)) source(i) # load functions
 option_list <- list(
   make_option("--outcome", type = "character", default = "",
               help = "Outcome phecode"),
-  make_option("--mgi_version", type = "character", default = "20210318",
-              help = "Version of MGI data [default = 20210318]"),
+  make_option("--mgi_version", type = "character", default = "20220822",
+              help = "Version of MGI data [default = %default]"),
   make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = 20221117]"),
+              help = "Version of UKB data [default = %default]"),
   make_option("--time_threshold", type = "numeric", default = "0",
               help = glue("Time threshold for the phenome data ",
                           "[default = 0]")),
