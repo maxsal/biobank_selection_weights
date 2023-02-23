@@ -259,7 +259,7 @@ auc_plot <- rbindlist(list(in_stuff, out_stuff))  |>
   labs(
     title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
     subtitle = glue("discovery = {opt$discovery_cohort}, external = {ifelse(opt$discovery_cohort == 'mgi', 'ukb', 'mgi')}"),
-    caption  = str_wrap(glue("N_trees = {opt$n_trees}, mtry = {hyper_grid[order(oob_rmse), ][1, mtry]}, node size = {hyper_grid[order(oob_rmse), ][1, node_size]}, sample fraction = {hyper_grid[order(oob_rmse), ][1, sample_size]}"), width = 100)
+    caption  = str_wrap(glue("N_trees = {opt$n_trees}, mtry = {hyper_grid[order(oob_rmse), ][1, mtry]}, node size = {hyper_grid[order(oob_rmse), ][1, node_size]}, sample fraction = {hyper_grid[order(oob_rmse), ][1, sample_frac]}"), width = 100)
   ) +
   coord_equal() +
   cowplot::theme_minimal_grid() +
