@@ -324,8 +324,8 @@ list(
   "vip_plot"              = vip_plot,
   "out_path"              = out_path,
   "optparse_list"         = opt
-) |> saveRDS(file = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_summary.rds"))
+) |> saveRDS(file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_summary.rds"))
   
-saveRDS(optimal_ranger, file = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_optimal_rf.rds"))
+saveRDS(optimal_ranger, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_optimal_rf.rds"))
 
 cli_alert_success("script success! see output in {.path {out_path}}")
