@@ -4,7 +4,12 @@
 # author:   max salvatore
 # date:     20230223
 
+suppressPackageStartupMessages({
+  library(cli)
+  })
+
 # libraries --------------------------------------------------------------------
+cli::cli_alert("loading packages and initializing...")
 suppressPackageStartupMessages({
   library(fst)
   library(vip)
@@ -12,7 +17,6 @@ suppressPackageStartupMessages({
   library(snakecase)
   library(stringr)
   library(cowplot)
-  library(cli)
   library(optparse)
   library(glue)
   library(colorblindr)
@@ -38,7 +42,7 @@ option_list <- list(
   make_option("--strata", type = "character", default = "case",
               help = glue("Strata (outcome variable) for distributing between train/test sets ",
                           "[default = %default]")),
-  make_option("--n_trees", type = "numeric", default = "500",
+  make_option("--n_trees", type = "numeric", default = "1000",
               help = glue("Number of trees to grow in random forest ",
                           "[default = %default]")),
   make_option("--n_vip", type = "numeric", default = "20",
@@ -52,9 +56,18 @@ option_list <- list(
                           "[default = %default]")),
   make_option("--discovery_cohort", type = "character", default = "mgi",
               help = glue("Cohort to use as discovery cohort (mgi / ukb) ",
+                          "[default = %default]")),
+  make_option("--n_mtry", type = "numeric", default = 6,
+              help = glue("Number of values of mtry to consider ",
+                          "[default = %default]")),
+  make_option("--n_node_size", type = "numeric", default = 5,
+              help = glue("Number of values of node_size to consider ",
+                          "[default = %default]")),
+  make_option("--n_samp_frac", type = "numeric", default = 4,
+              help = glue("Number of values of sample to consider ",
                           "[default = %default]"))
 )
-parser <- OptionParser(usage="%prog [options]", option_list = option_list)
+parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
@@ -67,12 +80,9 @@ if (parallel::detectCores() == 1) {
 } else {
   n_cores <- parallel::detectCores() * opt$n_core_prop
 }
+
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
-
-## extract file paths - UNNECESSARY?!
-file_paths <- get_files(mgi_version = opt$mgi_version,
-                        ukb_version = opt$ukb_version)
 
 # check output folder exists ---------------------------------------------------
 out_path <- glue("results/{coh}/{coh_version}/X{outc}/random_forest/",
@@ -157,12 +167,13 @@ data_test  <- testing(data_split)
 
 # full grid search
 hyper_grid <- expand.grid(
-  mtry        = round(seq(5, round(ncol(data_train) / 2), length.out = 5)),
-  node_size   = round(seq(3, round(nrow(data_train) / 100), length.out = 5)),
-  sample_size = seq(0.5, 0.8, length.out = 4),
+  mtry        = round(seq(5, round(ncol(data_train) / 2), length.out = opt$n_mtry)),
+  node_size   = round(seq(3, round(nrow(data_train) / 100), length.out = opt$n_node_size)),
+  sample_frac = seq(0.5, 0.8, length.out = opt$n_samp_frac),
   oob_rmse    = 0
 ) |> as.data.table()
 
+cli_alert("Trying {opt$n_mtry} values of mtry, {opt$n_node_size} of node size, {opt$n_samp_frac} values of sample fraction ({nrow(hyper_grid)} combinations)")
 
 cli_progress_bar(total = nrow(hyper_grid), "Optimizing hyperparameters")
 for (i in 1:nrow(hyper_grid)) {
@@ -172,7 +183,7 @@ for (i in 1:nrow(hyper_grid)) {
     num.trees       = opt$n_trees,
     mtry            = hyper_grid$mtry[i],
     min.node.size   = hyper_grid$node_size[i],
-    sample.fraction = hyper_grid$sample_size[i],
+    sample.fraction = hyper_grid$sample_frac[i],
     num.threads     = n_cores
   )
   hyper_grid$oob_rmse[i] <- sqrt(model$prediction.error)
