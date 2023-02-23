@@ -144,7 +144,7 @@ u <- u[, ..keep_these_vars]
 if (opt$discovery_cohort == "mgi") {
   data     <- d
   external <- u
-} else if (opt$discover_cohort == "ukb") {
+} else if (opt$discovery_cohort == "ukb") {
   data     <- u
   external <- d
 } else {
@@ -264,6 +264,7 @@ auc_plot <- rbindlist(list(in_stuff, out_stuff))  |>
   coord_equal() +
   cowplot::theme_minimal_grid() +
   theme(
+    plot.caption = element_text(hjust = 0),
     legend.position = "top",
     legend.title    = element_blank()
   )
@@ -299,6 +300,7 @@ vip_plot <- vip_data |>
   coord_flip() +
   cowplot::theme_minimal_grid() +
   theme(
+    plot.caption = element_text(hjust = 0)
     legend.position = "bottom",
     legend.title = element_blank()
   )
