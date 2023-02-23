@@ -15,7 +15,7 @@ system(glue("/usr/bin/time -v -o logs/00_prepare_mgi_data.txt Rscript r/",
 # phase 1 scripts --------------------------------------------------------------
 ## conduct a PCA analysis in MGI and UKB
 system(glue("/usr/bin/time -v -o logs/01_pca_analysis.txt Rscript r/",
-            "01_pca_analysis.R")) ##!!!this script is not yet optparsified!!!
+            "01_pca_analysis.R"))
 
 ## calculate partial correlations in MGI
 system(glue("/usr/bin/time -v -o logs/01_mgi_partial_correlations.txt Rscript r/",
@@ -24,7 +24,7 @@ system(glue("/usr/bin/time -v -o logs/01_mgi_partial_correlations.txt Rscript r/
 
 ## prepare time-restricted phenomes in MGI and UKB
 system(glue("/usr/bin/time -v -o logs/01_prepare_phenomes.txt Rscript r/",
-            "01_prepare_phenomes.R --mgi_version={mgi_version} --ukb_version={ukb_version}",
+            "01_prepare_phenomes.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
             "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome}"))
 
 ## estimate ipw and poststratification weights in MGI
