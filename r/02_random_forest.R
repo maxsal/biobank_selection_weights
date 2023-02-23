@@ -202,7 +202,7 @@ for (i in seq_along(oob_rmse)) {
     num.trees       = opt$n_trees,
     mtry            = hyper_grid[order(oob_rmse), ][1, mtry],
     min.node.size   = hyper_grid[order(oob_rmse), ][1, node_size],
-    sample.fraction = hyper_grid[order(oob_rmse), ][1, sample_size],
+    sample.fraction = hyper_grid[order(oob_rmse), ][1, sample_frac],
     importance      = "impurity",
     num.threads     = n_cores
   )
