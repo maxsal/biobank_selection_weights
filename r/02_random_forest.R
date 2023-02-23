@@ -42,7 +42,7 @@ option_list <- list(
   make_option("--strata", type = "character", default = "case",
               help = glue("Strata (outcome variable) for distributing between train/test sets ",
                           "[default = %default]")),
-  make_option("--n_trees", type = "numeric", default = "1000",
+  make_option("--n_trees", type = "numeric", default = "500",
               help = glue("Number of trees to grow in random forest ",
                           "[default = %default]")),
   make_option("--n_vip", type = "numeric", default = "20",
@@ -105,7 +105,8 @@ d <- merge.data.table(
   by = "id",
   all.x = TRUE
 )
-d <- d[, !c("id")]
+d_ids <- d[, .(id, case)]
+
 
 u <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.fst"),
               as.data.table = TRUE)
@@ -117,7 +118,7 @@ u <- merge.data.table(
   by = "id",
   all.x = TRUE
 )
-u <- u[, !c("id")]
+u_ids <- u[, .(id, case)]
 
 p <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
            colClasses = "character")
@@ -155,7 +156,7 @@ if (opt$discovery_cohort == "mgi") {
 cli_alert("splitting data...")
 if (!is.null(opt$strata)) {
   data_split <- initial_split(data,
-                              prop = opt$split_prop,
+                              prop   = opt$split_prop,
                               strata = opt$strata)
 } else {
   data_split <- initial_split(data,
@@ -164,6 +165,10 @@ if (!is.null(opt$strata)) {
 
 data_train <- training(data_split)
 data_test  <- testing(data_split)
+
+test_ids <- data_test[, .(id, case)]
+
+data[, id := NULL]
 
 # full grid search
 hyper_grid <- expand.grid(
@@ -307,11 +312,67 @@ vip_plot <- vip_data |>
 ggsave(plot = vip_plot,
        filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_vip.pdf"),
        width = 10, height = 8, device = cairo_pdf)
+  
+saveRDS(optimal_ranger, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_optimal_rf.rds"))
+
+
+if (opt$discovery_cohort == "mgi") {
+  mgi <- data.table(
+    phers  = ((pred_opt[["predictions"]] - mean(pred_opt[["predictions"]], na.rm = TRUE)) / sd(pred_opt[["predictions"]], na.rm = TRUE)),
+    cohort = "mgi",
+    type = "test set")
+  mgi <- cbind(mgi, test_ids)
+} else {
+  mgi <- data.table(
+    phers  = ((pred_oth[["predictions"]] - mean(pred_oth[["predictions"]], na.rm = TRUE)) / sd(pred_oth[["predictions"]], na.rm = TRUE)),
+    cohort = "mgi",
+    type = "external")
+  mgi <- cbind(mgi, d_ids)
+}
+
+if (opt$discovery_cohort == "ukb") {
+  ukb <- data.table(
+    phers  = ((pred_opt[["predictions"]] - mean(pred_opt[["predictions"]], na.rm = TRUE)) / sd(pred_opt[["predictions"]], na.rm = TRUE)),
+    cohort = "ukb",
+    type = "test set")
+  ukb <- cbind(ukb, test_ids)
+} else {
+  ukb <- data.table(
+    phers  = ((pred_oth[["predictions"]] - mean(pred_oth[["predictions"]], na.rm = TRUE)) / sd(pred_oth[["predictions"]], na.rm = TRUE)),
+    cohort = "ukb",
+    type = "external")
+  ukb <- cbind(ukb, u_ids)
+}
+
+mgi_mod <- glm(case ~ phers, data = mgi, family = binomial())
+ukb_mod <- glm(case ~ phers, data = ukb, family = binomial())
+extractr <- function(x) {
+  suppressMessages(y <- confint(x))
+  data.table(
+    or_est = exp(coef(x)[["phers"]]),
+    or_lo = exp(y["phers", 1]),
+    or_hi = exp(y["phers", 2])
+  )[, print := paste0(round(or_est, 3), " (", round(or_lo, 3), ", ", round(or_hi, 3), ")")][]
+}
+or_sum <- rbindlist(list(
+  cbind(data.table(cohort = "mgi"), extractr(mgi_mod)),
+  cbind(data.table(cohort = "ukb"), extractr(ukb_mod))
+))
+
+total_sum <- merge.data.table(
+  auc_sum,
+  or_sum,
+  by = "cohort"
+)
+
+total_sum
 
 list(
   "discovery_cohort"      = opt$discovery_cohort,
   "external_cohort"       = ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi"),
-  "auc_summary"           = auc_sum,
+  "discovery_test_phers"  =  ifelse(opt$discovery_cohort == "mgi", mgi, ukb),
+  "external_phers"        = ifelse(opt$discovery_cohort == "mgi", ukb, mgi),
+  "total_summary"         = total_sum,
   "discovery_sense_spec"  = in_stuff,
   "external_sense_spec"   = out_stuff,
   "vip_table"             = data.table(
@@ -325,7 +386,5 @@ list(
   "out_path"              = out_path,
   "optparse_list"         = opt
 ) |> saveRDS(file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_summary.rds"))
-  
-saveRDS(optimal_ranger, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_optimal_rf.rds"))
 
 cli_alert_success("script success! see output in {.path {out_path}}")
