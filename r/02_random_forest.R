@@ -5,19 +5,21 @@
 # date:     20230223
 
 # libraries --------------------------------------------------------------------
-library(fst)
-library(vip)
-library(data.table)
-library(snakecase)
-library(stringr)
-library(cowplot)
-library(cli)
-library(optparse)
-library(glue)
-library(colorblindr)
-library(rsample)      # data splitting
-library(ranger)       # a faster implementation of randomForest
-library(caret)        # an aggregator package for performing many 
+suppressPackageStartupMessages({
+  library(fst)
+  library(vip)
+  library(data.table)
+  library(snakecase)
+  library(stringr)
+  library(cowplot)
+  library(cli)
+  library(optparse)
+  library(glue)
+  library(colorblindr)
+  library(rsample)      # data splitting
+  library(ranger)       # a faster implementation of randomForest
+  library(caret)        # an aggregator package for performing many 
+})
 
 # optparse list ---
 option_list <- list(
@@ -29,7 +31,7 @@ option_list <- list(
               help = "Version of UKB data [default = %default]"),
   make_option("--time_threshold", type = "numeric", default = "0",
               help = glue("Time threshold for the phenome data ",
-                          "[default = 0]")),
+                          "[default = %default]")),
   make_option("--split_prop", type = "numeric", default = "0.7",
               help = glue("Proportion of data in training set ",
                           "[default = %default]")),
@@ -56,6 +58,8 @@ parser <- OptionParser(usage="%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
+
+set.seed(opt$seed)
 
 if (parallel::detectCores() == 1) {
   cli_alert_warning("Only 1 core detected - this could be a while!")
