@@ -264,7 +264,7 @@ auc_plot <- rbindlist(list(in_stuff, out_stuff))  |>
   coord_equal() +
   cowplot::theme_minimal_grid() +
   theme(
-    plot.caption = element_text(hjust = 0),
+    plot.caption    = element_text(hjust = 0),
     legend.position = "top",
     legend.title    = element_blank()
   )
@@ -300,9 +300,9 @@ vip_plot <- vip_data |>
   coord_flip() +
   cowplot::theme_minimal_grid() +
   theme(
-    plot.caption = element_text(hjust = 0)
+    plot.caption    = element_text(hjust = 0),
     legend.position = "bottom",
-    legend.title = element_blank()
+    legend.title    = element_blank()
   )
 ggsave(plot = vip_plot,
        filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_vip.pdf"),
