@@ -187,7 +187,7 @@ if (is.null(opt$inner_folds)) {
     family     = binomial(),
     cvControl  = list(V = opt$folds)
   )
-  super_learner
+  print(super_learner)
   cli_alert_info("SuperLearner took {prettyunits::pretty_sec(super_learner$times$everything['elapsed'])} to run")
   sl <- super_learner
 } else {
@@ -378,6 +378,7 @@ list(
   "discovery_cohort"      = opt$discovery_cohort,
   "external_cohort"       = external_cohort,
   "total_summary"         = total_sum,
+  "super_learner_summary" = sl,
   "discovery_sense_spec"  = in_stuff,
   "external_sense_spec"   = out_stuff,
   "out_path"              = out_path,
