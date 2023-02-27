@@ -81,6 +81,7 @@ external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
 
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
+source("fn/super_learner-utils.R")
 
 # check output folder exists ---------------------------------------------------
 out_path <- glue("results/{coh}/{coh_version}/X{outc}/super_learner/",
@@ -162,10 +163,10 @@ train_ids    <- data_train[, .(id, case)]
 test_ids     <- data_test[, .(id, case)]
 external_ids <- external[, .(id, case)]
 
-data_train_covs <- data_train[, !c("case")]
+data_train_covs <- data_train[, !c("id", "case")]
 data_train_y    <- data_train[, case]
 
-data_test_covs <- data_test[, !c("case")]
+data_test_covs <- data_test[, !c("id", "case")]
 data_test_y    <- data_test[, case]
 
 external_covs <- external[, !c("id", "case")]
@@ -177,7 +178,7 @@ SL_library <- list("SL.ranger", "SL.glm", c("SL.glmnet", "screen.corP"),
 cli_alert("Using the following libraries for SuperLearner:")
 print(SL_library)
 
-if (!is.null(opt$inner_folds)) {
+if (is.null(opt$inner_folds)) {
   cli_alert("Running SuperLearner - set opt$inner_folds to execute external cross validation")
   super_learner <- SuperLearner(
     Y          = data_train_y,
