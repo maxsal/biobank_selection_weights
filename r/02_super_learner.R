@@ -227,7 +227,7 @@ suppressMessages({
 })
 
 pretty_print <- function(x, r = 3) {
-  paste0( round(x[2], r), " (", round(x[1], r), ", ", round(x[3], r), ")")
+  paste0( format(round(x[2], r), nsmall = r), " (", format(round(x[1], r), nsmall = r), ", ", format(round(x[3], r), nsmall = r), ")")
 }
 
 # outputs ----------------------------------------------------------------------
