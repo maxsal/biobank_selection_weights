@@ -20,7 +20,6 @@ suppressPackageStartupMessages({
   library(optparse)
   library(glue)
   library(colorblindr)
-  library(rsample)      # data splitting
   library(ranger)       # a faster implementation of randomForest
   library(caret)        # an aggregator package for performing many 
 })
@@ -81,6 +80,9 @@ if (parallel::detectCores() == 1) {
   n_cores <- parallel::detectCores() * opt$n_core_prop
 }
 
+test_cohort     <- opt$discovery_cohort
+external_cohort <- ifelse(test_cohort == "mgi", "ukb", "mgi")
+
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
 
@@ -97,27 +99,11 @@ if (!dir.exists(out_path)) {
 cli_alert("reading data...")
 d <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$mgi_version}.fst"),
               as.data.table = TRUE)
-d_c <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-d <- merge.data.table(
-  d,
-  d_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 d_ids <- d[, .(id, case)]
 
 
 u <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.fst"),
               as.data.table = TRUE)
-u_c <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-u <- merge.data.table(
-  u,
-  u_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 u_ids <- u[, .(id, case)]
 
 p <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
@@ -154,21 +140,28 @@ if (opt$discovery_cohort == "mgi") {
 
 # below is function or script
 cli_alert("splitting data...")
-if (!is.null(opt$strata)) {
-  data_split <- initial_split(data,
-                              prop   = opt$split_prop,
-                              strata = opt$strata)
-} else {
-  data_split <- initial_split(data,
-                              prop = opt$split_prop)
-}
 
-data_train <- training(data_split)
-data_test  <- testing(data_split)
+train_obs <- sample(seq_len(nrow(data)), size = round( nrow(data) *  opt$split_prop ))
 
-test_ids <- data_test[, .(id, case)]
+data_train <- data[train_obs, ]
+data_test  <- data[!train_obs, ]
 
-data[, id := NULL]
+train_ids    <- data_train[, .(id, case)]
+test_ids     <- data_test[, .(id, case)]
+external_ids <- external[, .(id, case)]
+
+data_train <- data_train[, !c("id")]
+data_test  <- data_test[, !c("id")]
+external   <- external[, !c("id")]
+
+data_train_covs <- data_train[, !c("case")]
+data_train_y    <- data_train[, case]
+
+data_test_covs <- data_test[, !c("case")]
+data_test_y    <- data_test[, case]
+
+external_covs <- external[, !c("case")]
+external_y    <- external[, case]
 
 # full grid search
 hyper_grid <- expand.grid(
@@ -216,15 +209,31 @@ for (i in seq_along(oob_rmse)) {
 }
 
 # predicting -------------------------------------------------------------------
+phers_from_pred <- function(case_data, predicted) {
+  out <- cbind(case_data, pred = predicted)
+  out[, phers := scale(pred)][]
+}
+
 suppressMessages({
-  pred_opt     <- predict(optimal_ranger, data_test, type = "response")
-  pred_opt_roc <- pROC::roc(data_test[, case], pred_opt[["predictions"]])
-  pred_opt_auc <- pROC::ci.auc(data_test[, case], pred_opt[["predictions"]])
+  pred_opt      <- predict(optimal_ranger, data_test, type = "response")
+  test_phers    <- phers_from_pred(case_data = test_ids, predicted = pred_opt[["predictions"]])
+  pred_opt_roc  <- pROC::roc(test_phers[, case], test_phers[, phers])
+  pred_opt_auc  <- pROC::ci.auc(test_phers[, case], test_phers[, phers])
   
-  pred_oth     <- predict(optimal_ranger, external, type = "response")
-  pred_oth_roc <- pROC::roc(external[, case], pred_oth[["predictions"]])
-  pred_oth_auc <- pROC::ci.auc(external[, case], pred_oth[["predictions"]])
+  pred_oth       <- predict(optimal_ranger, external, type = "response")
+  external_phers <- phers_from_pred(case_data = external_ids, predicted = pred_oth[["predictions"]])
+  pred_oth_roc   <- pROC::roc(external_phers[, case], external_phers[, phers])
+  pred_oth_auc   <- pROC::ci.auc(external_phers[, case], external_phers[, phers])
 })
+
+write_fst(
+  x = test_phers,
+  path = glue("{out_path}{test_cohort}d_{test_cohort}e_t{opt$time_threshold}_test_phers.fst")
+)
+write_fst(
+  x = external_phers,
+  path = glue("{out_path}{test_cohort}d_{external_cohort}e_t{opt$time_threshold}_external_phers.fst")
+)
 
 pretty_print <- function(x, r = 3) {
   paste0( round(x[2], r), " (", round(x[1], r), ", ", round(x[3], r), ")")
@@ -233,17 +242,17 @@ pretty_print <- function(x, r = 3) {
 in_stuff <- data.table(
   sensitivity = pred_opt_roc$sensitivities,
   specificity = pred_opt_roc$specificities,
-  test_data   = "Hold-out test data"
+  test_data   = paste0(toupper(test_cohort), " (test)")
 )
 out_stuff <- data.table(
   sensitivity = pred_oth_roc$sensitivities,
   specificity = pred_oth_roc$specificities,
-  test_data   = "External data"
+  test_data   = paste0(toupper(external_cohort), " (external)")
 )
 
 auc_sum <- data.table(
   test_data = c("Hold-out test data", "External data"),
-  cohort    = c(opt$discovery_cohort, ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")),
+  cohort    = c(test_cohort, external_cohort),
   auc_est   = c(pred_opt_auc[2], pred_oth_auc[2]),
   auc_lo    = c(pred_opt_auc[1], pred_oth_auc[1]),
   auc_hi    = c(pred_opt_auc[3], pred_oth_auc[3]),
@@ -263,7 +272,6 @@ auc_plot <- rbindlist(list(in_stuff, out_stuff))  |>
   ) +
   labs(
     title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
-    subtitle = glue("discovery = {opt$discovery_cohort}, external = {ifelse(opt$discovery_cohort == 'mgi', 'ukb', 'mgi')}"),
     caption  = str_wrap(glue("N_trees = {opt$n_trees}, mtry = {hyper_grid[order(oob_rmse), ][1, mtry]}, node size = {hyper_grid[order(oob_rmse), ][1, node_size]}, sample fraction = {hyper_grid[order(oob_rmse), ][1, sample_frac]}"), width = 100)
   ) +
   coord_equal() +
@@ -317,31 +325,15 @@ saveRDS(optimal_ranger, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({
 
 
 if (opt$discovery_cohort == "mgi") {
-  mgi <- data.table(
-    phers  = ((pred_opt[["predictions"]] - mean(pred_opt[["predictions"]], na.rm = TRUE)) / sd(pred_opt[["predictions"]], na.rm = TRUE)),
-    cohort = "mgi",
-    type = "test set")
-  mgi <- cbind(mgi, test_ids)
+  mgi <- test_phers[, type := "test set"]
 } else {
-  mgi <- data.table(
-    phers  = ((pred_oth[["predictions"]] - mean(pred_oth[["predictions"]], na.rm = TRUE)) / sd(pred_oth[["predictions"]], na.rm = TRUE)),
-    cohort = "mgi",
-    type = "external")
-  mgi <- cbind(mgi, d_ids)
+  mgi <- external_phers[, type := "external"]
 }
 
 if (opt$discovery_cohort == "ukb") {
-  ukb <- data.table(
-    phers  = ((pred_opt[["predictions"]] - mean(pred_opt[["predictions"]], na.rm = TRUE)) / sd(pred_opt[["predictions"]], na.rm = TRUE)),
-    cohort = "ukb",
-    type = "test set")
-  ukb <- cbind(ukb, test_ids)
+  ukb <- test_phers[, type := "test set"]
 } else {
-  ukb <- data.table(
-    phers  = ((pred_oth[["predictions"]] - mean(pred_oth[["predictions"]], na.rm = TRUE)) / sd(pred_oth[["predictions"]], na.rm = TRUE)),
-    cohort = "ukb",
-    type = "external")
-  ukb <- cbind(ukb, u_ids)
+  ukb <- external_phers[, type := "external"]
 }
 
 mgi_mod <- glm(case ~ phers, data = mgi, family = binomial())
@@ -367,11 +359,57 @@ total_sum <- merge.data.table(
 
 total_sum
 
+# phers distribution by case status ---
+test_phers_dist_plot <- test_phers |>
+  ggplot(aes(x = phers)) +
+  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
+  scale_fill_OkabeIto() +
+  scale_color_OkabeIto() +
+  labs(
+    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+    subtitle = glue("In {toupper(test_cohort)} hold out test sample"),
+    x = "PheRS (mean standardized)",
+    y = "Density",
+    caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
+  ) +
+  cowplot::theme_minimal_grid() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.caption = element_text(hjust = 0)
+  )
+ggsave(plot = test_phers_dist_plot,
+       filename = glue("{out_path}{test_cohort}d__{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_test_phers_dist.pdf"),
+       width = 6, height = 6, device = cairo_pdf)
+
+external_phers_dist_plot <- external_phers |>
+  ggplot(aes(x = phers)) +
+  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
+  scale_fill_OkabeIto() +
+  scale_color_OkabeIto() +
+  labs(
+    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+    subtitle = glue("In {toupper(external_cohort)} external sample"),
+    x = "PheRS (mean standardized)",
+    y = "Density",
+    caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
+  ) +
+  cowplot::theme_minimal_grid() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.caption = element_text(hjust = 0)
+  )
+ggsave(plot = external_phers_dist_plot,
+       filename = glue("{out_path}{test_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_external_phers_dist.pdf"),
+       width = 6, height = 6, device = cairo_pdf)
+
+# optimal ranger object
+saveRDS(optimal_ranger, file = glue("{out_path}{test_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_ranger.rds"))
+
 list(
   "discovery_cohort"      = opt$discovery_cohort,
   "external_cohort"       = ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi"),
-  "discovery_test_phers"  =  ifelse(opt$discovery_cohort == "mgi", mgi, ukb),
-  "external_phers"        = ifelse(opt$discovery_cohort == "mgi", ukb, mgi),
   "total_summary"         = total_sum,
   "discovery_sense_spec"  = in_stuff,
   "external_sense_spec"   = out_stuff,
@@ -379,7 +417,6 @@ list(
     variable = names(optimal_ranger$variable.importance),
     importance = optimal_ranger$variable.importance
   )[order(-importance), ],
-  "optimal_forest_object" = optimal_ranger,
   "hyper_grid"            = hyper_grid,
   "auc_plot"              = auc_plot,
   "vip_plot"              = vip_plot,
