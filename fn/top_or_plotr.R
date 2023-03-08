@@ -98,23 +98,23 @@ top_or_plotr <- function(phers_data, phers_var = "phers", probs = c(0.25, 0.1, 0
   
   top_or_plot <- ggplot() +
     geom_ribbon(
-      data = d[!is.na(t), ],
+      data = density_data[!is.na(t), ],
       aes(x = new_x, ymin = 0, ymax = max_y, fill = t), alpha = 0.4
     ) +
     geom_vline(
-      data = d[!is.na(t), .SD[which.min(new_x)], by = t],
+      data = density_data[!is.na(t), .SD[which.min(new_x)], by = t],
       aes(xintercept = new_x, color = t), linewidth = 1
     ) +
     annotation_custom(
       ggplotGrob(or_table),
-      xmax = max(test_dat[, x], na.rm = TRUE),
-      xmin = max(test_dat[, x], na.rm = TRUE) - 2, ymin = max(test_dat[, y], na.rm = TRUE) - 0.2,
-      ymax = max(test_dat[, y], na.rm = TRUE)
+      xmax = max(prep_data[, x], na.rm = TRUE),
+      xmin = max(prep_data[, x], na.rm = TRUE) - 2, ymin = max(prep_data[, y], na.rm = TRUE) - 0.2,
+      ymax = max(prep_data[, y], na.rm = TRUE)
     ) +
     scale_fill_OkabeIto() +
     scale_color_OkabeIto() +
     new_scale_color() +
-    geom_line(data = test_dat, aes(x = x, y = y, group = factor(case), color = factor(case)), linewidth = 1) +
+    geom_line(data = prep_data, aes(x = x, y = y, group = factor(case), color = factor(case)), linewidth = 1) +
     scale_color_manual(values = c("red", "black")) +
     labs(
       x = "PheRS (mean standardized)",
