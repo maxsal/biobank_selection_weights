@@ -4,7 +4,7 @@ library(glue)
 mgi_version     <- "20220822"
 ukb_version     <- "20221117"
 outcome         <- "157"
-time_thresholds <- c(0, 1, 2, 3, 5)
+time_thresholds <- c(0, 0.5, 1, 2, 3, 5)
 use_geno_pcs    <- TRUE
 
 # phase 0 scripts --------------------------------------------------------------
@@ -32,6 +32,19 @@ system(glue("/usr/bin/time -v -o logs/01_estimate_weights.txt Rscript r/",
             "01_estimate_weights.R --cohort_version={mgi_version}"))
 
 ## phase 2 scripts -------------------------------------------------------------
+for (i in seq_along(time_thresholds)) {
+  cli::cli_alert_info("running random forest at {time_thresholds[i]}")
+  system(glue("/usr/bin/time -v -o logs/02_random_forest.txt Rscript r/",
+              "02_random_forest.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
+              "--time_threshold={time_thresholds[i]} --outcome={outcome}"))
+}
+
+for (i in seq_along(time_thresholds)) {
+  cli::cli_alert_info("running SuperLearner at {time_thresholds[i]}")
+  system(glue("/usr/bin/time -v -o logs/02_super_learner.txt Rscript r/",
+              "02_super_learner.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
+              "--time_threshold={time_thresholds[i]} --outcome={outcome}"))
+}
 
 ## phase 3 scripts -------------------------------------------------------------
 for (i in time_thresholds) {
