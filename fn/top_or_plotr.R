@@ -38,7 +38,7 @@ approximate_density <- function(.input_dat, .probs = c(0.25, 0.1, 0.01), .cut_po
   }
   
   out <- data.table(
-    new_x = seq(min(test_dat[, x], na.rm = TRUE), max(test_dat[, x], na.rm = TRUE), length.out = 500)
+    new_x = seq(min(.input_dat[, x], na.rm = TRUE), max(.input_dat[, x], na.rm = TRUE), length.out = 500)
   )[, `:=` (
     case_y    = approximatr(xs = .input_dat[case == "Cases", x], ys = .input_dat[case == "Cases", y], b = new_x),
     control_y = approximatr(xs = .input_dat[case == "Controls", x], ys = .input_dat[case == "Controls", y], b = new_x)
