@@ -22,6 +22,10 @@ suppressPackageStartupMessages({
   library(colorblindr)
   library(ranger)       # a faster implementation of randomForest
   library(caret)        # an aggregator package for performing many 
+  library(ggnewscale)
+  library(ggpubr)
+  library(scales)
+  library(logistf)
 })
 
 # optparse list ---
@@ -85,6 +89,7 @@ external_cohort <- ifelse(test_cohort == "mgi", "ukb", "mgi")
 
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
+source("fn/top_or_plotr.R")
 
 # check output folder exists ---------------------------------------------------
 out_path <- glue("results/{coh}/{coh_version}/X{outc}/random_forest/",
@@ -188,7 +193,7 @@ for (i in 1:nrow(hyper_grid)) {
   cli_progress_update()
 }
 
-hyper_grid[order(oob_rmse),][1, ]
+hyper_grid[order(oob_rmse), ][1, ]
 
 oob_rmse <- vector(mode = "numeric", length = 100)
 
@@ -360,49 +365,23 @@ total_sum <- merge.data.table(
 total_sum
 
 # phers distribution by case status ---
-test_phers_dist_plot <- test_phers |>
-  ggplot(aes(x = phers)) +
-  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
-  scale_fill_OkabeIto() +
-  scale_color_OkabeIto() +
-  labs(
-    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
-    subtitle = glue("In {toupper(test_cohort)} hold out test sample"),
-    x = "PheRS (mean standardized)",
-    y = "Density",
-    caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
-  ) +
-  cowplot::theme_minimal_grid() +
-  theme(
-    legend.position = "top",
-    legend.title = element_blank(),
-    plot.caption = element_text(hjust = 0)
-  )
+test_phers_dist_plot <- top_or_plotr(phers_data = test_phers,
+                                     .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+                                     .subtitle = glue("In {toupper(test_cohort)} hold out test sample"),
+                                     .caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
+
 ggsave(plot = test_phers_dist_plot,
        filename = glue("{out_path}{test_cohort}d__{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_test_phers_dist.pdf"),
-       width = 6, height = 6, device = cairo_pdf)
+       width = 8, height = 6, device = cairo_pdf)
 
-external_phers_dist_plot <- external_phers |>
-  ggplot(aes(x = phers)) +
-  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
-  scale_fill_OkabeIto() +
-  scale_color_OkabeIto() +
-  labs(
-    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
-    subtitle = glue("In {toupper(external_cohort)} external sample"),
-    x = "PheRS (mean standardized)",
-    y = "Density",
-    caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
-  ) +
-  cowplot::theme_minimal_grid() +
-  theme(
-    legend.position = "top",
-    legend.title = element_blank(),
-    plot.caption = element_text(hjust = 0)
-  )
+external_phers_dist_plot <- top_or_plotr(phers_data = external_phers,
+                                         .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+                                         .subtitle = glue("In {toupper(external_cohort)} external sample"),
+                                         .caption = str_wrap(glue("Discovery cohort = {test_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
+  
 ggsave(plot = external_phers_dist_plot,
        filename = glue("{out_path}{test_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_external_phers_dist.pdf"),
-       width = 6, height = 6, device = cairo_pdf)
+       width = 8, height = 6, device = cairo_pdf)
 
 # optimal ranger object
 saveRDS(optimal_ranger, file = glue("{out_path}{test_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_ranger.rds"))
