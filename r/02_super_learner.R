@@ -86,7 +86,7 @@ external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
 source("fn/super_learner-utils.R")
-
+source("fn/top_or_plotr.R")
 
 # check output folder exists ---------------------------------------------------
 out_path <- glue("results/{coh}/{coh_version}/X{outc}/super_learner/",
