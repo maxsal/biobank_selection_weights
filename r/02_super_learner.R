@@ -337,7 +337,7 @@ ggsave(plot = auc_plot,
 test_phers_dist_plot <- top_or_plotr(phers_data = test_phers,
                                      .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
                                      .subtitle = glue("SuperLearner model in {toupper(opt$discovery_cohort)} hold out test sample"),
-                                     str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
+                                     .caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
 
 ggsave(plot = test_phers_dist_plot,
        filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_test_phers_dist.pdf"),
@@ -345,7 +345,7 @@ ggsave(plot = test_phers_dist_plot,
 
 external_phers_dist_plot <- top_or_plotr(phers_data = external_phers,
                                          .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
-                                         .subtitle = glue("SuperLearner model in {external_cohort} external sample"),
+                                         .subtitle = glue("SuperLearner model in {toupper(external_cohort)} external sample"),
                                          .caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
 
 ggsave(plot = external_phers_dist_plot,
