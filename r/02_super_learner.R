@@ -27,6 +27,9 @@ suppressPackageStartupMessages({
   library(e1071)
   library(bartMachine)
   library(prettyunits)
+  library(ggnewscale)
+  library(ggpubr)
+  library(scales)
 })
 
 # optparse list ---
