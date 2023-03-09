@@ -98,12 +98,12 @@ getValues <- function(fitAsso, predictor) {
 
 # calculate_phers --------------------------------------------------------------
 calculate_phers <- function(
-    pim,                 # phecode indicator matrix
-    res,                 # results matrix - phecode, beta, p-value
-    method,              # tophits or pwide_sig
-    tophits_n    = 50,   # n of hits to select based on p-value
-    bonf_tests   = NULL, # denominator of bonferroni correction
-    reverse_code = FALSE # reverse code negatives to keep phers above 0?
+    pim,                  # phecode indicator matrix
+    res,                  # results matrix - phecode, beta, p-value
+    method,               # tophits or pwide_sig
+    tophits_n    = 50,    # n of hits to select based on p-value
+    bonf_tests   = NULL,  # denominator of bonferroni correction
+    reverse_code = FALSE, # reverse code negatives to keep phers above 0?
     corr_remove  = 0.25
     ) {
   
