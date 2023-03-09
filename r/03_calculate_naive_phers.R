@@ -67,11 +67,11 @@ if (!dir.exists(out_path)) {
 
 # 2. specifications (specifies outcome) ----------------------------------------
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
-w               <- ifelse(is.null(opt$weights), "naive", paste0(opt$weights, opt$tophits_n))
+w               <- ifelse(is.null(opt$weights), "naive", opt$weights)
 
-mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}_{w}_")
-ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}_{w}_")
-comb_out_prefix <- glue("{opt$discovery_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}_{w}_")
+mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
+ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
+comb_out_prefix <- glue("{opt$discovery_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
 
 ## extract file paths
 file_paths <- get_files(mgi_version = opt$mgi_version,
