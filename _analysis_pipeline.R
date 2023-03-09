@@ -35,12 +35,15 @@ system(glue("/usr/bin/time -v -o logs/01_estimate_weights.txt Rscript r/",
 cli::cli_alert("running unweighted cooccurrence")
 system(glue("/usr/bin/time -v -o logs/02_unweighted_coccurrence_analysis.txt Rscript r/",
             "02_unweighted_cooccurrence_analysis.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
-            "--time_thresholds={time_thresholds} --outcome={outcome}"))
+            "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome}"))
 
-cli::cli_alert("running weighted cooccurrence")
-system(glue("/usr/bin/time -v -o logs/02_weighted_cooccurrence_analysis.txt Rscript r/",
-            "02_weighted_cooccurrence_analysis.R --mgi_version={mgi_version} ",
-            "--time_thresholds={time_thresholds} --outcome={outcome}"))
+for (w in c("cancer_ipw", "cancer_postw")) {
+  cli::cli_alert_info("running {w} weighted cooccurrence")
+  system(glue("/usr/bin/time -v -o logs/02_weighted_cooccurrence_analysis.txt Rscript r/",
+              "02_weighted_cooccurrence_analysis.R --mgi_version={mgi_version} ",
+              "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome} ",
+              "--weights={w}"))
+}
 
 for (i in seq_along(time_thresholds)) {
   cli::cli_alert_info("running random forest at {time_thresholds[i]}")
@@ -50,7 +53,7 @@ for (i in seq_along(time_thresholds)) {
 }
 
 for (i in seq_along(time_thresholds)) {
-  cli::cli_alert_info("running SuperLearner at {time_thresholds[i]}")
+  cli::cli_alert("running SuperLearner at {time_thresholds[i]}")
   system(glue("/usr/bin/time -v -o logs/02_super_learner.txt Rscript r/",
               "02_super_learner.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
               "--time_threshold={time_thresholds[i]} --outcome={outcome}"))
@@ -58,8 +61,25 @@ for (i in seq_along(time_thresholds)) {
 
 ## phase 3 scripts -------------------------------------------------------------
 for (i in time_thresholds) {
+  cli::cli_alert("calculating unweighted naive phers at {i}")
   system(glue("/usr/bin/time -v -o logs/03_calculate_naive_phers.txt Rscript r/",
               "03_calculate_naive_phers.R --outcome={outcome} --time_threshold={i}"))
+}
+for (i in c("cancer_ipw", "cancer_postw")) {
+  for (j in time_thresholds) {
+    cli::cli_alert("calculating {i} weighted naive pwide sig phers at {j}")
+    system(glue("/usr/bin/time -v -o logs/03_calculate_naive_phers.txt Rscript r/",
+                "03_calculate_naive_phers.R --outcome={outcome} --time_threshold={j} ",
+                "--weights={i}"))
+  }
+}
+for (i in c("cancer_ipw", "cancer_postw")) {
+  for (j in time_thresholds) {
+    cli::cli_alert("calculating {i} weighted naive top hits phers at {j}")
+    system(glue("/usr/bin/time -v -o logs/03_calculate_naive_phers.txt Rscript r/",
+                "03_calculate_naive_phers.R --outcome={outcome} --time_threshold={j} ",
+                "--weights={i} --method=tophits"))
+  }
 }
 
 ## phase 4 scripts -------------------------------------------------------------

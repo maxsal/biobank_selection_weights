@@ -49,6 +49,9 @@ option_list <- list(
                           "[default = %default]")),
   make_option("--corr_remove", type = "numeric", default = 0.25,
               help = glue("Correlation threshold for phecode removal (set NULL if no thresholding) ",
+                          "[default = %default]")),
+  make_option("--exclude", type = "logical", default = FALSE,
+              help = glue("Remove phecodes in exclusion range ",
                           "[default = %default]"))
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -130,19 +133,23 @@ pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
                  colClasses = "character")
 
 # 4. phecode exclusions ------------------------------------------------------
-## exclusion range from PhewasCatalog
-exclusionRange <- pheinfo[phecode == opt$outcome, phecode_exclude_range]
-exclusions1    <- pheinfo[phecode %in% unlist(unname(sapply(
-  strsplit(exclusionRange,', {0,1}')[[1]],
-  expandPhecodes))), phecode]
-
-## phecodes not defined in both cohorts
-exclusions2 <- pheinfo[!(phecode %in% gsub("X", "",
-                                           intersect(names(mgi_pim0),
-                                                     names(ukb_pim0)))),
-                       phecode]
-
-exclusionsX <- glue("X{union(exclusions1, exclusions2)}")
+if (opt$exclude == TRUE) {
+  ## exclusion range from PhewasCatalog
+  exclusionRange <- pheinfo[phecode == opt$outcome, phecode_exclude_range]
+  exclusions1    <- pheinfo[phecode %in% unlist(unname(sapply(
+    strsplit(exclusionRange,', {0,1}')[[1]],
+    expandPhecodes))), phecode]
+  
+  ## phecodes not defined in both cohorts
+  exclusions2 <- pheinfo[!(phecode %in% gsub("X", "",
+                                             intersect(names(mgi_pim0),
+                                                       names(ukb_pim0)))),
+                         phecode]
+  
+  exclusionsX <- glue("X{union(exclusions1, exclusions2)}")
+  
+  cooccur <- cooccur[!phecode %in% exclusionsX, ]
+}
 
 ## helper functions
 pretty_round <- function(x, r) {
@@ -167,7 +174,7 @@ extractr_or <- function(x, r = 2) {
 cli_alert("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
 ## naive
 if (opt$method == "pwide_sig") {
-  phes <- cooccur[!(phecode %in% exclusionsX) & p_value < 0.05/.N, length(phecode)]
+  phes <- cooccur[p_value < 0.05/.N, length(phecode)]
   if (length(phes) == 0) {
     stop("No phenomewide significant phecodes, stopping...")
   }
@@ -209,10 +216,10 @@ if (opt$discovery_cohort == "mgi") {
 
 cli_alert("generating outputs...")
 suppressMessages({
-  mgi_roc <- pROC::roc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
+  mgi_roc <- pROC::roc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers], smooth = TRUE, se = FALSE)
   mgi_auc <- pROC::ci.auc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
   
-  ukb_roc <- pROC::roc(ukb_phers[["data"]][, case], ukb_phers[["data"]][, phers])
+  ukb_roc <- pROC::roc(ukb_phers[["data"]][, case], ukb_phers[["data"]][, phers], smooth = TRUE, se = FALSE)
   ukb_auc <- pROC::ci.auc(ukb_phers[["data"]][, case], ukb_phers[["data"]][, phers])
 })
 
@@ -240,9 +247,7 @@ auc_sum <- data.table(
 auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
   ggplot(aes(x = 1 - specificity, y = sensitivity, color = test_data)) +
   geom_abline(lty = 3) +
-  geom_path(linewidth = 2, alpha = 0.2) +
-  geom_smooth(method = "loess", formula = "y ~ x",
-              span = 0.5, se = FALSE, linewidth = 1) +
+  geom_path(linewidth = 2) +
   scale_color_OkabeIto() +
   annotate(
     geom = "label", x = rep(0.75, 2), y = c(0.275, 0.225), label.size = NA,
@@ -250,7 +255,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
   ) +
   labs(
     title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
-    caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}; external cohort: {toupper(external_cohort)}; N_phecodes: {length(mgi_phers$phecodes$phecode)}; method: {opt$method}"), 60)
+    caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}; external cohort: {toupper(external_cohort)}; N_phecodes: {length(mgi_phers$phecodes$phecode)}; method: {opt$method}{ifelse(opt$method == 'tophits', paste0('; N_tophits = ', opt$tophits_n), '')}; exclude codes = {opt$exclude}{ifelse(!is.null(opt$corr_remove), paste0('; correlation threshold = ', opt$corr_remove), '')}"), 80)
   ) +
   coord_equal() +
   cowplot::theme_minimal_grid() +
@@ -261,7 +266,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
   )
 ggsave(plot = auc_plot,
        filename = glue("{out_path}{comb_out_prefix}auc.pdf"),
-       width = 6, height = 6, device = cairo_pdf)
+       width = 7, height = 7, device = cairo_pdf)
 
 mgi_mod <- logistf(case ~ phers, data = mgi_phers$data, control = logistf.control(maxit = 1000))
 ukb_mod <- logistf(case ~ phers, data = ukb_phers$data, control = logistf.control(maxit = 1000))
