@@ -233,7 +233,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
     legend.title    = element_blank()
   )
 ggsave(plot = auc_plot,
-       filename = glue("{out_path}{comb_out_prefix}_auc.pdf"),
+       filename = glue("{out_path}{comb_out_prefix}auc.pdf"),
        width = 6, height = 6, device = cairo_pdf)
 
 mgi_mod <- logistf(case ~ phers, data = mgi_phers$data)
@@ -259,7 +259,7 @@ mgi_phers_dist_plot <- top_or_plotr(phers_data = mgi_phers[["data"]],
                                      .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
                                                          width = 100))
 ggsave(plot = mgi_phers_dist_plot,
-       filename = glue("{out_path}{mgi_out_prefix}_phers_dist.pdf"),
+       filename = glue("{out_path}{mgi_out_prefix}phers_dist.pdf"),
        width = 8, height = 6, device = cairo_pdf)
 
 
@@ -270,17 +270,27 @@ ukb_phers_dist_plot <- top_or_plotr(phers_data = ukb_phers[["data"]],
                                     .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
                                                         width = 100))
 ggsave(plot = ukb_phers_dist_plot,
-       filename = glue("{out_path}{ukb_out_prefix}_phers_dist.pdf"),
+       filename = glue("{out_path}{ukb_out_prefix}phers_dist.pdf"),
        width = 8, height = 6, device = cairo_pdf)
 
-## SAVE OUTPUT
+## phers and summary output
+write_fst(
+  x = mgi_phers$data,
+  path = glue("{out_path}{mgi_out_prefix}phers.fst")
+)
+write_fst(
+  x = ukb_phers$data,
+  path = glue("{out_path}{ukb_out_prefix}phers.fst")
+)
 
 saveRDS(
   mgi_phers,
-  file = glue("{out_path}{mgi_out_prefix}_summary.rds")
+  file = glue("{out_path}{mgi_out_prefix}summary.rds")
 )
 
 saveRDS(
   ukb_phers,
-  file = glue("{out_path}{ukb_out_prefix}_summary.rds")
+  file = glue("{out_path}{ukb_out_prefix}summary.rds")
 )
+
+cli_alert_success("script success! see output in {.path {out_path}}")
