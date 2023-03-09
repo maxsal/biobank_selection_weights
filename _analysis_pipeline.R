@@ -65,6 +65,15 @@ for (i in time_thresholds) {
   system(glue("/usr/bin/time -v -o logs/03_calculate_naive_phers.txt Rscript r/",
               "03_calculate_naive_phers.R --outcome={outcome} --time_threshold={i}"))
 }
+
+for (i in time_thresholds) {
+  cli::cli_alert("calculating unweighted naive phers at {i}")
+  system(glue("/usr/bin/time -v -o logs/03_calculate_naive_phers.txt Rscript r/",
+              "03_calculate_naive_phers.R --outcome={outcome} --time_threshold={i} ",
+              "--method=tophits"))
+}
+
+
 for (i in c("cancer_ipw", "cancer_postw")) {
   for (j in time_thresholds) {
     cli::cli_alert("calculating {i} weighted naive pwide sig phers at {j}")
