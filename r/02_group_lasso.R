@@ -141,7 +141,7 @@ train_ids    <- data_train[, .(id, case)]
 test_ids     <- data_test[, .(id, case)]
 external_ids <- external[, .(id, case)]
 
-data_train_covs <- data_train[, !c("id", "case", "female", "age_at_threshold")]
+data_train_covs <- data_train[, !c("id", "case")]
 data_train_y    <- data_train[, case]
 
 data_test_covs <- data_test[, !c("id", "case")]

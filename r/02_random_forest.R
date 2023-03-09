@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
   })
 
 # libraries --------------------------------------------------------------------
-cli::cli_alert("loading packages and initializing...")
+cli_alert("loading packages and initializing...")
 suppressPackageStartupMessages({
   library(fst)
   library(vip)

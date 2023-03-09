@@ -103,14 +103,8 @@ calculate_phers <- function(
     method,              # tophits or pwide_sig
     tophits_n    = 50,   # n of hits to select based on p-value
     bonf_tests   = NULL, # denominator of bonferroni correction
-    phers_name   = NULL,
     reverse_code = FALSE # reverse code negatives to keep phers above 0?
     ) {
-  
-  # check that phers_name argument is specified
-  if (is.null(phers_name)) {
-    stop("'phers_name' argument is not specified!")
-  }
   
   # check that columns exist in res data
   res_data_cols <- c("phecode", "beta", "p_value")
@@ -134,7 +128,7 @@ calculate_phers <- function(
   
   out <- data.table::copy(pim)
   
-  out[, phers := 0]
+  out[, pred := 0]
   cli_progress_bar(name = "calculating phers...",
                    total = length(phers_hits[, phecode]))
   
@@ -144,7 +138,7 @@ calculate_phers <- function(
         cli_alert_warning("{i} not in phecode indicator matrix, skipping")
         next
       }
-      out[, phers := phers + (phers_hits[phecode == i, beta] * get(i))]
+      out[, pred := pred + (phers_hits[phecode == i, beta] * get(i))]
       cli_progress_update()
     }
   } else {
@@ -153,7 +147,7 @@ calculate_phers <- function(
       cli_alert_warning("{i} not in phecode indicator matrix, skipping")
       next
       }
-      out[, phers := phers + (
+      out[, pred := pred + (
         phers_hits[phecode == i, beta] * get(i) * 
           as.numeric(phers_hits[phecode == i, beta] > 0)) - (
           phers_hits[phecode == i, beta] * (1 - get(i)) * 
@@ -163,16 +157,14 @@ calculate_phers <- function(
     }
   }
   cli_progress_done()
-  
-  setnames(out, old = "phers", new = phers_name)
-  keep_cols <- c("id", phers_name)
 
+  out[, phers := scale(pred)]
+  
   return(list(
     n_phecodes = length(phers_hits[, phecode]),
     method     = method,
     phecodes   = phers_hits,
-    data       = out[, ..keep_cols],
-    phers_name = phers_name
+    data       = out[, .(id, case, pred, phers)]
     ))
   
 }
