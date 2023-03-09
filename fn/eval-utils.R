@@ -117,7 +117,7 @@ calculate_phers <- function(
   
   ## select significant hits
   if (method == "tophits") {
-    phers_hits <- res[order(p_value)][1:tophits_n]
+    phers_hits <- res[order(p_value)][1:min(tophits_n, nrow(res))]
   }
   if (method == "pwide_sig") {
     if (is.null(bonf_tests)) {
@@ -134,7 +134,7 @@ calculate_phers <- function(
       phecodes    = phers_hits[, phecode],
       corr_thresh = corr_remove
     )
-    cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {corr_remove}")
+    cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {corr_remove})")
   }
   
   out <- data.table::copy(pim)
