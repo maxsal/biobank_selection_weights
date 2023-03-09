@@ -10,7 +10,7 @@ quick_cooccur_mod <- function(
     dat,
     covs       = c("age_at_threshold", "female", "length_followup"),
     ex_code    = "X157",
-    mod_type   = "logistf",
+    mod_type   = "glm",
     weight_var = NULL
 ) {
   
@@ -49,8 +49,32 @@ quick_cooccur_mod <- function(
       phecode = ex_code,
       beta    = mod$coefficients[[ex_code]],
       se_beta = sqrt(diag(vcov(mod)))[[ex_code]],
-      p_value = mod$prob[[ex_code]]
+      p_value = mod$prob[[ex_code]],
+      log10p  = log10(mod$prob[[ex_code]])
     )
+    
+  }
+  
+  ### glm
+  if (mod_type == "glm") {
+    if (!is.null(weight_var)) {
+      wgts <- dat[[weight_var]]
+      mod <- glm(as.formula(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + "))),
+                 data    = dat,
+                 weights = wgts,
+                 family  = binomial())
+    } else {
+      mod <- glm(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat, family = binomial())
+    }
+    
+    data.table(
+      phecode = ex_code,
+      beta    = coef(mod)[[ex_code]],
+      se_beta = coef(summary(mod))[ex_code, 2],
+      p_value = coef(summary(mod))[ex_code, 4],
+      log10p  = log10(coef(summary(mod))[ex_code, 4])
+    )
+    
   }
   
 }

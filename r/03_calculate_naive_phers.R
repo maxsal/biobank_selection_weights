@@ -173,24 +173,39 @@ if (opt$method == "pwide_sig") {
   }
 }
 
-### using MGI data
-#### mgi
-mgi_phers <- calculate_phers(
-  pim         = mgi_pim,
-  res         = cooccur,
-  method      = opt$method,
-  tophits_n   = opt$tophits_n,
-  corr_remove = opt$corr_remove
-)
-
-#### ukb
-ukb_phers <- calculate_phers(
-  pim        = ukb_pim,
-  res        = cooccur,
-  method     = opt$method,
-  tophits_n  = opt$tophits_n,
-  corr_remove = opt$corr_remove
-)
+if (opt$discovery_cohort == "mgi") {
+  mgi_phers <- calculate_phers(
+    pim         = mgi_pim,
+    res         = cooccur,
+    method      = opt$method,
+    tophits_n   = opt$tophits_n,
+    corr_remove = opt$corr_remove
+  )
+  
+  ukb_phers <- calculate_phers(
+    pim         = ukb_pim,
+    res         = cooccur[phecode %in% mgi_phers$phecodes[, phecode]],
+    method      = opt$method,
+    tophits_n   = opt$tophits_n,
+    corr_remove = NULL
+  )
+} else {
+  ukb_phers <- calculate_phers(
+    pim         = ukb_pim,
+    res         = cooccur,
+    method      = opt$method,
+    tophits_n   = opt$tophits_n,
+    corr_remove = opt$corr_remove
+  )
+  
+  mgi_phers <- calculate_phers(
+    pim         = mgi_pim,
+    res         = cooccur[phecode %in% ukb_phers$phecodes[, phecode]],
+    method      = opt$method,
+    tophits_n   = opt$tophits_n,
+    corr_remove = opt$corr_remove
+  )
+}
 
 cli_alert("generating outputs...")
 suppressMessages({
