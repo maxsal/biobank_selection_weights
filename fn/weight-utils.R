@@ -39,7 +39,7 @@ ipw <- function(stacked_data, id_var = "id") {
   data.table(
     "id"                  = stacked_data[dataset == "MGI", ][[id_var]],
     "no_cancer_ipw"       = WEIGHT_NHANES_NOCAN,
-    "cancer_indirect_ipw" = CANCER_NHANES_UNCORRECTED
+    "cancer_ipw" = CANCER_NHANES_UNCORRECTED
   )
   
 }
