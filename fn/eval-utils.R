@@ -104,6 +104,7 @@ calculate_phers <- function(
     tophits_n    = 50,   # n of hits to select based on p-value
     bonf_tests   = NULL, # denominator of bonferroni correction
     reverse_code = FALSE # reverse code negatives to keep phers above 0?
+    corr_remove  = 0.25
     ) {
   
   # check that columns exist in res data
@@ -124,6 +125,16 @@ calculate_phers <- function(
     } else {
       phers_hits <- res[p_value < 0.05/bonf_tests]
     }
+  }
+  
+  if (!is.null(corr_remove)) {
+    phers_hits <- remove_by_correlation(
+      pim         = pim,
+      co_res      = phers_hits,
+      phecodes    = phers_hits[, phecode],
+      corr_thresh = corr_remove
+    )
+    cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {corr_remove}")
   }
   
   out <- data.table::copy(pim)
@@ -186,4 +197,57 @@ quick_naive_aucs <- function(x) {
     cli_progress_update()
   }
   out[order(-auc)]
+}
+
+# remove phecodes by correlation -----------------------------------------------
+remove_by_correlation <- function(pim, co_res, phecodes = NULL, top_n = 50, corr_thresh = 0.25) {
+  
+  if (is.null(phecodes)) {
+    sub_co <- co_res[order(p_value), ][1:top_n, ]
+  } else {
+    sub_co <- co_res[phecode %in% phecodes, ]
+  }
+  mat    <- combn(sub_co[, phecode], m = 2)
+  
+  if (dim(mat)[1] != 0) {
+    
+    corr_results <- data.table(
+      "PHE1"      = mat[1, ],
+      "PHE1_PVAL" = rep(NA, dim(mat)[2]),
+      "PHE2"      = mat[2, ],
+      "PHE2_PVAL" = rep(NA, dim(mat)[2]),
+      "CORR"      = rep(NA, dim(mat)[2]),
+      "EXCLUDE"   = rep(NA, dim(mat)[2])
+    )
+    
+    cli_progress_bar(total = dim(mat)[2])
+    for (k in 1:dim(mat)[2]) {
+      corr_results$CORR[k]      <- abs(cor(pim[[corr_results$PHE1[k]]], pim[[corr_results$PHE2[k]]]))
+      corr_results$PHE1_PVAL[k] <- co_res[phecode == corr_results$PHE1[k], p_value]
+      corr_results$PHE2_PVAL[k] <- co_res[phecode == corr_results$PHE2[k], p_value]
+      cli_progress_update()
+    }
+    
+    sub_corr <- corr_results[order(-CORR), ][CORR >= corr_thresh]
+    
+    if (dim(sub_corr)[1] != 0) {
+      for (k in 1:dim(sub_corr)[1]) {
+        if (sub_corr[k, PHE1] %in% sub_corr[, EXCLUDE] | sub_corr[k, PHE2] %in% sub_corr[, EXCLUDE]) {
+          sub_corr$EXCLUDE[k] <- "Previously Removed"
+        } else {
+          sub_corr$EXCLUDE[k] <- ifelse(sub_corr[k, PHE1_PVAL] < sub_corr[k, PHE2_PVAL],
+                                        sub_corr[k, PHE2], sub_corr[k, PHE1])
+        }
+      }
+      exclude_corr_x <- sub_corr$EXCLUDE[!sub_corr$EXCLUDE %in% "Previously Removed"]
+    }
+    
+    cli_alert_info("{length(exclude_corr_x)} phecodes removes at correlation < {corr_thresh}")
+    
+    return(sub_co[!(phecode %in% exclude_corr_x), ])
+    
+  } else {
+    cli_alert_warning("There are no phecodes to calculate correlation between")
+  }
+  
 }

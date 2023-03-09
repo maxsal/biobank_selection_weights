@@ -46,6 +46,9 @@ option_list <- list(
                           "[default = %default]")),
   make_option("--weights", type = "character", default = NULL,
               help = glue("Name of weight suffix for weighted cooccurrence ",
+                          "[default = %default]")),
+  make_option("--corr_remove", type = "numeric", default = 0.25,
+              help = glue("Correlation threshold for phecode removal (set NULL if no thresholding) ",
                           "[default = %default]"))
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -155,7 +158,7 @@ extractr_or <- function(x, r = 2) {
     or_est = exp(coef(x)[["phers"]]),
     or_lo = exp(y["phers", 1]),
     or_hi = exp(y["phers", 2])
-  )[, print := paste0(format(round(or_est, r), big.mark = ",", nsmall = r), " (",
+  )[, or_print := paste0(format(round(or_est, r), big.mark = ",", nsmall = r), " (",
                       format(round(or_lo, r), big.mark = ",", nsmall = r), ", ",
                       format(round(or_hi, r), big.mark = ",", nsmall = r), ")")][]
 }
@@ -163,23 +166,30 @@ extractr_or <- function(x, r = 2) {
 # 5. calculate naive phers -----------------------------------------------------
 cli_alert("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
 ## naive
+if (opt$method == "pwide_sig") {
+  phes <- cooccur[!(phecode %in% exclusionsX) & p_value < 0.05/.N, length(phecode)]
+  if (length(phes) == 0) {
+    stop("No phenomewide significant phecodes, stopping...")
+  }
+}
+
 ### using MGI data
 #### mgi
 mgi_phers <- calculate_phers(
-  pim        = mgi_pim,
-  res        = cooccur[!(phecode %in% exclusionsX), ],
-  method     = opt$method,
-  tophits_n  = opt$tophits_n
+  pim         = mgi_pim,
+  res         = cooccur,
+  method      = opt$method,
+  tophits_n   = opt$tophits_n,
+  corr_remove = opt$corr_remove
 )
-
-cli_alert_info("phers contains {length(mgi_phers$phecodes$phecode)} phecodes")
 
 #### ukb
 ukb_phers <- calculate_phers(
   pim        = ukb_pim,
-  res        = cooccur[!(phecode %in% exclusionsX), ],
+  res        = cooccur,
   method     = opt$method,
-  tophits_n  = opt$tophits_n
+  tophits_n  = opt$tophits_n,
+  corr_remove = opt$corr_remove
 )
 
 cli_alert("generating outputs...")
@@ -221,7 +231,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
   scale_color_OkabeIto() +
   annotate(
     geom = "label", x = rep(0.75, 2), y = c(0.275, 0.225), label.size = NA,
-    label = auc_sum[, auc_print], color = rev(palette_OkabeIto[1:nrow(auc_sum)])
+    label = auc_sum[, auc_print], color = palette_OkabeIto[1:nrow(auc_sum)]
   ) +
   labs(
     title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
