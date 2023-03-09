@@ -101,27 +101,11 @@ if (!dir.exists(out_path)) {
 cli_alert("reading data...")
 d <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$mgi_version}.fst"),
               as.data.table = TRUE)
-d_c <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-d <- merge.data.table(
-  d,
-  d_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 d_ids <- d[, .(id, case)]
 
 
 u <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.fst"),
               as.data.table = TRUE)
-u_c <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-u <- merge.data.table(
-  u,
-  u_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 u_ids <- u[, .(id, case)]
 
 p <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",

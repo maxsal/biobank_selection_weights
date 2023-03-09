@@ -28,7 +28,7 @@ option_list <- list(
               help = "Version of MGI data [default = %default]"),
   make_option("--ukb_version", type = "character", default = "20221117",
               help = "Version of UKB data [default = %default]"),
-  make_option("--time_thresholds", type = "character", default = "0,1,2,3,5",
+  make_option("--time_thresholds", type = "character", default = "0,0.5,1,2,3,5",
               help = glue("Time thresholds for the phenome data ",
               "[default = %default]")),
   make_option("--nearest_matching_var", type = "character",

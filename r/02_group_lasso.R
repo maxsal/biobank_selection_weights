@@ -69,11 +69,13 @@ if (parallel::detectCores() == 1) {
 }
 
 options(mc.cores = n_cores)
+test_cohort     <- opt$discovery_cohort
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
 
 source("fn/expandPhecodes.R")
 source("fn/files-utils.R")
 source("fn/super_learner-utils.R")
+source("fn/top_or_plotr.R")
 
 # check output folder exists ---------------------------------------------------
 out_path <- glue("results/{coh}/{coh_version}/X{outc}/grp_lasso/",
@@ -88,27 +90,11 @@ if (!dir.exists(out_path)) {
 cli_alert("reading data...")
 d <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$mgi_version}.fst"),
               as.data.table = TRUE)
-d_c <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-d <- merge.data.table(
-  d,
-  d_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 d_ids <- d[, .(id, case)]
 
 
 u <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.fst"),
               as.data.table = TRUE)
-u_c <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/matched_covariates.fst"),
-                as.data.table = TRUE)
-u <- merge.data.table(
-  u,
-  u_c[, .(id, age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 3), female)],
-  by = "id",
-  all.x = TRUE
-)
 u_ids <- u[, .(id, case)]
 
 p <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
@@ -174,26 +160,27 @@ v_group <- merge.data.table(
 setcolorder(data_train_covs, v_group[, phecode])
 data_train_y[data_train_y == 0] <- -1
 
-gr <- gglasso(x = as.matrix(data_train_covs), y = data_train_y, group = v_group[, group_num],
-              loss = "logit", intercept = FALSE)
+# gr <- gglasso(x = as.matrix(data_train_covs), y = data_train_y, group = v_group[, group_num],
+#               loss = "logit", intercept = FALSE)
 
 # cross validation -------------------------------------------------------------
 cli_alert("performing {opt$folds}-fold cross-validation to select lambda...")
 gr_cv <- cv.gglasso(
-  x = as.matrix(data_train_covs),
-  y = data_train_y,
-  loss = "logit", pred.loss = "L2",
-  group = v_group[, group_num],
+  x         = as.matrix(data_train_covs),
+  y         = data_train_y,
+  loss      = "logit",
+  pred.loss = "L2",
+  group     = v_group[, group_num],
   intercept = FALSE, nfolds = opt$folds
 )
 
 cli_alert_info("optimal lambda (within 1sd): {round(gr_cv$lambda.1se, 5)}")
 
 gr_cv_min <- gglasso(
-  x = as.matrix(data_train_covs),
-  y = data_train_y,
-  lambda = gr_cv$lambda.1se,
-  group = v_group[, group_num], loss = "logit",
+  x         = as.matrix(data_train_covs),
+  y         = data_train_y,
+  lambda    = gr_cv$lambda.1se,
+  group     = v_group[, group_num], loss = "logit",
   intercept = FALSE
   )
 summary(gr_cv_min)
@@ -204,59 +191,20 @@ data.table(
   beta    = gr_cv_min$beta[, 1]
 )[order(beta), ][, or := exp(beta)][]
 
-# fitting SuperLearner ---------------------------------------------------------
-SL_library <- list("SL.ranger", "SL.glm", c("SL.glmnet", "screen.corP"),
-                   "SL.xgboost", "SL.svm")
-cli_alert("Using the following libraries for SuperLearner:")
-print(SL_library)
-
-if (is.null(opt$inner_folds)) {
-  cli_alert("Running SuperLearner - set opt$inner_folds to execute external cross validation")
-  super_learner <- SuperLearner(
-    Y          = data_train_y,
-    X          = data_train_covs,
-    SL.library = SL_library,
-    family     = binomial(),
-    cvControl  = list(V = opt$folds)
-  )
-  print(super_learner)
-  cli_alert_info("SuperLearner took {prettyunits::pretty_sec(super_learner$times$everything['elapsed'])} to run")
-  sl <- super_learner
-} else {
-  cv_super_learner <- CV.SuperLearner(
-    Y              = data_train_y,
-    X              = data_train_covs,
-    SL.library     = SL_library,
-    family         = binomial(),
-    parallel       = "multicore",
-    cvControl      = list(V = opt$folds),
-    innerCvControl = list(list(V = opt$inner_folds))
-  )
-  summary(cv_super_learner)
-  cv_super_learner$whichDiscreteSL
-  table(simplify2array(cv_super_learner$whichDiscreteSL))
-  cv_super_learner_plot <- plot(cv_super_learner) +
-    cowplot::theme_minimal_grid()
-  ggsave(plot = cv_super_learner_plot,
-         filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_csl_methods_plot.pdf"),
-         width = 6, height = 6, device = cairo_pdf)
-  
-  print(review_weights(cv_super_learner), digits = 3)
-  sl <- cv_super_learner
-}
-
 
 
 # predicting -------------------------------------------------------------------
 suppressMessages({
-  pred_test     <- predict(sl, data_test_covs, onlySL = TRUE)
-  pred_test_roc <- pROC::roc(data_test_y, pred_test[["pred"]][, 1])
-  pred_test_auc <- pROC::ci.auc(data_test_y, pred_test[["pred"]][, 1])
+  pred_test                  <- predict(gr_cv_min, data_test_covs, type = "link")[, 1]
+  pred_test[pred_test == -1] <- 0
+  pred_test_roc              <- pROC::roc(data_test_y, pred_test)
+  pred_test_auc              <- pROC::ci.auc(data_test_y, pred_test)
   
-  pred_ext     <- predict(sl, external_covs, onlySL = TRUE)
-  pred_ext_roc <- pROC::roc(external_y, pred_ext[["pred"]][, 1])
-  pred_ext_auc <- pROC::ci.auc(external_y, pred_ext[["pred"]][, 1])
-})
+  pred_ext                 <- predict(gr_cv_min, external_covs, type = "link")[, 1]
+  pred_ext[pred_ext == -1] <- 0
+  pred_ext_roc             <- pROC::roc(external_y, pred_ext)
+  pred_ext_auc             <- pROC::ci.auc(external_y, pred_ext)
+})            
 
 pretty_print <- function(x, r = 3) {
   paste0( format(round(x[2], r), nsmall = r), " (", format(round(x[1], r), nsmall = r), ", ", format(round(x[3], r), nsmall = r), ")")
@@ -265,15 +213,15 @@ pretty_print <- function(x, r = 3) {
 # outputs ----------------------------------------------------------------------
 
 ## SuperLearner object
-saveRDS(sl, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_super_learner.rds"))
+saveRDS(gr_cv_min, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_grp_lasso.rds"))
 
 ## dataset containin ID, case status, phers_raw, and phers (mean-standardized)
 phers_from_pred <- function(case_data, predicted) {
   out <- cbind(case_data, pred = predicted)
-  out[, phers := ((pred - mean(pred, na.rm = TRUE)) / sd(pred, na.rm = TRUE))][]
+  out[, phers := scale(pred)][]
 }
-test_phers     <- phers_from_pred(case_data = test_ids, pred = pred_test[["pred"]][, 1])[, `:=` (cohort = opt$discovery_cohort, split = "test")]
-external_phers <- phers_from_pred(case_data = external_ids, pred = pred_ext[["pred"]][, 1])[, `:=` (cohort = external_cohort, split = "external")]
+test_phers     <- phers_from_pred(case_data = test_ids, pred = pred_test)[, `:=` (cohort = opt$discovery_cohort, split = "test")]
+external_phers <- phers_from_pred(case_data = external_ids, pred = pred_ext)[, `:=` (cohort = external_cohort, split = "external")]
 
 write_fst(
   x = test_phers,
@@ -288,12 +236,12 @@ write_fst(
 in_stuff <- data.table(
   sensitivity = pred_test_roc$sensitivities,
   specificity = pred_test_roc$specificities,
-  test_data   = "Hold-out test data"
+  test_data   = paste0(toupper(test_cohort), " (test)")
 )
 out_stuff <- data.table(
   sensitivity = pred_ext_roc$sensitivities,
   specificity = pred_ext_roc$specificities,
-  test_data   = "External data"
+  test_data   = paste0(toupper(external_cohort), " (external)")
 )
 
 auc_sum <- data.table(
@@ -327,6 +275,7 @@ total_sum <- merge.data.table(
 )
 
 total_sum
+
 fwrite(
   x   = total_sum,
   file = glue("{out_path}{opt$discovery_cohort}d_{external_cohort}e_t{opt$time_threshold}_summary.txt")
@@ -361,46 +310,20 @@ ggsave(plot = auc_plot,
        width = 6, height = 6, device = cairo_pdf)
 
 # phers distribution by case status ---
-test_phers_dist_plot <- test_phers |>
-  ggplot(aes(x = phers)) +
-  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
-  scale_fill_OkabeIto() +
-  scale_color_OkabeIto() +
-  labs(
-    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
-    subtitle = glue("SuperLearner model in {toupper(opt$discovery_cohort)} hold out test sample"),
-    x = "PheRS (mean standardized)",
-    y = "Density",
-    caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
-  ) +
-  cowplot::theme_minimal_grid() +
-  theme(
-    legend.position = "top",
-    legend.title = element_blank(),
-    plot.caption = element_text(hjust = 0)
-  )
+test_phers_dist_plot <- top_or_plotr(phers_data = test_phers,
+                                     .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+                                     .subtitle = glue("In {toupper(test_cohort)} hold out test sample"),
+                                     .caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
+
 ggsave(plot = test_phers_dist_plot,
        filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_test_phers_dist.pdf"),
        width = 6, height = 6, device = cairo_pdf)
 
-external_phers_dist_plot <- external_phers |>
-  ggplot(aes(x = phers)) +
-  geom_density(aes(fill = factor(case), color = factor(case)), alpha = 0.5) +
-  scale_fill_OkabeIto() +
-  scale_color_OkabeIto() +
-  labs(
-    title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
-    subtitle = glue("SuperLearner model in {external_cohort} external sample"),
-    x = "PheRS (mean standardized)",
-    y = "Density",
-    caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100)
-  ) +
-  cowplot::theme_minimal_grid() +
-  theme(
-    legend.position = "top",
-    legend.title = element_blank(),
-    plot.caption = element_text(hjust = 0)
-  )
+external_phers_dist_plot <- top_or_plotr(phers_data = external_phers,
+                                         .title = glue("X{gsub('X', '', opt$outcome)} PheRS distribution by case status at t{opt$time_threshold}"),
+                                         .subtitle = glue("In {toupper(external_cohort)} external sample"),
+                                         .caption = str_wrap(glue("Discovery cohort = {opt$discovery_cohort}; CV folds = {opt$folds}, train/test prop = {opt$split_prop}"), width = 100))
+
 ggsave(plot = external_phers_dist_plot,
        filename = glue("{out_path}mgid_ukbe_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_external_phers_dist.pdf"),
        width = 6, height = 6, device = cairo_pdf)
@@ -410,7 +333,11 @@ list(
   "discovery_cohort"      = opt$discovery_cohort,
   "external_cohort"       = external_cohort,
   "total_summary"         = total_sum,
-  "super_learner_summary" = sl,
+  "group_lasso_summary"   = data.table(
+    phecode = rownames(gr_cv_min$beta),
+    beta    = gr_cv_min$beta[, 1]
+  )[order(beta), ][, or := exp(beta)][],
+  "group_lasso_lambda"    = gr_cv_min$lambda,
   "discovery_sense_spec"  = in_stuff,
   "external_sense_spec"   = out_stuff,
   "out_path"              = out_path,
