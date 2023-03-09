@@ -71,7 +71,7 @@ make_top_pct_indicators <- function(.phers_data, .phers_var = "phers", .probs, .
 }
 
 top_or_extractr <- function(x, p, r = 1) {
-  mod <- logistf(glue("case ~ top_{p}"), data = x)
+  mod <- logistf(glue("case ~ top_{p}"), data = x, control = logistf.control(maxit = 1000))
   suppressMessages(y <- confint(mod))
   data.table(
     or_est = exp(coef(mod)[[glue("top_{p}")]]),
