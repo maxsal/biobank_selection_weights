@@ -238,8 +238,8 @@ ggsave(plot = auc_plot,
        filename = glue("{out_path}{comb_out_prefix}auc.pdf"),
        width = 6, height = 6, device = cairo_pdf)
 
-mgi_mod <- logistf(case ~ phers, data = mgi_phers$data)
-ukb_mod <- logistf(case ~ phers, data = ukb_phers$data)
+mgi_mod <- logistf(case ~ phers, data = mgi_phers$data, control = logistf.control(maxit = 1000))
+ukb_mod <- logistf(case ~ phers, data = ukb_phers$data, control = logistf.control(maxit = 1000))
 
 or_sum <- rbindlist(list(
   cbind(data.table(cohort = "mgi"), extractr_or(mgi_mod)),
