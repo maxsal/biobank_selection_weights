@@ -98,11 +98,11 @@ cli_alert("estimating cancer~female log(OR) as sanity check...")
 ## ipw
 m0 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged)
 m1 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = no_cancer_ipw)
-m2 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_indirect_ipw)
+m2 <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged, weights = cancer_ipw)
 
 m0_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ])
 m1_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = no_cancer_ipw)
-m2_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = cancer_indirect_ipw)
+m2_bb <- glm(cancer~as.numeric(Sex == "F"), family = quasibinomial(), data = merged[StudyName == "MGI", ], weights = cancer_ipw)
 ##
 
 ## poststrat
@@ -142,7 +142,7 @@ fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$coho
 
 # save -------------------------------------------------------------------------
 write_fst(
-  x = merged[, .(id, no_cancer_ipw, cancer_indirect_ipw, no_cancer_postw, cancer_postw)],
+  x = merged[, .(id, no_cancer_ipw, cancer_ipw, no_cancer_postw, cancer_postw)],
   path = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.fst")
   )
 
