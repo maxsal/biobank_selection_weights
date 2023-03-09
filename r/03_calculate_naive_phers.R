@@ -67,7 +67,7 @@ if (!dir.exists(out_path)) {
 
 # 2. specifications (specifies outcome) ----------------------------------------
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
-w               <- ifelse(is.null(opt$weights), "naive", opt$weights)
+w               <- ifelse(is.null(opt$weights), "naive", paste0(opt$weights, opt$tophits_n))
 
 mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}_{w}_")
 ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}_{w}_")
@@ -78,7 +78,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
 
 # 3. read data -----------------------------------------------------------------
-cli_alert_info("loading data...")
+cli_alert("loading data...")
 ## mgi
 mgi_pim0    <- fread(file_paths[["mgi"]]$pim0_file)
 mgi_pim     <- read_fst(glue("data/private/mgi/{opt$mgi_version}/",
@@ -161,7 +161,7 @@ extractr_or <- function(x, r = 2) {
 }
 
 # 5. calculate naive phers -----------------------------------------------------
-cli_alert_info("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
+cli_alert("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
 ## naive
 ### using MGI data
 #### mgi
@@ -172,6 +172,7 @@ mgi_phers <- calculate_phers(
   tophits_n  = opt$tophits_n
 )
 
+cli_alert_info("phers contains {length(mgi_phers$phecodes$phecode)} phecodes")
 
 #### ukb
 ukb_phers <- calculate_phers(
@@ -181,6 +182,7 @@ ukb_phers <- calculate_phers(
   tophits_n  = opt$tophits_n
 )
 
+cli_alert("generating outputs...")
 suppressMessages({
   mgi_roc <- pROC::roc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
   mgi_auc <- pROC::ci.auc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
