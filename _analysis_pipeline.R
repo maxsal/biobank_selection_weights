@@ -32,6 +32,16 @@ system(glue("/usr/bin/time -v -o logs/01_estimate_weights.txt Rscript r/",
             "01_estimate_weights.R --cohort_version={mgi_version}"))
 
 ## phase 2 scripts -------------------------------------------------------------
+cli::cli_alert("running unweighted cooccurrence")
+system(glue("/usr/bin/time -v -o logs/02_unweighted_coccurrence_analysis.txt Rscript r/",
+            "02_unweighted_cooccurrence_analysis.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
+            "--time_thresholds={time_thresholds} --outcome={outcome}"))
+
+cli::cli_alert("running weighted cooccurrence")
+system(glue("/usr/bin/time -v -o logs/02_weighted_cooccurrence_analysis.txt Rscript r/",
+            "02_weighted_cooccurrence_analysis.R --mgi_version={mgi_version} ",
+            "--time_thresholds={time_thresholds} --outcome={outcome}"))
+
 for (i in seq_along(time_thresholds)) {
   cli::cli_alert_info("running random forest at {time_thresholds[i]}")
   system(glue("/usr/bin/time -v -o logs/02_random_forest.txt Rscript r/",

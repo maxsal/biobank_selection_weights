@@ -45,8 +45,7 @@ print(opt)
 time_thresholds <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
 
 ## extract file paths
-file_paths <- get_files(mgi_version = opt$mgi_version,
-                        ukb_version = opt$ukb_version)
+file_paths <- get_files(mgi_version = opt$mgi_version)
 
 # read data --------------------------------------------------------------------
 ## mgi
