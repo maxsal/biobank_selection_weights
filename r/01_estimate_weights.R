@@ -126,11 +126,11 @@ extractr <- function(x, weight_name) {
 
 log_or_est <- rbindlist(list(
   extractr(x = m0, weight_name = "None"),
-  extractr(x = m1, weight_name = "No cancer"),
-  extractr(x = m2, weight_name = "Cancer (uncorrected)"),
+  extractr(x = m1, weight_name = "IPW: No cancer"),
+  extractr(x = m2, weight_name = "IPW: Cancer"),
   extractr(x = m0_bb, weight_name = "None [BB]"),
-  extractr(x = m1_bb, weight_name = "No cancer [BB]"),
-  extractr(x = m2_bb, weight_name = "Cancer (uncorrected) [BB]"),
+  extractr(x = m1_bb, weight_name = "IPW: No cancer [BB]"),
+  extractr(x = m2_bb, weight_name = "IPW: Cancer [BB]"),
   extractr(x = m1_ps, weight_name = "Poststrat: without cancer"),
   extractr(x = m2_ps, weight_name = "Poststrat: with cancer"),
   extractr(x = m1_ps_bb, weight_name = "Poststrat: without cancer [BB]"),
