@@ -208,7 +208,7 @@ remove_by_correlation <- function(pim, co_res, phecodes = NULL, top_n = 50, corr
     sub_co <- co_res[phecode %in% phecodes, ]
   }
   
-  cli_alert_info("{length(exclude_corr_x)} phecodes before correlation thresholding")
+  cli_alert_info("{nrow(sub_co)} phecodes before correlation thresholding")
   
   mat    <- combn(sub_co[, phecode], m = 2)
   
