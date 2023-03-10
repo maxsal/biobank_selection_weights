@@ -207,6 +207,9 @@ remove_by_correlation <- function(pim, co_res, phecodes = NULL, top_n = 50, corr
   } else {
     sub_co <- co_res[phecode %in% phecodes, ]
   }
+  
+  cli_alert_info("{length(exclude_corr_x)} phecodes before correlation thresholding")
+  
   mat    <- combn(sub_co[, phecode], m = 2)
   
   if (dim(mat)[1] != 0) {
@@ -242,7 +245,7 @@ remove_by_correlation <- function(pim, co_res, phecodes = NULL, top_n = 50, corr
       exclude_corr_x <- sub_corr$EXCLUDE[!sub_corr$EXCLUDE %in% "Previously Removed"]
     }
     
-    cli_alert_info("{length(exclude_corr_x)} phecodes removes at correlation < {corr_thresh}")
+    cli_alert_info("{length(exclude_corr_x)} phecodes removed at correlation < {corr_thresh}")
     
     return(sub_co[!(phecode %in% exclude_corr_x), ])
     

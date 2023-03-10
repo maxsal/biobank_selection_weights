@@ -87,6 +87,12 @@ top_or_plotr <- function(phers_data, phers_var = "phers", probs = c(0.25, 0.1, 0
   
   cut_points <- quantile(phers_data[[phers_var]], 1 - probs)
   
+  if (length(unique(cut_points)) != length(cut_points)) {
+    ind <- match(unique(cut_points), cut_points)
+    cut_points <- cut_points[ind]
+    probs      <- probs[ind]
+  }
+  
   prep_data <- prep_top_or_data(.phers_data = phers_data, .phers_var = phers_var, .probs = probs, .cut_points = cut_points)
   prep_data2 <- make_top_pct_indicators(.phers_data = phers_data, .probs = probs, .cut_points = cut_points)
   
