@@ -88,6 +88,7 @@ top_or_plotr <- function(phers_data, phers_var = "phers", probs = c(0.25, 0.1, 0
   cut_points <- quantile(phers_data[[phers_var]], 1 - probs)
   
   if (length(unique(cut_points)) != length(cut_points)) {
+    cli_alert_warning("quantile cut points not unique - keeping lowest quantile of each unique cut point value")
     ind <- match(unique(cut_points), cut_points)
     cut_points <- cut_points[ind]
     probs      <- probs[ind]

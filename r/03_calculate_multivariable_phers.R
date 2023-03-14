@@ -180,6 +180,62 @@ if (opt$method == "pwide_sig") {
   }
 }
 
+## select significant hits
+if (opt$discovery_cohort == "mgi") {
+  pim <- mgi_pim
+} else {
+  pim <- ukb_pim
+}
+
+if (opt$method == "tophits") {
+  phers_hits <- cooccur[order(p_value)][1:min(tophits_n, nrow(res))]
+}
+if (opt$method == "pwide_sig") {
+  phers_hits <- cooccur[p_value < 0.05/nrow(pim)]
+}
+
+if (!is.null(opt$corr_remove)) {
+  phers_hits <- remove_by_correlation(
+    pim         = pim,
+    co_res      = phers_hits,
+    phecodes    = phers_hits[, phecode],
+    corr_thresh = opt$corr_remove
+  )
+  cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {opt$corr_remove})")
+}
+
+if (is.null(opt$weights)) {
+  preds <- c("case", phers_hits[, phecode])
+  mod   <- glm(case ~ ., data = pim[, ..preds], family = binomial())
+} else {
+  if (opt$discovery_cohort == "ukb") {
+    stop("Cannot calculate multivariable PheRS with weights in UKB - set '--weights=NULL'")
+  } else {
+    preds <- phers_hits[, phecode]
+    y     <- pim[, case]
+    xs    <- as.matrix(pim[, ..preds])
+    wgts  <- as.matrix(pim[, ])
+    ## 
+    lambdas    <- 10^seq(3, -2, by = -.1)
+    cv_fit     <- cv.glmnet(x = xs, y = y, alpha = 0, family = "binomial", nfolds = 10)
+    opt_lambda <- cv_fit$lambda.min
+    mod        <- cv_fit$glmnet.fit
+    
+    opt_ridge <- glmnet(x = xs, y = y, alpha = 0, lambda = opt_lambda, family = "binomial")
+    
+    y_pred <- predict(opt_ridge, newx = xs)
+    sst <- sum((y - mean(y))^2)
+    sse <- sum((y_pred - pim[, case])^2)
+    rsq <- 1 - sse/sst
+    rsq
+  }
+}
+
+
+pROC::auc(predictor = y_pred, response = y)
+
+
+
 if (opt$discovery_cohort == "mgi") {
   mgi_phers <- calculate_phers(
     pim         = mgi_pim,
