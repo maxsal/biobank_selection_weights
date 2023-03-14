@@ -192,7 +192,7 @@ if (opt$discovery_cohort == "mgi") {
 }
 
 if (opt$method == "tophits") {
-  phers_hits <- cooccur[order(p_value)][1:min(opt$tophits_n, nrow(res))]
+  phers_hits <- cooccur[order(p_value)][1:min(opt$tophits_n, nrow(cooccur))]
 }
 if (opt$method == "pwide_sig") {
   phers_hits <- cooccur[p_value < 0.05/nrow(pim)]
