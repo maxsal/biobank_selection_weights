@@ -254,3 +254,28 @@ remove_by_correlation <- function(pim, co_res, phecodes = NULL, top_n = 50, corr
   }
   
 }
+
+# performs simple ridge selecting minimum lambda -------------------------------
+glmnet_ridge <- function(.x, .y, .alpha = 0, .family = "binomial",
+                         .nfolds = 10, .weights = NULL) {
+  cli_alert("identifying optimal lambda...")
+  cv_ridge <- cv.glmnet(
+    x       = .x,
+    y       = .y,
+    alpha   = .alpha,
+    family  = .family,
+    nfolds  = .nfolds,
+    weights = .weights
+  )
+  lambda_opt <- cv_ridge$lambda.min
+  cli_alert_info("optimal lambda: {format(lambda_opt, scientific = TRUE)}. fitting final model...")
+  ridge <- glmnet(
+    x       = .x,
+    y       = .y,
+    alpha   = .alpha,
+    family  = .family,
+    lambda  = lambda_opt,
+    weights = .weights
+  )
+  return(ridge)
+}

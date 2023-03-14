@@ -17,6 +17,7 @@ suppressPackageStartupMessages({
   library(fst)
   library(optparse)
   library(colorblindr)
+  library(glmnet)
 })
 
 set.seed(61787)
@@ -47,11 +48,14 @@ option_list <- list(
   make_option("--weights", type = "character", default = NULL,
               help = glue("Name of weight suffix for weighted cooccurrence ",
                           "[default = %default]")),
-  make_option("--corr_remove", type = "numeric", default = 0.25,
+  make_option("--corr_remove", type = "numeric", default = NULL,
               help = glue("Correlation threshold for phecode removal (set NULL if no thresholding) ",
                           "[default = %default]")),
   make_option("--exclude", type = "logical", default = FALSE,
               help = glue("Remove phecodes in exclusion range ",
+                          "[default = %default]")),
+  make_option("--model", type = "character", default = "ridge",
+              help = glue("Type of logistic regression model - logistic (glm) or ridge ",
                           "[default = %default]"))
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -59,8 +63,15 @@ args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
 
+if (opt$discovery_cohort == "ukb" & !is.null(opt$weights)) {
+  stop("Script cannot use weights when discovery cohort is UKB. Set --weights=NULL or change discovery cohort.")
+}
+if (!(opt$model %in% c("glm", "ridge"))) {
+  stop("Script can only take 'glm' or 'ridge' settings for '--model'")
+}
+
 # check output folder exists ---------------------------------------------------
-out_path <- glue("results/{coh}/{coh_version}/X{outc}/naive/",
+out_path <- glue("results/{coh}/{coh_version}/X{outc}/multivariable/",
                  coh = opt$discovery_cohort,
                  coh_version = ifelse(opt$discovery_cohort == "mgi",
                                       opt$mgi_version,
@@ -75,9 +86,9 @@ if (!dir.exists(out_path)) {
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
 w               <- ifelse(is.null(opt$weights), "naive", opt$weights)
 
-mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
-ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
-comb_out_prefix <- glue("{opt$discovery_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_")
+mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
+ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
+comb_out_prefix <- glue("{opt$discovery_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
 
 ## extract file paths
 file_paths <- get_files(mgi_version = opt$mgi_version,
@@ -204,71 +215,38 @@ if (!is.null(opt$corr_remove)) {
   cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {opt$corr_remove})")
 }
 
-if (is.null(opt$weights)) {
-  preds <- c("case", phers_hits[, phecode])
-  mod   <- glm(case ~ ., data = pim[, ..preds], family = binomial())
+preds <- phers_hits[, phecode]
+y     <- pim[, case]
+xs    <- as.matrix(pim[, ..preds])
+
+if (!is.null(opt$weights)) {
+  wgts <- ...
 } else {
-  if (opt$discovery_cohort == "ukb") {
-    stop("Cannot calculate multivariable PheRS with weights in UKB - set '--weights=NULL'")
-  } else {
-    preds <- phers_hits[, phecode]
-    y     <- pim[, case]
-    xs    <- as.matrix(pim[, ..preds])
-    wgts  <- as.matrix(pim[, ])
-    ## 
-    lambdas    <- 10^seq(3, -2, by = -.1)
-    cv_fit     <- cv.glmnet(x = xs, y = y, alpha = 0, family = "binomial", nfolds = 10)
-    opt_lambda <- cv_fit$lambda.min
-    mod        <- cv_fit$glmnet.fit
-    
-    opt_ridge <- glmnet(x = xs, y = y, alpha = 0, lambda = opt_lambda, family = "binomial")
-    
-    y_pred <- predict(opt_ridge, newx = xs)
-    sst <- sum((y - mean(y))^2)
-    sse <- sum((y_pred - pim[, case])^2)
-    rsq <- 1 - sse/sst
-    rsq
-  }
+  wgts <- NULL
 }
 
-
-pROC::auc(predictor = y_pred, response = y)
-
-
-
-if (opt$discovery_cohort == "mgi") {
-  mgi_phers <- calculate_phers(
-    pim         = mgi_pim,
-    res         = cooccur,
-    method      = opt$method,
-    tophits_n   = opt$tophits_n,
-    corr_remove = opt$corr_remove
-  )
-  
-  ukb_phers <- calculate_phers(
-    pim         = ukb_pim,
-    res         = cooccur[phecode %in% mgi_phers$phecodes[, phecode]],
-    method      = opt$method,
-    tophits_n   = opt$tophits_n,
-    corr_remove = NULL
-  )
+if (opt$model == "ridge") {
+  mod <- glmnet_ridge(.x = xs, .y = y, .nfolds = opt$nfolds, .weights = wgts)
 } else {
-  ukb_phers <- calculate_phers(
-    pim         = ukb_pim,
-    res         = cooccur,
-    method      = opt$method,
-    tophits_n   = opt$tophits_n,
-    corr_remove = opt$corr_remove
-  )
-  
-  mgi_phers <- calculate_phers(
-    pim         = mgi_pim,
-    res         = cooccur[phecode %in% ukb_phers$phecodes[, phecode]],
-    method      = opt$method,
-    tophits_n   = opt$tophits_n,
-    corr_remove = opt$corr_remove
-  )
+  mod <- glm(paste0("case ~ ", paste0(preds, collapse = " + ")), family = binomial(),
+             data = pim, weights = wgts)
 }
+
+mgi_phers <- data.table(
+  id   = mgi_pim[, id],
+  case = mgi_pim[, case],
+  pred = predict(mod, newx = as.matrix(mgi_pim[, ..preds]), type = "response") |> as.numeric()
+)[, phers := scale(pred)][]
+
+ukb_phers <- data.table(
+  id   = ukb_pim[, id],
+  case = ukb_pim[, case],
+  pred = predict(mod, newx = as.matrix(ukb_pim[, names(ukb_pim) %in% preds]), type = "response") |> as.numeric()
+)[, phers := scale(pred)][]
+
+pROC::auc(predictor = mgi_phers[, phers], response = mgi_phers[, case])
+
+pROC::auc(predictor = ukb_phers[, phers], response = ukb_phers[, case])
 
 cli_alert("generating outputs...")
 suppressMessages({
