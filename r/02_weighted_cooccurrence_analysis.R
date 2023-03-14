@@ -22,17 +22,17 @@ lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome", type = "character", default = "157",
-              help = "Outcome phecode [default = 157]"),
+              help = "Outcome phecode [default = %default]"),
   make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Version of MGI data [default = 20210318]"),
+              help = "Version of MGI data [default = %default]"),
   make_option("--mgi_cohort", type = "character", default = "comb",
               help = "Cohort of MGI used in weighting (comb, bb, mend, mhb) [default = %default]"),
-  make_option("--time_thresholds", type = "character", default = "0,1,2,3,5",
+  make_option("--time_thresholds", type = "character", default = "0,0.5,1,2,3,5",
               help = glue("Time thresholds for the phenome data ",
-                          "[default = 0,1,2,3,5]")),
-  make_option("--mod_type", type = "character", default = "logistf",
+                          "[default = %default]")),
+  make_option("--mod_type", type = "character", default = "glm",
               help = glue("Type of model to use in cooccurrence analysis - ",
-                          "logistf for SPAtest [default = logistf]")),
+                          "glm, logistf or SPAtest [default = %default]")),
   make_option("--weights", type = "character", default = "all",
               help = glue("Weighting variable to use for weighted analyses - ",
                           "no_cancer_ipw, cancer_indirect_ipw, no_cancer_postw, cancer_postw or all [default = %default]"))

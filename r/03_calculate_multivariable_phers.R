@@ -111,6 +111,11 @@ mgi_covariates <- read_fst(glue("data/private/mgi/{opt$mgi_version}/",
                              "X{gsub('X', '', opt$outcome)}/",
                              "matched_covariates.fst"),
                            as.data.table = TRUE)
+if (w != "naive") {
+  mgi_weights <- read_fst(glue("data/private/mgi/{opt$mgi_version}/",
+                          "weights_{opt$mgi_version}_comb.fst"),
+                          as.data.table = TRUE)
+}
 
 ## ukb
 ukb_pim0    <- fread(file_paths[["ukb"]]$pim0_file)
@@ -223,7 +228,7 @@ y     <- pim[, case]
 xs    <- as.matrix(pim[, ..preds])
 
 if (!is.null(opt$weights)) {
-  wgts <- ...
+  wgts <- merge.data.table(pim[, id], mgi_weights, by = "id")[[opt$weights]]
 } else {
   wgts <- NULL
 }
