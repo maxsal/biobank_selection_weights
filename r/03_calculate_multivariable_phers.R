@@ -56,6 +56,9 @@ option_list <- list(
                           "[default = %default]")),
   make_option("--model", type = "character", default = "ridge",
               help = glue("Type of logistic regression model - logistic (glm) or ridge ",
+                          "[default = %default]")),
+  make_option("--nfolds", type = "numeric", default = 10,
+              help = glue("Number of folds  ",
                           "[default = %default]"))
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -232,29 +235,32 @@ if (opt$model == "ridge") {
              data = pim, weights = wgts)
 }
 
+mod_sum <- data.table(
+  "phecode" = rownames(coef(mod)),
+  "beta"    = coef(mod)[, 1]
+)[!phecode %in% c("(Intercept)", "Intercept"), ]
+
+saveRDS(mod, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$model}.rds"))
+
 mgi_phers <- data.table(
   id   = mgi_pim[, id],
   case = mgi_pim[, case],
-  pred = predict(mod, newx = as.matrix(mgi_pim[, ..preds]), type = "response") |> as.numeric()
+  pred = predict(mod, newx = as.matrix(predictor_checker(mgi_pim, preds)), type = "response") |> as.numeric()
 )[, phers := scale(pred)][]
 
 ukb_phers <- data.table(
   id   = ukb_pim[, id],
   case = ukb_pim[, case],
-  pred = predict(mod, newx = as.matrix(ukb_pim[, names(ukb_pim) %in% preds]), type = "response") |> as.numeric()
+  pred = predict(mod, newx = as.matrix(predictor_checker(ukb_pim, preds)), type = "response") |> as.numeric()
 )[, phers := scale(pred)][]
-
-pROC::auc(predictor = mgi_phers[, phers], response = mgi_phers[, case])
-
-pROC::auc(predictor = ukb_phers[, phers], response = ukb_phers[, case])
 
 cli_alert("generating outputs...")
 suppressMessages({
-  mgi_roc <- pROC::roc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers], smooth = TRUE, se = FALSE)
-  mgi_auc <- pROC::ci.auc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
+  mgi_roc <- pROC::roc(mgi_phers[, case], mgi_phers[, phers], smooth = TRUE, se = FALSE)
+  mgi_auc <- pROC::ci.auc(mgi_phers[, case], mgi_phers[, phers])
   
-  ukb_roc <- pROC::roc(ukb_phers[["data"]][, case], ukb_phers[["data"]][, phers], smooth = TRUE, se = FALSE)
-  ukb_auc <- pROC::ci.auc(ukb_phers[["data"]][, case], ukb_phers[["data"]][, phers])
+  ukb_roc <- pROC::roc(ukb_phers[, case], ukb_phers[, phers], smooth = TRUE, se = FALSE)
+  ukb_auc <- pROC::ci.auc(ukb_phers[, case], ukb_phers[, phers])
 })
 
 
@@ -289,7 +295,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
   ) +
   labs(
     title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
-    caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}; external cohort: {toupper(external_cohort)}; N_phecodes: {length(mgi_phers$phecodes$phecode)}; method: {opt$method}{ifelse(opt$method == 'tophits', paste0('; N_tophits = ', opt$tophits_n), '')}; exclude codes = {opt$exclude}{ifelse(!is.null(opt$corr_remove), paste0('; correlation threshold = ', opt$corr_remove), '')}"), 80)
+    caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}; external cohort: {toupper(external_cohort)}; N_phecodes: {nrow(mod_sum)}; method: {opt$method}{ifelse(opt$method == 'tophits', paste0('; N_tophits = ', opt$tophits_n), '')}; exclude codes = {opt$exclude}{ifelse(!is.null(opt$corr_remove), paste0('; correlation threshold = ', opt$corr_remove), '')}"), 80)
   ) +
   coord_equal() +
   cowplot::theme_minimal_grid() +
@@ -301,9 +307,6 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
 ggsave(plot = auc_plot,
        filename = glue("{out_path}{comb_out_prefix}auc.pdf"),
        width = 7, height = 7, device = cairo_pdf)
-
-mgi_mod <- logistf(case ~ phers, data = mgi_phers$data, control = logistf.control(maxit = 1000))
-ukb_mod <- logistf(case ~ phers, data = ukb_phers$data, control = logistf.control(maxit = 1000))
 
 or_sum <- rbindlist(list(
   cbind(data.table(cohort = "mgi"), extractr_or(mgi_mod)),
@@ -318,22 +321,22 @@ total_sum <- merge.data.table(
 
 total_sum
 
-mgi_phers_dist_plot <- top_or_plotr(phers_data = mgi_phers[["data"]],
+mgi_phers_dist_plot <- top_or_plotr(phers_data = mgi_phers,
                                      .title = glue("X{gsub('X', '', opt$outcome)}",
                                                    " PheRS distribution by case status at t{opt$time_threshold}"),
                                      .subtitle = glue("In MGI discovery cohort"),
-                                     .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
+                                     .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}; N_phecodes: {nrow(mod_sum)}"),
                                                          width = 100))
 ggsave(plot = mgi_phers_dist_plot,
        filename = glue("{out_path}{mgi_out_prefix}phers_dist.pdf"),
        width = 8, height = 6, device = cairo_pdf)
 
 
-ukb_phers_dist_plot <- top_or_plotr(phers_data = ukb_phers[["data"]],
+ukb_phers_dist_plot <- top_or_plotr(phers_data = ukb_phers,
                                     .title = glue("X{gsub('X', '', opt$outcome)}",
                                                   " PheRS distribution by case status at t{opt$time_threshold}"),
                                     .subtitle = glue("In UKB external cohort"),
-                                    .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
+                                    .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}; N_phecodes: {nrow(mod_sum)}"),
                                                         width = 100))
 ggsave(plot = ukb_phers_dist_plot,
        filename = glue("{out_path}{ukb_out_prefix}phers_dist.pdf"),
@@ -341,22 +344,25 @@ ggsave(plot = ukb_phers_dist_plot,
 
 ## phers and summary output
 write_fst(
-  x = mgi_phers$data,
+  x = mgi_phers,
   path = glue("{out_path}{mgi_out_prefix}phers.fst")
 )
 write_fst(
-  x = ukb_phers$data,
+  x = ukb_phers,
   path = glue("{out_path}{ukb_out_prefix}phers.fst")
 )
 
-saveRDS(
-  mgi_phers,
-  file = glue("{out_path}{mgi_out_prefix}summary.rds")
-)
-
-saveRDS(
-  ukb_phers,
-  file = glue("{out_path}{ukb_out_prefix}summary.rds")
-)
+list(
+  "discovery_cohort" = opt$discovery_cohort,
+  "external_cohort"  = external_cohort,
+  "total_summary"    = total_sum,
+  "model_summary"    = mod_sum,
+  "model_call"       = mod$call,
+  "n_phecodes"       = nrow(mod_sum),
+  "mgi_sense_spec"   = mgi_stuff,
+  "ukb_sense_spec"   = mgi_stuff,
+  "out_path"         = out_path,
+  "optparse_list"    = opt
+) |> saveRDS(file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_summary.rds"))
 
 cli_alert_success("script success! see output in {.path {out_path}}")

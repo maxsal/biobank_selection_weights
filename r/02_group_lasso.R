@@ -212,7 +212,7 @@ pretty_print <- function(x, r = 3) {
 
 # outputs ----------------------------------------------------------------------
 
-## SuperLearner object
+## group lasso object
 saveRDS(gr_cv_min, file = glue("{out_path}{opt$discovery_cohort}d_{ifelse({opt$discovery_cohort} == 'mgi', 'ukb', 'mgi')}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_grp_lasso.rds"))
 
 ## dataset containin ID, case status, phers_raw, and phers (mean-standardized)

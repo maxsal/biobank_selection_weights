@@ -279,3 +279,23 @@ glmnet_ridge <- function(.x, .y, .alpha = 0, .family = "binomial",
   )
   return(ridge)
 }
+
+# check for missing predictors and add 0 variables if missing ------------------
+predictor_checker <- function(data, predictors) {
+  
+  out <- data.table::copy(data)
+  
+  # see which predictors are not in data
+  missing_predictors <- predictors[!(predictors %in% names(out))]
+  if (length(missing_predictors) > 0) {
+    cli_alert_warning("Found {length(missing_predictors)} missing predictor{?s}: {paste0(missing_predictors, collapse = ', ')}")
+    for (i in seq_along(missing_predictors)) {
+      out[[missing_predictors[i]]] <- 0
+    }
+  } else {
+    cli_alert_success("No missing predictors found")
+  }
+  
+  return(out[, ..predictors])
+  
+}
