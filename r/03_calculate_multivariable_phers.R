@@ -46,7 +46,7 @@ option_list <- list(
               help = glue("Number of top hits to use in top hits PheRS ",
                           "[default = %default]")),
   make_option("--weights", type = "character", default = NULL,
-              help = glue("Name of weight suffix for weighted cooccurrence ",
+              help = glue("Name of weight suffix for weights used in multivariable regression model (see --cooccur_weights for weights used in cooccurrence results) ",
                           "[default = %default]")),
   make_option("--corr_remove", type = "numeric", default = NULL,
               help = glue("Correlation threshold for phecode removal (set NULL if no thresholding) ",
@@ -58,7 +58,10 @@ option_list <- list(
               help = glue("Type of logistic regression model - logistic (glm) or ridge ",
                           "[default = %default]")),
   make_option("--nfolds", type = "numeric", default = 10,
-              help = glue("Number of folds  ",
+              help = glue("Number of folds for ridge regression cross-validation ",
+                          "[default = %default]")),
+  make_option("--cooccur_weights", type = "character", default = NULL,
+              help = glue("Weights used in cooccurrence analysis, if desired (see --weights for weights for use in multivariable regression model) ",
                           "[default = %default]"))
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -66,8 +69,8 @@ args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
 
-if (opt$discovery_cohort == "ukb" & !is.null(opt$weights)) {
-  stop("Script cannot use weights when discovery cohort is UKB. Set --weights=NULL or change discovery cohort.")
+if (opt$discovery_cohort == "ukb" & (!is.null(opt$weights) | !is.null(opt$weighted_cooccur))) {
+  stop("Script cannot use weights when discovery cohort is UKB. Set --weights=NULL and --weighted_cooccur=NULL or change discovery cohort.")
 }
 if (!(opt$model %in% c("glm", "ridge"))) {
   stop("Script can only take 'glm' or 'ridge' settings for '--model'")
@@ -87,11 +90,12 @@ if (!dir.exists(out_path)) {
 
 # 2. specifications (specifies outcome) ----------------------------------------
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
-w               <- ifelse(is.null(opt$weights), "naive", opt$weights)
+w               <- ifelse(is.null(opt$weights), "naive", opt$weights) # weights used in multivariable regression
+w_co            <- ifelse(is.null(opt$cooccur_weights), "", paste0(opt$cooccur_weights, "_"))
 
-mgi_out_prefix <- glue("{opt$discovery_cohort}d_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
-ukb_out_prefix <- glue("{opt$discovery_cohort}d_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
-comb_out_prefix <- glue("{opt$discovery_cohort}d_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
+mgi_out_prefix <- glue("{opt$discovery_cohort}d{w_co}_mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
+ukb_out_prefix <- glue("{opt$discovery_cohort}d{w_co}_ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
+comb_out_prefix <- glue("{opt$discovery_cohort}d{w_co}_{external_cohort}e_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$method}{ifelse(opt$method == 'tophits', opt$tophits_n, '')}_{w}_{opt$model}_")
 
 ## extract file paths
 file_paths <- get_files(mgi_version = opt$mgi_version,
@@ -170,25 +174,6 @@ if (opt$exclude == TRUE) {
   cooccur <- cooccur[!phecode %in% exclusionsX, ]
 }
 
-## helper functions
-pretty_round <- function(x, r) {
-  format(round(x, r), big.mark = ",", nsmall = r)
-}
-pretty_print <- function(x, r = 3) {
-  paste0( pretty_round(x[2], r), " (", pretty_round(x[1], r), ", ",
-          pretty_round(x[3], r), ")")
-}
-extractr_or <- function(x, r = 2) {
-  suppressMessages(y <- confint(x))
-  data.table(
-    or_est = exp(coef(x)[["phers"]]),
-    or_lo = exp(y["phers", 1]),
-    or_hi = exp(y["phers", 2])
-  )[, or_print := paste0(format(round(or_est, r), big.mark = ",", nsmall = r), " (",
-                      format(round(or_lo, r), big.mark = ",", nsmall = r), ", ",
-                      format(round(or_hi, r), big.mark = ",", nsmall = r), ")")][]
-}
-
 # 5. calculate naive phers -----------------------------------------------------
 cli_alert("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
 ## naive
@@ -223,15 +208,18 @@ if (!is.null(opt$corr_remove)) {
   cli_alert_info("{nrow(phers_hits)} phecodes remain after correlation thresholding (r2 < {opt$corr_remove})")
 }
 
-preds <- phers_hits[, phecode]
-y     <- pim[, case]
-xs    <- as.matrix(pim[, ..preds])
-
 if (!is.null(opt$weights)) {
-  wgts <- merge.data.table(pim[, id], mgi_weights, by = "id")[[opt$weights]]
+  keep_wgts <- c("id", opt$weights)
+  wgts      <- na.omit(merge.data.table(pim[, .(id)], mgi_weights, by = "id")[, ..keep_wgts])
+  pim       <- pim[id %in% wgts[, id]]
+  wgts      <- wgts[[opt$weights]]
 } else {
   wgts <- NULL
 }
+
+preds <- phers_hits[, phecode]
+y     <- pim[, case]
+xs    <- as.matrix(pim[, ..preds])
 
 if (opt$model == "ridge") {
   mod <- glmnet_ridge(.x = xs, .y = y, .nfolds = opt$nfolds, .weights = wgts)
@@ -312,6 +300,9 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
 ggsave(plot = auc_plot,
        filename = glue("{out_path}{comb_out_prefix}auc.pdf"),
        width = 7, height = 7, device = cairo_pdf)
+
+mgi_mod <- glm(case ~ phers, data = mgi_phers, family = "binomial")
+ukb_mod <- glm(case ~ phers, data = ukb_phers, family = "binomial")
 
 or_sum <- rbindlist(list(
   cbind(data.table(cohort = "mgi"), extractr_or(mgi_mod)),

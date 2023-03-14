@@ -299,3 +299,25 @@ predictor_checker <- function(data, predictors) {
   return(out[, ..predictors])
   
 }
+
+# helper functions (see 03_calculated_multivariable_phers.R) -------------------
+## round to specific number of decimal places with big mark
+pretty_round <- function(x, r) {
+  format(round(x, r), big.mark = ",", nsmall = r)
+}
+## print an estimate (CI) from vector (lower, estimate, upper)
+pretty_print <- function(x, r = 3) {
+  paste0( pretty_round(x[2], r), " (", pretty_round(x[1], r), ", ",
+          pretty_round(x[3], r), ")")
+}
+## extract OR from a model
+extractr_or <- function(x, r = 2) {
+  suppressMessages(y <- confint(x))
+  data.table(
+    or_est = exp(coef(x)[["phers"]]),
+    or_lo = exp(y["phers", 1]),
+    or_hi = exp(y["phers", 2])
+  )[, or_print := paste0(format(round(or_est, r), big.mark = ",", nsmall = r), " (",
+                         format(round(or_lo, r), big.mark = ",", nsmall = r), ", ",
+                         format(round(or_hi, r), big.mark = ",", nsmall = r), ")")][]
+}
