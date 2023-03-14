@@ -45,7 +45,7 @@ option_list <- list(
   make_option("--tophits_n", type = "numeric", default = "50",
               help = glue("Number of top hits to use in top hits PheRS ",
                           "[default = %default]")),
-  make_option("--weights", type = "character", default = NULL,
+  make_option("--weights", type = "character", default = "cancer_ipw",
               help = glue("Name of weight suffix for weights used in multivariable regression model (see --cooccur_weights for weights used in cooccurrence results) ",
                           "[default = %default]")),
   make_option("--corr_remove", type = "numeric", default = NULL,
@@ -140,7 +140,7 @@ if (opt$discovery_cohort == "mgi") {
                            "X{gsub('X', '', opt$outcome)}/",
                            "mgi_X{gsub('X', '', opt$outcome)}_",
                            "t{opt$time_threshold}_{opt$mgi_version}_",
-                           "{ifelse(is.null(opt$weights), '', paste0(opt$weights, '_'))}results.fst"),
+                           "{ifelse(is.null(opt$cooccur_weights), '', paste0(opt$cooccur_weights, '_'))}results.fst"),
                       as.data.table = TRUE)
 } else {
   cooccur <- read_fst(glue("results/ukb/{opt$ukb_version}/",
