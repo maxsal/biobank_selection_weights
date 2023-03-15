@@ -326,9 +326,6 @@ mgi_phers_vec     <- as.matrix(exclude_mgi_pim) %*%
   as.matrix(results[, betas_m2sig])
 mgi_phers_vec_std <- scale(mgi_phers_vec)
 
-
-results[, phecode] %in% names(short_ukb_pim)
-
 sub_ukb <- predictor_checker(short_ukb_pim, results[, phecode])
 
 ukb_phers_vec <- as.matrix(sub_ukb) %*%

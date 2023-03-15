@@ -288,7 +288,7 @@ predictor_checker <- function(data, predictors) {
   # see which predictors are not in data
   missing_predictors <- predictors[!(predictors %in% names(out))]
   if (length(missing_predictors) > 0) {
-    cli_alert_warning("Found {length(missing_predictors)} missing predictor{?s}: {paste0(missing_predictors, collapse = ', ')}")
+    cli_alert_warning("Found {length(missing_predictors)} missing predictor{?s}: {stringr::str_trunc(paste0(missing_predictors, collapse = ', '), width = 100)}")
     for (i in seq_along(missing_predictors)) {
       out[[missing_predictors[i]]] <- 0
     }
