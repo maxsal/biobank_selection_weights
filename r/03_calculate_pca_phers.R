@@ -1,7 +1,7 @@
 # phers construction code
 # an adaptaion from Lauren Beesley's D1_Construct PheRS PanCan.R script
 # author: max salvatore
-# date:   20221214
+# date:   20230314
 
 # libraries, functions, and options --------------------------------------------
 options(stringsAsFactors = FALSE)
@@ -16,14 +16,20 @@ suppressPackageStartupMessages({
   library(SPAtest)
   library(ggrepel)
   library(cli)
+  library(fst)
+  library(colorblindr)
   library(optparse)
+  library(stringr)
+  library(pROC)
+  library(cowplot)
 })
 
 set.seed(61787)
 
 source("fn/files-utils.R") # load partial correlation function
-source(glue("https://raw.githubusercontent.com/umich-cphds/",
-            "createUKBphenome/master/scripts/function.expandPhecodes.r"))
+source("fn/expandPhecodes.R")
+source("fn/eval-utils.R")
+source("fn/top_or_plotr.R")
 
 mytheme <- gridExtra::ttheme_default(
   core = list(fg_params = list(cex = 0.5)),
@@ -32,65 +38,85 @@ mytheme <- gridExtra::ttheme_default(
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "",
-              help = "Outcome phecode"),
-  make_option("--mgi_version", type = "character", default = "20210318",
-              help = "Version of MGI data [default = 20210318]"),
+  make_option("--outcome", type = "character", default = "157",
+              help = "Outcome phecode [default = %default]"),
+  make_option("--mgi_version", type = "character", default = "20220822",
+              help = "Version of MGI data [default = %default]"),
   make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = 20221117]"),
+              help = "Version of UKB data [default = %default]"),
   make_option("--time_threshold", type = "numeric", default = "0",
               help = glue("Time threshold for the phenome data ",
-                          "[default = 0]")),
-  make_option("--pc_var_explain", type = "numeric", default = "0.95",
+                          "[default = %default]")),
+  make_option("--pc_var_explain", type = "numeric", default = 0.95,
               help = glue("Cumulative variation explained by PCs threshold ",
-                          "[default = 0.95]"))
+                          "[default = %default]")),
+  make_option("--discovery_cohort", type = "character", default = "mgi",
+              help = glue("Which cohort to conduct PCA in ",
+                          "[default = %default]"))
+  
 )
-
 parser <- OptionParser(usage="%prog [options]", option_list = option_list)
-
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 # specifications ---------------------------------------------------------------
-mgi_version       <- opt$mgi_version
-ukb_version        <- opt$ukb_version
-outcome           <- opt$outcome
-pc_var_explain    <- opt$pc_var_explain
-time_threshold    <- opt$time_threshold
-derivation_cohort <- "mgi"
 
-mgi_data_path <- glue("data/private/mgi/{mgi_version}/",
-                      "X{gsub('X', '', outcome)}")
-mgi_results_path <- glue("results/mgi/{mgi_version}/X{gsub('X', '', outcome)}/",
+mgi_data_path <- glue("data/private/mgi/{opt$mgi_version}/",
+                      "X{gsub('X', '', opt$outcome)}")
+ukb_data_path <- glue("data/private/ukb/{opt$ukb_version}/",
+                      "X{gsub('X', '', opt$outcome)}")
+out_path <- glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
                          "pca")
-if (!dir.exists(mgi_results_path)) {
-  dir.create(mgi_results_path, recursive = TRUE)
+if (!dir.exists(out_path)) {
+  dir.create(out_path, recursive = TRUE)
 }
 
 ## pull file paths corresponding to the data version specified
-file_paths <- get_files(mgi_version = mgi_version, ukb_version = ukb_version)
+file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_version)
 
 # read in data -----------------------------------------------------------------
 cli_alert_info("reading data...")
 
 ## mgi covariate data
-mgi_cov <- fread(glue("{mgi_data_path}/matched_covariates.txt"))[
-  get(glue("t{time_threshold}_indicator")) == 1, .(
+mgi_cov <- read_fst(glue("{mgi_data_path}/matched_covariates.fst"),
+                    as.data.table = TRUE)[
+  get(glue("t{opt$time_threshold}_indicator")) == 1, .(
     id, female,
-    age_at_threshold = round(get(glue("t{time_threshold}_threshold")) /
+    age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) /
                                365.25, 1),
     length_followup, case)]
 mgi_cov <- mgi_cov[complete.cases(mgi_cov), ]
 
 # mgi time-restricted pim
-mgi_pim <- fread(glue("{mgi_data_path}/time_restricted_phenomes/",
-                      "mgi_X{gsub('X', '', outcome)}_t{time_threshold}",
-                      "_{mgi_version}.txt"))
+mgi_pim <- read_fst(glue("{mgi_data_path}/time_restricted_phenomes/",
+                      "mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}",
+                      "_{opt$mgi_version}.fst"),
+                    as.data.table = TRUE)
 mgi_pim <- merge(mgi_pim, data.table(id = mgi_cov$id),
                  by = "id", all.x = FALSE)
 short_mgi_pim <- mgi_pim[, !c("id")]
 short_mgi_pim[is.na(short_mgi_pim)] <- 0
+
+# ukb time_restricted pim
+ukb_cov <- read_fst(glue("{ukb_data_path}/matched_covariates.fst"),
+                    as.data.table = TRUE)[
+                      get(glue("t{opt$time_threshold}_indicator")) == 1, .(
+                        id, female,
+                        age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) /
+                                                   365.25, 1),
+                        length_followup, case)]
+ukb_cov <- ukb_cov[complete.cases(ukb_cov), ]
+
+ukb_pim <- read_fst(glue("{ukb_data_path}/time_restricted_phenomes/",
+                         "ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}",
+                         "_{opt$ukb_version}.fst"),
+                    as.data.table = TRUE)
+ukb_pim <- merge(ukb_pim, data.table(id = ukb_cov$id),
+                 by = "id", all.x = FALSE)
+ukb_pim[is.na(ukb_pim)] <- 0
+ukb_cases <- ukb_pim[, .(id, case)]
+short_ukb_pim <- ukb_pim[, !c("id", "case")]
 
 ## mgi master PIM - read 1 row for variable names only
 mgi_pim0 <- fread(file_paths[["mgi"]]$pim0_file, nrow = 1)
@@ -106,7 +132,7 @@ pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
 outcome_vector <- short_mgi_pim[["case"]]
 
 ## exclusion range phecodes (from PhewasCatalog)
-exclusionRange <- pheinfo[phecode == outcome, phecode_exclude_range]
+exclusionRange <- pheinfo[phecode == opt$outcome, phecode_exclude_range]
 exclusions1    <- pheinfo[phecode %in% unlist(unname(sapply(
   strsplit(exclusionRange,', {0,1}')[[1]],
   expandPhecodes))), phecode]
@@ -117,7 +143,7 @@ exclusions2 <- pheinfo[!(phecode %in% gsub("X", "",
                                                      names(ukb_pim0)))),
                        phecode]
 
-exclusionsX <- c("case", glue("X{c(gsub('X', '', outcome), ",
+exclusionsX <- c("case", glue("X{c(gsub('X', '', opt$outcome), ",
                               "union(exclusions1, exclusions2))}"))
 
 # subset phenotype data --------------------------------------------------------
@@ -129,7 +155,7 @@ cli_alert_info("calculating principal components")
 mgi_pca <- prcomp(exclude_mgi_pim, center = FALSE, scale. = FALSE)
 
 pcs <- mgi_pca$x[
-  , 1:which.min(abs(summary(mgi_pca)$importance[3, ] - pc_var_explain))]
+  , 1:which.min(abs(summary(mgi_pca)$importance[3, ] - opt$pc_var_explain))]
 
 maxs <- apply(abs(pcs), 2, max)
 pcs_mod <- sweep(pcs, MARGIN = 2, maxs, "/")
@@ -137,7 +163,7 @@ pcs_mod <- pcs_mod + 1
 
 rotations <- data.table(mgi_pca$rotation)
 rotations <- rotations[
-  , 1:which.min(abs(summary(mgi_pca)$importance[3, ] - pc_var_explain))]
+  , 1:which.min(abs(summary(mgi_pca)$importance[3, ] - opt$pc_var_explain))]
 
 # run SPAtest ------------------------------------------------------------------
 cli_alert_info("running SPAtest")
@@ -173,26 +199,23 @@ results$betas_m2sig <- as.matrix(rotations) %*%
   as.matrix(results_pc[, alphasmod_m2sig])
 
 ### save rotations, results_pc, and results
-fwrite(
-  x = rotations,
-  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-              "t{time_threshold}_pve{pc_var_explain}_",
-              "pc_rotations.txt"),
-  sep = "\t"
+write_fst(
+  x    = rotations,
+  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+              "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+              "pc_rotations.fst")
 )
-fwrite(
-  x = results_pc,
-  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-              "t{time_threshold}_pve{pc_var_explain}_",
-              "pcs.txt"),
-  sep = "\t"
+write_fst(
+  x    = results_pc,
+  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+              "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+              "pcs.fst")
 )
-fwrite(
-  x = results,
-  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-              "t{time_threshold}_pve{pc_var_explain}_",
-              "pc_results.txt"),
-  sep = "\t"
+write_fst(
+  x    = results,
+  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+              "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+              "pc_results.fst")
 )
 
 # manhattan plot ---------------------------------------------------------------
@@ -220,13 +243,13 @@ p <- results_short |>
   labs(
     x = "Principal components",
     y = "-log10(p-value)",
-    title = glue("Associations with phecode {outcome}: ",
-                 "{pheinfo[phecode == gsub('X', '', outcome), description]}"),
-    caption = glue("Cumulative variation explained by PCs: {pc_var_explain}; ",
+    title = glue("Associations with phecode {opt$outcome}: ",
+                 "{pheinfo[phecode == gsub('X', '', opt$outcome), description]}"),
+    caption = glue("Cumulative variation explained by PCs: {opt$pc_var_explain}; ",
                    "n PCs = {format(length(pcs_mod[1, ]), big.mark = ',')}; ",
-                   "t = {time_threshold}; ",
-                   "derivation cohort: {derivation_cohort}; ",
-                   "application cohort: mgi")
+                   "t = {opt$time_threshold}; ",
+                   "derivation cohort: {toupper(opt$discovery_cohort)}; ",
+                   "application cohort: MGI")
   ) +
   theme_minimal() +
   theme(
@@ -239,8 +262,8 @@ p <- results_short |>
     )
 
 ggsave(
-  filename = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-                  "t{time_threshold}_pve{pc_var_explain}_",
+  filename = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+                  "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
                   "pc_mahanttan.pdf"),
   plot     = p,
   width = 8, height = 6,
@@ -272,13 +295,13 @@ p2 <- results |>
   labs(
     x = "Phenotypes",
     y = "Beta",
-    title = glue("Associations with phecode {outcome}: ",
-                 "{pheinfo[phecode == gsub('X', '', outcome), description]}"),
-    caption = glue("Cumulative variation explained by PCs: {pc_var_explain}; ",
+    title = glue("Associations with phecode {opt$outcome}: ",
+                 "{pheinfo[phecode == gsub('X', '', opt$outcome), description]}"),
+    caption = glue("Cumulative variation explained by PCs: {opt$pc_var_explain}; ",
                    "n PCs = {format(length(pcs_mod[1, ]), big.mark = ',')}; ",
-                   "t = {time_threshold}; ",
-                   "derivation cohort: {derivation_cohort}; ",
-                   "application cohort: mgi")
+                   "t = {opt$time_threshold}; ",
+                   "derivation cohort: {toupper(opt$discovery_cohort)}; ",
+                   "application cohort: MGI")
   ) +
   theme_minimal() +
   theme(
@@ -290,8 +313,8 @@ p2 <- results |>
     text = element_text(size = 12))
 
 ggsave(
-  filename = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-                  "t{time_threshold}_pve{pc_var_explain}_",
+  filename = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+                  "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
                   "pc_betas.pdf"),
   plot     = p2,
   width = 8, height = 6,
@@ -301,20 +324,138 @@ ggsave(
 cli_alert_info("calculating phers...")
 mgi_phers_vec     <- as.matrix(exclude_mgi_pim) %*%
   as.matrix(results[, betas_m2sig])
-mgi_phers_vec_std <- (mgi_phers_vec - mean(mgi_phers_vec)) / sd(mgi_phers_vec)
+mgi_phers_vec_std <- scale(mgi_phers_vec)
+
+
+results[, phecode] %in% names(short_ukb_pim)
+
+sub_ukb <- predictor_checker(short_ukb_pim, results[, phecode])
+
+ukb_phers_vec <- as.matrix(sub_ukb) %*%
+  as.matrix(results[, betas_m2sig])
+ukb_phers_vec_std <- scale(ukb_phers_vec)
 
 mgi_phers <- data.frame(
-  id        = mgi_pim[, id],
-  phers     = mgi_phers_vec,
-  phers_std = mgi_phers_vec_std
+  id    = mgi_pim[, id],
+  case  = mgi_pim[, case],
+  pred  = mgi_phers_vec,
+  phers = mgi_phers_vec_std
 ) |> as.data.table()
 
-fwrite(
+ukb_phers <- data.frame(
+  id    = ukb_pim[, id],
+  case  = ukb_pim[, case],
+  pred  = ukb_phers_vec,
+  phers = ukb_phers_vec_std
+) |> as.data.table()
+
+write_fst(
+  x = ukb_phers,
+  path = glue("{out_path}/ukb_X{gsub('X', '', opt$outcome)}_",
+              "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+              "pc_phers.fst")
+)
+write_fst(
   x = mgi_phers,
-  file = glue("{mgi_results_path}/mgi_X{gsub('X', '', outcome)}_",
-              "t{time_threshold}_pve{pc_var_explain}_",
-              "pc_phers.txt"),
-  sep = "\t"
+  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+              "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+              "pc_phers.fst")
 )
 
-cli_alert_success("PCA-PheRS for {outcome} a success!")
+cli_alert("generating outputs...")
+suppressMessages({
+  mgi_roc <- pROC::roc(mgi_phers[, case], mgi_phers[, phers], smooth = TRUE, se = FALSE)
+  mgi_auc <- pROC::ci.auc(mgi_phers[, case], mgi_phers[, phers])
+  
+  ukb_roc <- pROC::roc(ukb_phers[, case], ukb_phers[, phers], smooth = TRUE, se = FALSE)
+  ukb_auc <- pROC::ci.auc(ukb_phers[, case], ukb_phers[, phers])
+})
+
+mgi_stuff <- data.table(
+  sensitivity = mgi_roc$sensitivities,
+  specificity = mgi_roc$specificities,
+  test_data   = glue("MGI ({ifelse(opt$discovery_cohort == 'mgi', 'discovery', 'external')})")
+)
+ukb_stuff <- data.table(
+  sensitivity = ukb_roc$sensitivities,
+  specificity = ukb_roc$specificities,
+  test_data   = glue("UKB ({ifelse(opt$discovery_cohort == 'mgi', 'external', 'discovery')})")
+)
+
+auc_sum <- data.table(
+  test_data = c(glue("MGI ({ifelse(opt$discovery_cohort == 'mgi', 'discovery', 'external')})"), glue("UKB ({ifelse(opt$discovery_cohort == 'mgi', 'external', 'discovery')})")),
+  cohort    = c("mgi", "ukb"),
+  auc_est   = c(mgi_auc[2], ukb_auc[2]),
+  auc_lo    = c(mgi_auc[1], ukb_auc[1]),
+  auc_hi    = c(mgi_auc[3], ukb_auc[3]),
+  auc_print = c(pretty_print(mgi_auc), pretty_print(ukb_auc))
+)
+
+auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color = test_data)) +
+  geom_abline(lty = 3) +
+  geom_path(linewidth = 2) +
+  scale_color_OkabeIto() +
+  annotate(
+    geom = "label", x = rep(0.75, 2), y = c(0.275, 0.225), label.size = NA,
+    label = auc_sum[, auc_print], color = palette_OkabeIto[1:nrow(auc_sum)]
+  ) +
+  labs(
+    title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
+    caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}"), 80)
+  ) +
+  coord_equal() +
+  cowplot::theme_minimal_grid() +
+  theme(
+    plot.caption    = element_text(hjust = 0),
+    legend.position = "top",
+    legend.title    = element_blank()
+  )
+
+ggsave(plot = auc_plot,
+       filename = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+                       "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+                       "pc_auc.pdf"),
+       width = 7, height = 7, device = cairo_pdf)
+
+mgi_mod <- glm(case ~ phers, data = mgi_phers)
+ukb_mod <- glm(case ~ phers, data = ukb_phers)
+
+or_sum <- rbindlist(list(
+  cbind(data.table(cohort = "mgi"), extractr_or(mgi_mod)),
+  cbind(data.table(cohort = "ukb"), extractr_or(ukb_mod))
+))
+
+total_sum <- merge.data.table(
+  auc_sum,
+  or_sum,
+  by = "cohort"
+)
+
+total_sum
+
+mgi_phers_dist_plot <- top_or_plotr(phers_data = mgi_phers,
+                                    .title = glue("X{gsub('X', '', opt$outcome)}",
+                                                  " PheRS distribution by case status at t{opt$time_threshold}"),
+                                    .subtitle = glue("In MGI discovery cohort"),
+                                    .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
+                                                        width = 100))
+ggsave(plot = mgi_phers_dist_plot,
+       filename = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+                       "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+                       "pc_phers_dist.pdf"),
+       width = 8, height = 6, device = cairo_pdf)
+
+ukb_phers_dist_plot <- top_or_plotr(phers_data = ukb_phers,
+                                    .title = glue("X{gsub('X', '', opt$outcome)}",
+                                                  " PheRS distribution by case status at t{opt$time_threshold}"),
+                                    .subtitle = glue("In UKB external cohort"),
+                                    .caption = str_wrap(glue("Discovery cohort = {toupper(opt$discovery_cohort)}"),
+                                                        width = 100))
+ggsave(plot = ukb_phers_dist_plot,
+       filename = glue("{out_path}/ukb_X{gsub('X', '', opt$outcome)}_",
+                       "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
+                       "pc_phers_dist.pdf"),
+       width = 8, height = 6, device = cairo_pdf)
+
+cli_alert_success("script success! see output in {.path {out_path}}")
