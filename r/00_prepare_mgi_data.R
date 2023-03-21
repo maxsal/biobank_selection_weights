@@ -81,12 +81,12 @@ MGIcohort[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0
 
 MGIcohort[, nhanes_nhw := fifelse(Ethnicity != "Hispanic" & Race == "Caucasian", 1, 0)]
 
-MGIcohort[, age_cat := between(AgeLastEntry, 0, 5) +
-                       2 * between(AgeLastEntry, 6, 11) +
-                       3 * between(AgeLastEntry, 12, 19) +
-                       4 * between(AgeLastEntry, 20, 39) +
-                       5 * between(AgeLastEntry, 40, 59) +
-                       6 * between(AgeLastEntry, 60, 150)]
+MGIcohort[, age_cat := between(AgeLastEntry, 0, 5.99) +
+                       2 * between(AgeLastEntry, 6, 11.99) +
+                       3 * between(AgeLastEntry, 12, 19.99) +
+                       4 * between(AgeLastEntry, 20, 39.99) +
+                       5 * between(AgeLastEntry, 40, 59.99) +
+                       6 * between(AgeLastEntry, 60, 150.99)]
 
 setnames(MGIcohort, "BMI", "bmi")
 MGIcohort[, bmi_cat := fcase(

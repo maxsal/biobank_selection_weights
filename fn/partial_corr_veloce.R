@@ -13,9 +13,9 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
   registerDoMC(cores = ncore)
   column <- colnames(pim)
   cols   <- 1:ncol(pim)
-  p <- progressor(along = cols)
+  p      <- progressor(along = cols)
   output <- foreach(i = cols) %dopar% {
-    out <- list()
+    out  <- list()
     p()
     for (j in cols) {
       if (j >= i) next

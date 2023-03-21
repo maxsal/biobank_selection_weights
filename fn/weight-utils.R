@@ -1,15 +1,15 @@
 # calculate IPW from stacked data
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
-ipw <- function(stacked_data, id_var = "id") {
+ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes / sum(weight_nhanes, na.rm = TRUE)]
   
   selection_NHANES_NOCAN <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + cad + diabetes + smoking_current + smoking_former + bmi_under + bmi_overweight + bmi_obese + nhanes_nhw, data = stacked_data[dataset == 'NHANES', ])
   
-  mgiselect_NOCAN <- glm(as.numeric(dataset == "MGI") ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data, family = quasibinomial())
+  mgiselect_NOCAN <- glm(as.numeric(dataset == dataset_name) ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data, family = quasibinomial())
   
-  p_Sext <- predict(selection_NHANES_NOCAN, newdata = stacked_data[dataset == "MGI", ], type = "response")[, 1]
-  p_MGI  <- predict(mgiselect_NOCAN, newdata = stacked_data[dataset == "MGI", ], type = "response")
+  p_Sext <- predict(selection_NHANES_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")[, 1]
+  p_MGI  <- predict(mgiselect_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")
   temp <- rep(0, times = length(p_MGI))
   temp[which(rownames(data.frame(p_Sext)) %in% rownames(data.frame(p_MGI)) == T)] <- p_Sext
   temp[which(rownames(data.frame(p_Sext)) %in% rownames(data.frame(p_MGI)) == F)] <- NA
@@ -19,25 +19,25 @@ ipw <- function(stacked_data, id_var = "id") {
   
   SELECT_NHANES_NOCAN <- chopr(SELECT_NHANES_NOCAN)
   WEIGHT_NHANES_NOCAN <- 1 / SELECT_NHANES_NOCAN
-  WEIGHT_NHANES_NOCAN <- stacked_data[dataset == "MGI", .N] * WEIGHT_NHANES_NOCAN / sum(WEIGHT_NHANES_NOCAN, na.rm = TRUE)
+  WEIGHT_NHANES_NOCAN <- stacked_data[dataset == dataset_name, .N] * WEIGHT_NHANES_NOCAN / sum(WEIGHT_NHANES_NOCAN, na.rm = TRUE)
   
   ## With Cancer
   NHANES_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data[dataset == "NHANES", ], weights = weight_nhanes, family = quasibinomial())
   
   modelCAN_NHANES <- predict(NHANES_cancer_model, type = "response", newdata = stacked_data)
   
-  MGI_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data[dataset == "MGI", ], family = quasibinomial())
+  MGI_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data[dataset == dataset_name, ], family = quasibinomial())
   
   modelCAN_MGI <- predict(MGI_cancer_model, type = "response", newdata = stacked_data)
   denom <- ifelse(stacked_data[, cancer] == 1, modelCAN_MGI, 1 - modelCAN_MGI)
   num <- ifelse(stacked_data[, cancer] == 1, modelCAN_NHANES, 1 - modelCAN_NHANES)
-  cancer_factor <- (num[stacked_data[, dataset] == "MGI"] / denom[stacked_data[, dataset] == "MGI"])
+  cancer_factor <- (num[stacked_data[, dataset] == dataset_name] / denom[stacked_data[, dataset] == dataset_name])
   cancer_factor <- chopr(cancer_factor)
   CANCER_NHANES_UNCORRECTED = cancer_factor * WEIGHT_NHANES_NOCAN
-  CANCER_NHANES_UNCORRECTED  = stacked_data[dataset == "MGI", .N] * CANCER_NHANES_UNCORRECTED / sum(CANCER_NHANES_UNCORRECTED, na.rm = TRUE)
+  CANCER_NHANES_UNCORRECTED  = stacked_data[dataset == dataset_name, .N] * CANCER_NHANES_UNCORRECTED / sum(CANCER_NHANES_UNCORRECTED, na.rm = TRUE)
   
   data.table(
-    "id"                  = stacked_data[dataset == "MGI", ][[id_var]],
+    "id"                  = stacked_data[dataset == dataset_name, ][[id_var]],
     "no_cancer_ipw"       = WEIGHT_NHANES_NOCAN,
     "cancer_ipw" = CANCER_NHANES_UNCORRECTED
   )
