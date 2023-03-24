@@ -89,7 +89,7 @@ cli_alert("estimating ipw weights...")
 estimated_weights <- ipw(stacked_data = stacked)
 
 cli_alert("estimating poststratification weights...")
-post   <- poststratification(mgi_data = mgi, chop = TRUE)
+post   <- poststratification(mgi_data = mgi, use_female = TRUE, chop = TRUE)
 
 merged <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, estimated_weights, post))
 
