@@ -2,7 +2,9 @@
 library(data.table)
 library(glue)
 library(cli)
+library(qs)
 library(fst)
+library(parallel)
 library(optparse)
 
 # optparse list ----
@@ -104,6 +106,26 @@ MGIcohort[, bmi_cat := fcase(
 
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
+
+save_qs <- function(
+  x,
+  file,
+  qs_preset = "balance",
+  nthreads  = ifelse(parallel::detectCores() >= 4, 4, parallel::detectCores()),
+  verbose   = FALSE
+) {
+  if (verbose) cli::cli_alert_info(glue("using {nthreads} threads and '{qs_preset}' preset..."))
+  qsave(x = x, file = file, preset = qs_present, nthreads = nthreads)
+  if (verbose) cli::cli_alert_info("saved to {.path {file}}")
+}
+
+# qs
+save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"), verbose = TRUE)
+for (i in MGIcohort[, unique(StudyName)]) {
+  save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.fst"))
+}
+
+# fst
 write_fst(MGIcohort, path = glue("{out_path}data_{opt$mgi_version}_comb.fst"))
 write_fst(MGIcohort[StudyName == "MGI", ], path = glue("{out_path}data_{opt$mgi_version}_bb.fst"))
 write_fst(MGIcohort[StudyName == "MHB2", ], path = glue("{out_path}data_{opt$mgi_version}_mhb.fst"))
