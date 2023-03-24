@@ -1,11 +1,13 @@
 # libraries, paths, and such ---------------------------------------------------
-library(data.table)
-library(glue)
-library(cli)
-library(qs)
-library(fst)
-library(parallel)
-library(optparse)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(glue)
+  library(cli)
+  library(qs)
+  library(fst)
+  library(parallel)
+  library(optparse)
+})
 
 # optparse list ----
 option_list <- list(
@@ -115,7 +117,7 @@ save_qs <- function(
   verbose   = FALSE
 ) {
   if (verbose) cli::cli_alert_info(glue("using {nthreads} threads and '{qs_preset}' preset..."))
-  qsave(x = x, file = file, preset = qs_present, nthreads = nthreads)
+  qsave(x = x, file = file, preset = qs_preset, nthreads = nthreads)
   if (verbose) cli::cli_alert_info("saved to {.path {file}}")
 }
 
