@@ -104,7 +104,7 @@ poststratification <- function(
   if (use_female == TRUE) {
     cli_alert_warning(glue("Estimating poststratification weights with ",
                            "`female` variable. IPW estimation does not include",
-                           " female by default.")
+                           " female by default."))
   }
   
   Nobs    <- nrow(mgi_data)
