@@ -4,9 +4,9 @@ ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes / sum(weight_nhanes, na.rm = TRUE)]
   
-  selection_NHANES_NOCAN <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + cad + diabetes + smoking_current + smoking_former + bmi_under + bmi_overweight + bmi_obese + nhanes_nhw, data = stacked_data[dataset == 'NHANES', ])
+  selection_NHANES_NOCAN <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + cad + diabetes + smoking_current + smoking_former + bmi_under + bmi_overweight + bmi_obese + nhanes_nhw + female, data = stacked_data[dataset == 'NHANES', ])
   
-  mgiselect_NOCAN <- glm(as.numeric(dataset == dataset_name) ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data, family = quasibinomial())
+  mgiselect_NOCAN <- glm(as.numeric(dataset == dataset_name) ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data, family = quasibinomial())
   
   p_Sext <- predict(selection_NHANES_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")[, 1]
   p_MGI  <- predict(mgiselect_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")
@@ -22,11 +22,11 @@ ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
   WEIGHT_NHANES_NOCAN <- stacked_data[dataset == dataset_name, .N] * WEIGHT_NHANES_NOCAN / sum(WEIGHT_NHANES_NOCAN, na.rm = TRUE)
   
   ## With Cancer
-  NHANES_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data[dataset == "NHANES", ], weights = weight_nhanes, family = quasibinomial())
+  NHANES_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data[dataset == "NHANES", ], weights = weight_nhanes, family = quasibinomial())
   
   modelCAN_NHANES <- predict(NHANES_cancer_model, type = "response", newdata = stacked_data)
   
-  MGI_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw, data = stacked_data[dataset == dataset_name, ], family = quasibinomial())
+  MGI_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data[dataset == dataset_name, ], family = quasibinomial())
   
   modelCAN_MGI <- predict(MGI_cancer_model, type = "response", newdata = stacked_data)
   denom <- ifelse(stacked_data[, cancer] == 1, modelCAN_MGI, 1 - modelCAN_MGI)
@@ -39,7 +39,7 @@ ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
   data.table(
     "id"                  = stacked_data[dataset == dataset_name, ][[id_var]],
     "no_cancer_ipw"       = WEIGHT_NHANES_NOCAN,
-    "cancer_ipw" = CANCER_NHANES_UNCORRECTED
+    "cancer_ipw"          = CANCER_NHANES_UNCORRECTED
   )
   
 }
@@ -54,8 +54,14 @@ poststratification <- function(
     chd_var            = "cad",
     smoke_var          = "smoking_current",
     diabetes_var       = "diabetes",
-    chop               = FALSE
+    female_var         = "female",
+    chop               = FALSE,
+    use_female         = FALSE
 ) {
+  
+  if (use_female == FALSE) {
+    cli_alert_warning("Estimating poststratification weights without `female` variable. IPW estimation includes female by default.")
+  }
   
   Nobs    <- nrow(mgi_data)
   age_vec <- as.numeric(mgi_data[[last_entry_age_var]])
@@ -146,15 +152,35 @@ poststratification <- function(
   age_func_mgi  <- stepfun(x = age_prevalence[["lower"]], y = as.numeric(c(0, table(cut(age_vec, breaks = c(0, age_prevalence[["upper"]]), labels = age_prevalence[["group"]], right = FALSE), useNA = "ifany") / Nobs)), right = FALSE)
   age_func_mgi2 <- stepfun(x = age_prevalence[["lower"]], y = c(0, as.numeric(table(factor(mgi_age_group, levels = age_vals))) / Nobs), right = FALSE)
   
+  # sex distribution by age (us)
+  # same source as above for age
+  if (use_female == TRUE) {
+  female_prevalence <- age_grp_table(
+    lower_ages   = low_ages,
+    upper_offset = 0,
+    num_vec      = age_counts_female[["counts"]] / (age_counts_male[["counts"]] + age_counts_female[["counts"]]),
+    num_var_name = "prevalence"
+  )
+  female_func_pop <- stepfun(x = female_prevalence[["lower"]], y = c(0, female_prevalence[["prevalence"]]), right = FALSE)
+  female_b        <- aggregate(as.formula(paste0(female_var, " ~ ", last_entry_age_var)), FUN = mean, data = mgi_data)
+  female_func_mgi <- stepfun(x = female_b[, 1], y = c(0, female_b[, 2]), right = FALSE)
+  }
+  
   # without cancer
   population <- fifelse(mgi_data[[diabetes_var]] == 1, diabetes_func_pop(age_vec), 1 - diabetes_func_pop(age_vec))
   population <- population * fifelse(mgi_data[[chd_var]] == 1, chd_func_pop(age_vec), 1 - chd_func_pop(age_vec))
   population <- population * fifelse(mgi_data[[smoke_var]] == 1, smoke_func_pop(age_vec), 1 - smoke_func_pop(age_vec))
+  if (use_female == TRUE) {
+    population <- population * fifelse(mgi_data[[female_var]] == 1, female_func_pop(age_vec), 1 - female_func_pop(age_vec))
+    }
   population <- population * age_func_pop(age_vec)
   
   mgi <- fifelse(mgi_data[[diabetes_var]] == 1, diabetes_func_mgi(age_vec), 1 - diabetes_func_mgi(age_vec))
   mgi <- mgi * fifelse(mgi_data[[chd_var]] == 1, chd_func_mgi(age_vec), 1 - chd_func_mgi(age_vec))
   mgi <- mgi * fifelse(mgi_data[[smoke_var]] == 1, smoke_func_mgi(age_vec), 1 - smoke_func_mgi(age_vec))
+  if (use_female == TRUE) {
+    mgi <- mgi * fifelse(mgi_data[[female_var]] == 1, female_func_mgi(age_vec), 1 - female_func_mgi(age_vec))
+  }
   mgi <- mgi * age_func_mgi(age_vec)
   
   if (chop == TRUE) {
