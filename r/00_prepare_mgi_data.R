@@ -112,7 +112,7 @@ cli_alert("saving processed files...")
 save_qs <- function(
   x,
   file,
-  qs_preset = "balance",
+  qs_preset = "balanced",
   nthreads  = ifelse(parallel::detectCores() >= 4, 4, parallel::detectCores()),
   verbose   = FALSE
 ) {
