@@ -7,7 +7,7 @@
 options(stringsAsFactors = FALSE)
 
 library(data.table)
-library(fst)
+library(qs)
 library(ppcor)
 library(glue)
 library(cli)
@@ -101,10 +101,12 @@ res_table <- rbindlist(res_list, fill = TRUE)
 output_file <- glue("data/private/mgi/{opt$mgi_version}/",
                     "mgi_phenome_partial_correlations_",
                     "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
-                    "{opt$mgi_version}.fst")
+                    "{opt$mgi_version}.qs")
 cli_alert_info("saving results to: {.path {output_file}}")
 
-write_fst(x    = res_table,
-          path = output_file)
+save_qs(
+  x    = res_table,
+  file = output_file
+)
 
 cli_alert_success("script success! see {.path {output_file}}")

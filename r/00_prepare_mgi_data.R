@@ -4,7 +4,6 @@ suppressPackageStartupMessages({
   library(glue)
   library(cli)
   library(qs)
-  library(fst)
   library(parallel)
   library(optparse)
 })
@@ -111,10 +110,9 @@ MGIcohort[, female := as.numeric(Sex == "F")]
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
 
-save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"), verbose = TRUE)
+save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"))
 for (i in c("MGI", "MGI-MEND", "MIPACT", "MHB2")) {
-  save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"),
-          verbose = TRUE)
+  save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"))
 }
 
 cli_alert_success("script success! see {.path {out_path}} for output files")

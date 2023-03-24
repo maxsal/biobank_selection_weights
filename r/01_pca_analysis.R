@@ -7,6 +7,7 @@
 library(data.table)
 library(ggplot2)
 library(patchwork)
+library(qs)
 library(glue)
 
 set.seed(61787)
@@ -80,9 +81,10 @@ short_ukb_pim[is.na(short_ukb_pim)] <- 0
 mgi_pca      <- prcomp(short_mgi_pim, center = FALSE, scale. = FALSE)
 mgi_pca_sum  <- summary(mgi_pca)$importance
 ### save data
-write_fst(
+save_qs(
   x = as.data.table(mgi_pca_sum),
-  path = glue("results/mgi/{opt$mgi_version}/mgi_pca_importance_{opt$mgi_version}.fst"))
+  file = glue("results/mgi/{opt$mgi_version}/mgi_pca_importance_{opt$mgi_version}.qs")
+)
 ### save plot
 mgi_pca_plot <- stacked_pca_plot(x = mgi_pca_sum, cohort = "mgi")
 ggsave(
@@ -99,9 +101,10 @@ ggsave(
 ukb_pca      <- prcomp(short_ukb_pim, center = FALSE, scale. = FALSE)
 ukb_pca_sum  <- summary(ukb_pca)$importance
 ### save data
-write_fst(
+save_qs(
   x = as.data.table(ukb_pca_sum),
-  path = glue("results/ukb/{opt$ukb_version}/ukb_pca_importance_{opt$ukb_version}.fst"))
+  file = glue("results/ukb/{opt$ukb_version}/ukb_pca_importance_{opt$ukb_version}.qs")
+)
 ### save plot
 ukb_pca_plot <- stacked_pca_plot(x = ukb_pca_sum, cohort = "ukb")
 ggsave(

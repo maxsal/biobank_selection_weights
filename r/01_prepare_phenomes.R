@@ -8,7 +8,7 @@ options(stringsAsFactors = FALSE)
 
 suppressPackageStartupMessages({
   library(data.table)
-  library(fst)
+  library(qs)
   library(MatchIt)
   library(cli)
   library(optparse)
@@ -101,8 +101,7 @@ check_folder_structure(
 ## mgi
 cli_alert("loading mgi data...")
 ### demographics
-mgi_cov <- read_fst(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.fst"),
-                    as.data.table = TRUE)
+mgi_cov <- read_qs(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.qs"))
 setnames(mgi_cov,
          old = c("DeID_PatientID", "Age", "AliveYN", "Deceased_DaysSinceBirth",
                  "Ethnicity", "MaritalStatusCode", "Sex", "Race", "AgeFirstEntry",
@@ -224,9 +223,9 @@ if ( !dir.exists( glue("data/private/mgi/{opt$mgi_version}/",
               recursive = TRUE )
 }
 ### save mgi matching data
-write_fst(x = mgi_post_match_cov,
-          path = glue("data/private/mgi/{opt$mgi_version}/",
-                      "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
+save_qs(x = mgi_post_match_cov,
+        file = glue("data/private/mgi/{opt$mgi_version}/",
+                    "X{gsub('X', '', opt$outcome)}/matched_covariates.qs"))
 
 ## ukb
 cli_alert(glue("performing 1:{opt$matching_ratio} case:non-case ",
@@ -270,9 +269,9 @@ if ( !dir.exists( glue("data/private/ukb/{opt$ukb_version}/",
               recursive = TRUE )
 }
 ### save ukb matching data
-write_fst(x = ukb_post_match_cov,
-          path = glue("data/private/ukb/{opt$ukb_version}/",
-            "X{gsub('X', '', opt$outcome)}/matched_covariates.fst"))
+save_qs(x = ukb_post_match_cov,
+        file = glue("data/private/ukb/{opt$ukb_version}/",
+                    "X{gsub('X', '', opt$outcome)}/matched_covariates.qs"))
 
 # 8. create time-restricted phenomes -------------------------------------------
 ## mgi
@@ -292,12 +291,12 @@ mgi_pims <- lapply(
 names(mgi_pims) <- glue("t{time_thresholds}")
 
 for (i in 1:length(mgi_pims)) {
-  write_fst(
+  save_qs(
     x = mgi_pims[[i]],
-    path = glue("data/private/mgi/{opt$mgi_version}/",
+    file = glue("data/private/mgi/{opt$mgi_version}/",
                 "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                 "mgi_X{gsub('X', '', opt$outcome)}",
-                "_{names(mgi_pims)[i]}_{opt$mgi_version}.fst")
+                "_{names(mgi_pims)[i]}_{opt$mgi_version}.qs")
   )
 }
 
@@ -317,12 +316,12 @@ for (i in seq_along(time_thresholds)) {
 }
 names(ukb_pims) <- glue("t{time_thresholds}")
 for (i in 1:length(ukb_pims)) {
-  write_fst(
+  save_qs(
     x = ukb_pims[[i]],
-    path = glue("data/private/ukb/{opt$ukb_version}/",
+    file = glue("data/private/ukb/{opt$ukb_version}/",
                 "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                 "ukb_X{gsub('X', '', opt$outcome)}",
-                "_{names(ukb_pims)[i]}_{opt$ukb_version}.fst")
+                "_{names(ukb_pims)[i]}_{opt$ukb_version}.qs")
   )
 }
 

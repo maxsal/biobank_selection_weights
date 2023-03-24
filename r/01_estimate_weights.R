@@ -13,7 +13,7 @@ suppressPackageStartupMessages({
   library(simplexreg)
   library(data.table)
   library(glue)
-  library(fst)
+  library(qs)
   library(optparse)
 })
 
@@ -47,8 +47,7 @@ lapply(list.files("fn", full.names = TRUE), source) |> # load functions
   invisible()
 
 # load data --------------------------------------------------------------------
-mgi <- read_fst(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.fst"),
-               as.data.table = TRUE)[, female := as.numeric(Sex == "F")]
+mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
 nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
@@ -141,9 +140,9 @@ log_or_est
 fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
 
 # save -------------------------------------------------------------------------
-write_fst(
+save_qs(
   x = merged[, .(id, no_cancer_ipw, cancer_ipw, no_cancer_postw, cancer_postw)],
-  path = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.fst")
-  )
+  path = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
+)
 
 cli_alert_success("script success! see {.path {data_path}} and suffix {.emph {opt$mgi_cohort}}")
