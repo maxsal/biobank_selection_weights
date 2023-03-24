@@ -10,7 +10,7 @@ library(data.table)
 library(MatchIt)
 library(logistf)
 library(glue)
-library(fst)
+library(qs)
 library(cli)
 library(optparse)
 
@@ -52,26 +52,24 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
 mgi_tr_pims <- lapply(seq_along(time_thresholds),
                       \(x) {glue("data/private/mgi/{opt$mgi_version}/X","{gsub('X', '', opt$outcome)}/",
                                  "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
-                                 "{time_thresholds[x]}_{opt$mgi_version}.fst") |>
-                          read_fst(as.data.table = TRUE)})
+                                 "{time_thresholds[x]}_{opt$mgi_version}.qs") |>
+                          read_qs()})
 names(mgi_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-mgi_covariates <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
-                                "matched_covariates.fst"),
-                           as.data.table = TRUE)
+mgi_covariates <- read_qs(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+                                "matched_covariates.qs"))
 
 ## ukb
 ukb_tr_pims <- lapply(seq_along(time_thresholds),
                       \(x) {glue("data/private/ukb/{opt$ukb_version}/X","{gsub('X', '', opt$outcome)}/",
                                  "time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t",
-                                 "{time_thresholds[x]}_{opt$ukb_version}.fst") |>
-                          read_fst(as.data.table = TRUE)})
+                                 "{time_thresholds[x]}_{opt$ukb_version}.qs") |>
+                          read_qs()})
 names(ukb_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-ukb_covariates <- read_fst(
+ukb_covariates <- read_qs(
   glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
-             "matched_covariates.fst"),
-  as.data.table = TRUE
+             "matched_covariates.qs")
 )
 
 ## phenome
@@ -114,11 +112,11 @@ names(ukb_results) <- glue("t{time_thresholds}")
 lapply(
   seq_along(time_thresholds),
   \(i) {
-    write_fst(
+    save_qs(
       x = mgi_results[[i]],
-      path = glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+      file = glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
                   "mgi_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                  "{opt$mgi_version}_results.fst")
+                  "{opt$mgi_version}_results.qs")
     )
   }
 ) |> invisible()
@@ -127,11 +125,11 @@ lapply(
 lapply(
   seq_along(time_thresholds),
   \(i) {
-    write_fst(
+    save_qs(
       x = ukb_results[[i]],
-      path = glue("results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
+      file = glue("results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
                   "ukb_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                  "{opt$ukb_version}_results.fst")
+                  "{opt$ukb_version}_results.qs")
     )
   }
 ) |> invisible()

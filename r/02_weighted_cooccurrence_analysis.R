@@ -10,7 +10,7 @@ library(data.table)
 library(MatchIt)
 library(logistf)
 library(glue)
-library(fst)
+library(qs)
 library(cli)
 library(optparse)
 
@@ -52,16 +52,14 @@ file_paths <- get_files(mgi_version = opt$mgi_version)
 mgi_tr_pims <- lapply(seq_along(time_thresholds),
                       \(x) {glue("data/private/mgi/{opt$mgi_version}/X","{gsub('X', '', opt$outcome)}/",
                                  "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
-                                 "{time_thresholds[x]}_{opt$mgi_version}.fst") |>
-                          read_fst(as.data.table = TRUE)})
+                                 "{time_thresholds[x]}_{opt$mgi_version}.qs") |>
+                          read_qs()})
 names(mgi_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-mgi_covariates <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
-                                "matched_covariates.fst"),
-                           as.data.table = TRUE)
+mgi_covariates <- read_qs(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+                                "matched_covariates.qs"))
 
-mgi_weights <- read_fst(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_{opt$mgi_cohort}.fst"),
-                        as.data.table = TRUE)
+mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_{opt$mgi_cohort}.qs"))
 
 ## phenome
 pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
@@ -104,11 +102,11 @@ for (w in seq_along(weight_vars)) {
   lapply(
     seq_along(time_thresholds),
     \(i) {
-      write_fst(
+      save_qs(
         x = out[[w]][[i]],
-        path = glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+        file = glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
                     "mgi_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                    "{opt$mgi_version}_{weight_vars[w]}_results.fst")
+                    "{opt$mgi_version}_{weight_vars[w]}_results.qs")
       )
     }
   ) |> invisible()

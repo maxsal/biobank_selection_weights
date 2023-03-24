@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 # libraries --------------------------------------------------------------------
 cli::cli_alert("loading packages and initializing...")
 suppressPackageStartupMessages({
-  library(fst)
+  library(qs)
   library(data.table)
   library(snakecase)
   library(stringr)
@@ -88,13 +88,11 @@ if (!dir.exists(out_path)) {
 
 # data -------------------------------------------------------------------------
 cli_alert("reading data...")
-d <- read_fst(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$mgi_version}.fst"),
-              as.data.table = TRUE)
+d <- read_qs(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$mgi_version}.qs"))
 d_ids <- d[, .(id, case)]
 
 
-u <- read_fst(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.fst"),
-              as.data.table = TRUE)
+u <- read_qs(glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}_{opt$ukb_version}.qs"))
 u_ids <- u[, .(id, case)]
 
 p <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
@@ -223,13 +221,13 @@ phers_from_pred <- function(case_data, predicted) {
 test_phers     <- phers_from_pred(case_data = test_ids, pred = pred_test)[, `:=` (cohort = opt$discovery_cohort, split = "test")]
 external_phers <- phers_from_pred(case_data = external_ids, pred = pred_ext)[, `:=` (cohort = external_cohort, split = "external")]
 
-write_fst(
+save_qs(
   x = test_phers,
-  path = glue("{out_path}{opt$discovery_cohort}d_{opt$discovery_cohort}e_t{opt$time_threshold}_test_phers.fst")
+  file = glue("{out_path}{opt$discovery_cohort}d_{opt$discovery_cohort}e_t{opt$time_threshold}_test_phers.qs")
 )
-write_fst(
+save_qs(
   x = external_phers,
-  path = glue("{out_path}{opt$discovery_cohort}d_{external_cohort}e_t{opt$time_threshold}_external_phers.fst")
+  file = glue("{out_path}{opt$discovery_cohort}d_{external_cohort}e_t{opt$time_threshold}_external_phers.qs")
 )
 
 ## auc and or summary table
