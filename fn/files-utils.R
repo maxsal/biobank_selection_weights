@@ -1,5 +1,9 @@
 suppressPackageStartupMessages({
   require(glue)
+  require(qs)
+  require(parallel)
+  require(cli)
+  require(glue)
 })
 
 ## extract file paths based on data version
@@ -56,3 +60,21 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
   ))
   
 }
+
+## convenient functions for reading and writing qs files
+save_qs <- function(
+  x,
+  file,
+  qs_preset = "balanced",
+  nthreads  = ifelse(detectCores() >= 4, 4, detectCores()),
+  verbose   = FALSE
+) {
+  if (verbose) cli_alert_info(glue("using {nthreads} threads and '{qs_preset}' preset..."))
+  qsave(x = x, file = file, preset = qs_preset, nthreads = nthreads)
+  if (verbose) cli_alert_info("saved to {.path {file}}")
+}
+
+read_qs <- fuction(
+  file,
+  nthreads = ifelse(detectCores() >= 4, 4, detectCores())
+)

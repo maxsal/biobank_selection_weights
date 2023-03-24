@@ -106,32 +106,15 @@ MGIcohort[, bmi_cat := fcase(
     smoking_former  = as.numeric(SmokingStatus == "Past")
   )]
 
+MGIcohort[, female := as.numeric(Sex == "F")]
+
 # saving files -----------------------------------------------------------------
 cli_alert("saving processed files...")
 
-save_qs <- function(
-  x,
-  file,
-  qs_preset = "balanced",
-  nthreads  = ifelse(parallel::detectCores() >= 4, 4, parallel::detectCores()),
-  verbose   = FALSE
-) {
-  if (verbose) cli::cli_alert_info(glue("using {nthreads} threads and '{qs_preset}' preset..."))
-  qsave(x = x, file = file, preset = qs_preset, nthreads = nthreads)
-  if (verbose) cli::cli_alert_info("saved to {.path {file}}")
-}
-
-# qs
 save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"), verbose = TRUE)
-for (i in MGIcohort[, unique(StudyName)]) {
-  save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.fst"))
+for (i in c("MGI", "MGI-MEND", "MIPACT", "MHB2")) {
+  save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"),
+          verbose = TRUE)
 }
-
-# fst
-write_fst(MGIcohort, path = glue("{out_path}data_{opt$mgi_version}_comb.fst"))
-write_fst(MGIcohort[StudyName == "MGI", ], path = glue("{out_path}data_{opt$mgi_version}_bb.fst"))
-write_fst(MGIcohort[StudyName == "MHB2", ], path = glue("{out_path}data_{opt$mgi_version}_mhb.fst"))
-write_fst(MGIcohort[StudyName == "MIPACT", ], path = glue("{out_path}data_{opt$mgi_version}_mipact.fst"))
-write_fst(MGIcohort[StudyName == "MGI-MEND", ], path = glue("{out_path}data_{opt$mgi_version}_mend.fst"))
 
 cli_alert_success("script success! see {.path {out_path}} for output files")
