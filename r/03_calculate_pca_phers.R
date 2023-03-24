@@ -16,7 +16,7 @@ suppressPackageStartupMessages({
   library(SPAtest)
   library(ggrepel)
   library(cli)
-  library(fst)
+  library(qs)
   library(colorblindr)
   library(optparse)
   library(stringr)
@@ -79,8 +79,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_ver
 cli_alert_info("reading data...")
 
 ## mgi covariate data
-mgi_cov <- read_fst(glue("{mgi_data_path}/matched_covariates.fst"),
-                    as.data.table = TRUE)[
+mgi_cov <- read_qs(glue("{mgi_data_path}/matched_covariates.qs"))[
   get(glue("t{opt$time_threshold}_indicator")) == 1, .(
     id, female,
     age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) /
@@ -89,18 +88,16 @@ mgi_cov <- read_fst(glue("{mgi_data_path}/matched_covariates.fst"),
 mgi_cov <- mgi_cov[complete.cases(mgi_cov), ]
 
 # mgi time-restricted pim
-mgi_pim <- read_fst(glue("{mgi_data_path}/time_restricted_phenomes/",
+mgi_pim <- read_qs(glue("{mgi_data_path}/time_restricted_phenomes/",
                       "mgi_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}",
-                      "_{opt$mgi_version}.fst"),
-                    as.data.table = TRUE)
+                      "_{opt$mgi_version}.qs"))
 mgi_pim <- merge(mgi_pim, data.table(id = mgi_cov$id),
                  by = "id", all.x = FALSE)
 short_mgi_pim <- mgi_pim[, !c("id")]
 short_mgi_pim[is.na(short_mgi_pim)] <- 0
 
 # ukb time_restricted pim
-ukb_cov <- read_fst(glue("{ukb_data_path}/matched_covariates.fst"),
-                    as.data.table = TRUE)[
+ukb_cov <- read_qs(glue("{ukb_data_path}/matched_covariates.qst"))[
                       get(glue("t{opt$time_threshold}_indicator")) == 1, .(
                         id, female,
                         age_at_threshold = round(get(glue("t{opt$time_threshold}_threshold")) /
@@ -108,10 +105,9 @@ ukb_cov <- read_fst(glue("{ukb_data_path}/matched_covariates.fst"),
                         length_followup, case)]
 ukb_cov <- ukb_cov[complete.cases(ukb_cov), ]
 
-ukb_pim <- read_fst(glue("{ukb_data_path}/time_restricted_phenomes/",
+ukb_pim <- read_qs(glue("{ukb_data_path}/time_restricted_phenomes/",
                          "ukb_X{gsub('X', '', opt$outcome)}_t{opt$time_threshold}",
-                         "_{opt$ukb_version}.fst"),
-                    as.data.table = TRUE)
+                         "_{opt$ukb_version}.qs"))
 ukb_pim <- merge(ukb_pim, data.table(id = ukb_cov$id),
                  by = "id", all.x = FALSE)
 ukb_pim[is.na(ukb_pim)] <- 0
@@ -199,23 +195,23 @@ results$betas_m2sig <- as.matrix(rotations) %*%
   as.matrix(results_pc[, alphasmod_m2sig])
 
 ### save rotations, results_pc, and results
-write_fst(
+save_qs(
   x    = rotations,
-  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+  file = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
               "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
-              "pc_rotations.fst")
+              "pc_rotations.qs")
 )
-write_fst(
+save_qs(
   x    = results_pc,
-  path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
+  file = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
               "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
-              "pcs.fst")
+              "pcs.qs")
 )
-write_fst(
+save_qs(
   x    = results,
   path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
               "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
-              "pc_results.fst")
+              "pc_results.qs")
 )
 
 # manhattan plot ---------------------------------------------------------------
@@ -346,17 +342,17 @@ ukb_phers <- data.frame(
   phers = ukb_phers_vec_std
 ) |> as.data.table()
 
-write_fst(
+save_qs(
   x = ukb_phers,
-  path = glue("{out_path}/ukb_X{gsub('X', '', opt$outcome)}_",
+  file = glue("{out_path}/ukb_X{gsub('X', '', opt$outcome)}_",
               "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
-              "pc_phers.fst")
+              "pc_phers.qs")
 )
-write_fst(
+save_qs(
   x = mgi_phers,
   path = glue("{out_path}/mgi_X{gsub('X', '', opt$outcome)}_",
               "t{opt$time_threshold}_pve{opt$pc_var_explain}_",
-              "pc_phers.fst")
+              "pc_phers.qs")
 )
 
 cli_alert("generating outputs...")

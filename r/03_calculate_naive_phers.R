@@ -14,7 +14,7 @@ suppressPackageStartupMessages({
   library(pROC)
   library(glue)
   library(logistf)
-  library(fst)
+  library(qs)
   library(optparse)
   library(colorblindr)
 })
@@ -87,45 +87,39 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
 cli_alert("loading data...")
 ## mgi
 mgi_pim0    <- fread(file_paths[["mgi"]]$pim0_file)
-mgi_pim     <- read_fst(glue("data/private/mgi/{opt$mgi_version}/",
+mgi_pim     <- read_qs(glue("data/private/mgi/{opt$mgi_version}/",
                           "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
                           "mgi_X{gsub('X', '', opt$outcome)}_",
-                          "t{opt$time_threshold}_{opt$mgi_version}.fst"),
-                     as.data.table = TRUE)
+                          "t{opt$time_threshold}_{opt$mgi_version}.qs"))
 mgi_pim[is.na(mgi_pim)] <- 0
-mgi_covariates <- read_fst(glue("data/private/mgi/{opt$mgi_version}/",
+mgi_covariates <- read_qs(glue("data/private/mgi/{opt$mgi_version}/",
                              "X{gsub('X', '', opt$outcome)}/",
-                             "matched_covariates.fst"),
-                           as.data.table = TRUE)
+                             "matched_covariates.qs"))
 
 ## ukb
 ukb_pim0    <- fread(file_paths[["ukb"]]$pim0_file)
-ukb_pim     <- read_fst(glue("data/private/ukb/{opt$ukb_version}/",
+ukb_pim     <- read_qs(glue("data/private/ukb/{opt$ukb_version}/",
                           "X{gsub('X', '', opt$outcome)}/",
                           "time_restricted_phenomes/",
                           "ukb_X{gsub('X', '', opt$outcome)}_",
-                          "t{opt$time_threshold}_{opt$ukb_version}.fst"),
-                        as.data.table = TRUE)
-ukb_covariates <- read_fst(glue("data/private/ukb/{opt$ukb_version}/",
+                          "t{opt$time_threshold}_{opt$ukb_version}.qs"))
+ukb_covariates <- read_qs(glue("data/private/ukb/{opt$ukb_version}/",
                              "X{gsub('X', '', opt$outcome)}/",
-                             "matched_covariates.fst"),
-                           as.data.table = TRUE)
+                             "matched_covariates.qs"))
 
 ## cooccur
 if (opt$discovery_cohort == "mgi") {
-  cooccur <- read_fst(glue("results/mgi/{opt$mgi_version}/",
+  cooccur <- read_qs(glue("results/mgi/{opt$mgi_version}/",
                            "X{gsub('X', '', opt$outcome)}/",
                            "mgi_X{gsub('X', '', opt$outcome)}_",
                            "t{opt$time_threshold}_{opt$mgi_version}_",
-                           "{ifelse(is.null(opt$weights), '', paste0(opt$weights, '_'))}results.fst"),
-                      as.data.table = TRUE)
+                           "{ifelse(is.null(opt$weights), '', paste0(opt$weights, '_'))}results.qs"))
 } else {
-  cooccur <- read_fst(glue("results/ukb/{opt$ukb_version}/",
+  cooccur <- read_qs(glue("results/ukb/{opt$ukb_version}/",
                            "X{gsub('X', '', opt$outcome)}/",
                            "ukb_X{gsub('X', '', opt$outcome)}_",
                            "t{opt$time_threshold}_{opt$ukb_version}",
-                           "{ifelse(is.null(opt$weights), '', paste0(opt$weights, '_'))}_results.fst"),
-                      as.data.table = TRUE)
+                           "{ifelse(is.null(opt$weights), '', paste0(opt$weights, '_'))}_results.qs"))
 }
 
 ## phecode info
@@ -306,23 +300,23 @@ ggsave(plot = ukb_phers_dist_plot,
        width = 8, height = 6, device = cairo_pdf)
 
 ## phers and summary output
-write_fst(
+save_qs(
   x = mgi_phers$data,
-  path = glue("{out_path}{mgi_out_prefix}phers.fst")
+  file = glue("{out_path}{mgi_out_prefix}phers.qs")
 )
-write_fst(
+save_qs(
   x = ukb_phers$data,
-  path = glue("{out_path}{ukb_out_prefix}phers.fst")
+  file = glue("{out_path}{ukb_out_prefix}phers.qs")
 )
 
-saveRDS(
-  mgi_phers,
-  file = glue("{out_path}{mgi_out_prefix}summary.rds")
+save_qs(
+  x = mgi_phers,
+  file = glue("{out_path}{mgi_out_prefix}summary.qs")
 )
 
-saveRDS(
-  ukb_phers,
-  file = glue("{out_path}{ukb_out_prefix}summary.rds")
+save_qs(
+  x = ukb_phers,
+  file = glue("{out_path}{ukb_out_prefix}summary.qs")
 )
 
 cli_alert_success("script success! see output in {.path {out_path}}")
