@@ -48,7 +48,7 @@ lapply(list.files("fn", full.names = TRUE), source) |> # load functions
 
 # load data --------------------------------------------------------------------
 mgi <- read_fst(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.fst"),
-               as.data.table = TRUE)
+               as.data.table = TRUE)[, female := as.numeric(Sex == "F")]
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
 nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
