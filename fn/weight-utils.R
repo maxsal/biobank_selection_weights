@@ -2,46 +2,90 @@
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
 ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
   
-  stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes / sum(weight_nhanes, na.rm = TRUE)]
+  stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
+                                      sum(weight_nhanes, na.rm = TRUE)]
   
-  selection_NHANES_NOCAN <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + cad + diabetes + smoking_current + smoking_former + bmi_under + bmi_overweight + bmi_obese + nhanes_nhw + female, data = stacked_data[dataset == 'NHANES', ])
+  # modeling nhanes sampling weights
+  nhanes_select_mod <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) +
+                                  as.numeric(age_cat == 6) + cad +
+                                  diabetes + smoking_current +
+                                  smoking_former + bmi_under +
+                                  bmi_overweight + bmi_obese + nhanes_nhw,
+                                  data = stacked_data[dataset == 'NHANES', ])
   
-  mgiselect_NOCAN <- glm(as.numeric(dataset == dataset_name) ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data, family = quasibinomial())
+  # selection model into internal data
+  int_select_mod <- glm(as.numeric(dataset == dataset_name) ~ 
+                          as.numeric(age_cat == 5) + as.numeric(age_cat == 6) +
+                          diabetes + cad + bmi_under + bmi_overweight +
+                          bmi_obese + smoking_current + smoking_former +
+                          nhanes_nhw + female,
+                        data = stacked_data, family = quasibinomial())
   
-  p_Sext <- predict(selection_NHANES_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")[, 1]
-  p_MGI  <- predict(mgiselect_NOCAN, newdata = stacked_data[dataset == dataset_name, ], type = "response")
+  # obtain fitted values from nhanes and internal models
+  p_nhanes <- predict(nhanes_select_mod,
+                    newdata = stacked_data[dataset == dataset_name, ],
+                    type = "response")[, 1]
+  p_MGI  <- predict(int_select_mod,
+                    newdata = stacked_data[dataset == dataset_name, ],
+                    type = "response")
+
+  ###
   temp <- rep(0, times = length(p_MGI))
-  temp[which(rownames(data.frame(p_Sext)) %in% rownames(data.frame(p_MGI)) == T)] <- p_Sext
-  temp[which(rownames(data.frame(p_Sext)) %in% rownames(data.frame(p_MGI)) == F)] <- NA
-  p_Sext <- temp
-  p_Sext[which(p_Sext == 0)] <- 1.921e-05
-  SELECT_NHANES_NOCAN <- p_Sext * (p_MGI / (1 - p_MGI))
+  temp[which(rownames(data.frame(p_nhanes)) %in%
+              rownames(data.frame(p_MGI)) == T)] <- p_nhanes
+  temp[which(rownames(data.frame(p_nhanes)) %in%
+              rownames(data.frame(p_MGI)) == F)] <- NA
+  p_nhanes                     <- temp
+  p_nhanes[which(p_nhanes == 0)] <- 1.921e-05
+  nhanes_selection        <- p_nhanes * (p_MGI / (1 - p_MGI))
+  ###
   
-  SELECT_NHANES_NOCAN <- chopr(SELECT_NHANES_NOCAN)
-  WEIGHT_NHANES_NOCAN <- 1 / SELECT_NHANES_NOCAN
-  WEIGHT_NHANES_NOCAN <- stacked_data[dataset == dataset_name, .N] * WEIGHT_NHANES_NOCAN / sum(WEIGHT_NHANES_NOCAN, na.rm = TRUE)
+  nhanes_selection <- chopr(nhanes_selection)
+  nhanes_weight <- 1 / nhanes_selection
+  nhanes_weight <- stacked_data[dataset == dataset_name, .N] *
+                          nhanes_weight /
+                          sum(nhanes_weight, na.rm = TRUE)
   
   ## With Cancer
-  NHANES_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data[dataset == "NHANES", ], weights = weight_nhanes, family = quasibinomial())
+  nhanes_cancer_mod <- glm(cancer ~ as.numeric(age_cat == 5) +
+                             as.numeric(age_cat == 6) + diabetes + cad +
+                             bmi_under + bmi_overweight + bmi_obese +
+                             smoking_current + smoking_former + nhanes_nhw +
+                             female,
+                             data = stacked_data[dataset == "NHANES", ],
+                             weights = weight_nhanes, family = quasibinomial())
   
-  modelCAN_NHANES <- predict(NHANES_cancer_model, type = "response", newdata = stacked_data)
+  nhanes_cancer <- predict(nhanes_cancer_mod, type = "response",
+                              newdata = stacked_data)
   
-  MGI_cancer_model <- glm(cancer ~ as.numeric(age_cat == 5) + as.numeric(age_cat == 6) + diabetes + cad + bmi_under + bmi_overweight + bmi_obese + smoking_current + smoking_former + nhanes_nhw + female, data = stacked_data[dataset == dataset_name, ], family = quasibinomial())
+  mgi_cancer_mod <- glm(cancer ~ as.numeric(age_cat == 5) +
+                          as.numeric(age_cat == 6) + diabetes + cad + 
+                          bmi_under + bmi_overweight + bmi_obese +
+                          smoking_current + smoking_former + nhanes_nhw +
+                          female,
+                          data = stacked_data[dataset == dataset_name, ],
+                          family = quasibinomial())
   
-  modelCAN_MGI <- predict(MGI_cancer_model, type = "response", newdata = stacked_data)
-  denom <- ifelse(stacked_data[, cancer] == 1, modelCAN_MGI, 1 - modelCAN_MGI)
-  num <- ifelse(stacked_data[, cancer] == 1, modelCAN_NHANES, 1 - modelCAN_NHANES)
-  cancer_factor <- (num[stacked_data[, dataset] == dataset_name] / denom[stacked_data[, dataset] == dataset_name])
+  mgi_cancer <- predict(mgi_cancer_mod, type = "response",
+                          newdata = stacked_data)
+  denom      <- ifelse(stacked_data[, cancer] == 1, mgi_cancer,
+                       1 - mgi_cancer)
+  num        <- ifelse(stacked_data[, cancer] == 1, nhanes_cancer,
+                       1 - nhanes_cancer)
+  cancer_factor <- (num[stacked_data[, dataset] == dataset_name] /
+                      denom[stacked_data[, dataset] == dataset_name])
   cancer_factor <- chopr(cancer_factor)
-  CANCER_NHANES_UNCORRECTED = cancer_factor * WEIGHT_NHANES_NOCAN
-  CANCER_NHANES_UNCORRECTED  = stacked_data[dataset == dataset_name, .N] * CANCER_NHANES_UNCORRECTED / sum(CANCER_NHANES_UNCORRECTED, na.rm = TRUE)
-  
+  nhanes_cancer_weight = cancer_factor * nhanes_weight
+  nhanes_cancer_weight  = stacked_data[dataset == dataset_name, .N] *
+                                nhanes_cancer_weight /
+                                sum(nhanes_cancer_weight, na.rm = TRUE)
+
   data.table(
     "id"                  = stacked_data[dataset == dataset_name, ][[id_var]],
-    "no_cancer_ipw"       = WEIGHT_NHANES_NOCAN,
-    "cancer_ipw"          = CANCER_NHANES_UNCORRECTED
+    "no_cancer_ipw"       = nhanes_weight,
+    "cancer_ipw"          = nhanes_cancer_weight
   )
-  
+
 }
 
 # calculate poststratification weights from MGI
