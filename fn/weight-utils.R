@@ -1,24 +1,33 @@
 # calculate IPW from stacked data
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
-ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
+ipw <- function(
+  stacked_data,
+  dataset_name = "MGI",
+  id_var       = "id",
+  use_female   = FALSE) {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
                                       sum(weight_nhanes, na.rm = TRUE)]
   
+  select_mod_covs <- paste(c("as.numeric(age_cat == 5)",
+                             "as.numeric(age_cat == 6)", "cad", "diabetes",
+                             "smoking_current", "smoking_former", "bmi_under",
+                             "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+                             collapse = " + ")
+  if (use_female == TRUE) { select_mod_covs <- paste(c(select_mod_covs,
+                                                     "female"),
+                                                     collapse = " + ") }
+
   # modeling nhanes sampling weights
-  nhanes_select_mod <- simplexreg(samp_nhanes ~ as.numeric(age_cat == 5) +
-                                  as.numeric(age_cat == 6) + cad +
-                                  diabetes + smoking_current +
-                                  smoking_former + bmi_under +
-                                  bmi_overweight + bmi_obese + nhanes_nhw,
+  nhanes_select_mod <- simplexreg(as.formula(cat("samp_nhanes ~",
+                                                  select_mod_covs)),
                                   data = stacked_data[dataset == 'NHANES', ])
   
+  
   # selection model into internal data
-  int_select_mod <- glm(as.numeric(dataset == dataset_name) ~ 
-                          as.numeric(age_cat == 5) + as.numeric(age_cat == 6) +
-                          diabetes + cad + bmi_under + bmi_overweight +
-                          bmi_obese + smoking_current + smoking_former +
-                          nhanes_nhw,
+  int_select_mod <- glm(cat(paste0("as.numeric(dataset == ",
+                                   dataset_name, ") ~"),
+                            select_mod_covs),
                         data = stacked_data, family = quasibinomial())
   
   # obtain fitted values from nhanes and internal models
@@ -47,20 +56,14 @@ ipw <- function(stacked_data, dataset_name = "MGI", id_var = "id") {
                           sum(nhanes_weight, na.rm = TRUE)
   
   ## With Cancer
-  nhanes_cancer_mod <- glm(cancer ~ as.numeric(age_cat == 5) +
-                             as.numeric(age_cat == 6) + diabetes + cad +
-                             bmi_under + bmi_overweight + bmi_obese +
-                             smoking_current + smoking_former + nhanes_nhw,
+  nhanes_cancer_mod <- glm(as.formula(cat("cancer ~", select_mod_covs)),
                              data = stacked_data[dataset == "NHANES", ],
                              weights = weight_nhanes, family = quasibinomial())
   
   nhanes_cancer <- predict(nhanes_cancer_mod, type = "response",
                               newdata = stacked_data)
   
-  mgi_cancer_mod <- glm(cancer ~ as.numeric(age_cat == 5) +
-                          as.numeric(age_cat == 6) + diabetes + cad + 
-                          bmi_under + bmi_overweight + bmi_obese +
-                          smoking_current + smoking_former + nhanes_nhw,
+  mgi_cancer_mod <- glm(as.formula(cat("cancer ~", select_mod_covs)),
                           data = stacked_data[dataset == dataset_name, ],
                           family = quasibinomial())
   
