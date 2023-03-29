@@ -146,7 +146,7 @@ fwrite(
 # save -------------------------------------------------------------------------
 save_qs(
   x = merged[, .(id, no_cancer_ipw, cancer_ipw, no_cancer_postw, cancer_postw)],
-  path = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
+  file = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
 )
 
 cli_alert_success("script success! see {.path {data_path}} and suffix {.emph {opt$mgi_cohort}}")
