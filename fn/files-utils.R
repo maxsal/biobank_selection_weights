@@ -76,5 +76,9 @@ save_qs <- function(
 
 read_qs <- function(
   file,
-  nthreads = ifelse(detectCores() >= 4, 4, detectCores())
-)
+  nthreads = ifelse(detectCores() >= 4, 4, detectCores()),
+  verbose  = FALSE
+) {
+  if (verbose) cli_alert_info(glue("reading {.path {file}} using {nthreads} threads..."))
+  qread(file, nthreads = nthreads)
+}
