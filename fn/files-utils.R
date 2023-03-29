@@ -74,7 +74,7 @@ save_qs <- function(
   if (verbose) cli_alert_info("saved to {.path {file}}")
 }
 
-read_qs <- fuction(
+read_qs <- function(
   file,
   nthreads = ifelse(detectCores() >= 4, 4, detectCores())
 )
