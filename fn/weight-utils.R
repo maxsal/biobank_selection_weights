@@ -25,28 +25,28 @@ ipw <- function(
   
   
   # selection model into internal data
-  int_select_mod <- glm(paste0("as.numeric(dataset == '",
-                               dataset_name,"') ~ ",
-                               select_mod_covs),
-                        data = stacked_data, family = quasibinomial())
+  internal_select_mod <- glm(paste0("as.numeric(dataset == '",
+                                    dataset_name,"') ~ ",
+                                    select_mod_covs),
+                             data = stacked_data, family = quasibinomial())
   
   # obtain fitted values from nhanes and internal models
   p_nhanes <- predict(nhanes_select_mod,
                       newdata = stacked_data[dataset == dataset_name, ],
                       type = "response")[, 1]
-  p_MGI  <- predict(int_select_mod,
+  p_internal  <- predict(internal_select_mod,
                     newdata = stacked_data[dataset == dataset_name, ],
                     type = "response")
 
   ###
-  temp <- rep(0, times = length(p_MGI))
+  temp <- rep(0, times = length(p_internal))
   temp[which(rownames(data.frame(p_nhanes)) %in%
-              rownames(data.frame(p_MGI)) == T)] <- p_nhanes
+              rownames(data.frame(p_internal)) == T)] <- p_nhanes
   temp[which(rownames(data.frame(p_nhanes)) %in%
-              rownames(data.frame(p_MGI)) == F)] <- NA
+              rownames(data.frame(p_internal)) == F)] <- NA
   p_nhanes                     <- temp
   p_nhanes[which(p_nhanes == 0)] <- 1.921e-05
-  nhanes_selection        <- p_nhanes * (p_MGI / (1 - p_MGI))
+  nhanes_selection        <- p_nhanes * (p_internal / (1 - p_internal))
   ###
   
   nhanes_selection <- chopr(nhanes_selection)

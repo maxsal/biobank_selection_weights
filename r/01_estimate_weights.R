@@ -137,7 +137,11 @@ log_or_est <- rbindlist(list(
 ))
 log_or_est
 
-fwrite(x = log_or_est, file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.csv"))
+fwrite(
+  x    = log_or_est,
+  file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.txt"),
+  sep  = "\t"
+  )
 
 # save -------------------------------------------------------------------------
 save_qs(
