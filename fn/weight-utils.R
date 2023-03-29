@@ -25,8 +25,8 @@ ipw <- function(
   
   
   # selection model into internal data
-  int_select_mod <- glm(paste0("as.numeric(dataset == ",
-                               dataset_name, ") ~ ",
+  int_select_mod <- glm(paste0("as.numeric(dataset == '",
+                               dataset_name,"') ~ ",
                                select_mod_covs),
                         data = stacked_data, family = quasibinomial())
   
