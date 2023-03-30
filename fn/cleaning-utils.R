@@ -65,7 +65,7 @@ demo_summarizr <- function(
     cancer_var = "cancer"
 ) {
   # continuous age (pretty_print() is in eval-utils.R)--------------------------
-  age_cont <- x[, .(mean = mean(get(age_var)), sd = sd(get(age_var)))][, `:=` (
+  age_cont <- x[, .(mean = mean(get(age_var), na.rm = TRUE), sd = sd(get(age_var), na.rm = TRUE))][, `:=` (
     print    = paste0(pretty_round(mean, 1), " (", pretty_round(sd, 1), ")"),
     var_name = age_var,
     variable = "Age (continuous)"

@@ -4,15 +4,19 @@
 # date:    20221208
 
 # 1. libraries, functions, and options -----------------------------------------
-library(data.table)
-library(ggplot2)
-library(patchwork)
-library(qs)
-library(glue)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(patchwork)
+  library(qs)
+  library(glue)
+  library(optparse)
+})
 
 set.seed(61787)
 
-for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
+lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
+  invisible()
 
 # optparse list ----
 option_list <- list(
