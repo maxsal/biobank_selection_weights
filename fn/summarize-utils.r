@@ -108,15 +108,15 @@ phecode_dsb_summarizer <- function(x) {
                val      = "count"),
 
     # encounters per person
-    v_sum(unique(cond[, .(id, dsb)])[, .N, id][, N],
+    v_sum(unique(x[, .(id, dsb)])[, .N, id][, N],
           var_name = "Encounters per person, unique"),
           
     # total phecodes per person
-    v_sum(summary(cond[, .N, id][, N]),
+    v_sum(summary(x[, .N, id][, N]),
           var_name = "Phecodes per person, total"),
 
     # unique phecodes per person
-    v_sum(unique(cond[, .(id, phecode)])[, .N, id][, N],
+    v_sum(unique(x[, .(id, phecode)])[, .N, id][, N],
           var_name = "Phecodes per person, unique")
     ,
 
