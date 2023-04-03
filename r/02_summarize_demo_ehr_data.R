@@ -24,20 +24,12 @@ lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "157",
-              help = "Outcome phecode [default = %default]"),
   make_option("--mgi_version", type = "character", default = "20220822",
               help = "Version of MGI data [default = %default]"),
   make_option("--mgi_cohort", type = "character", default = "comb",
               help = "Cohort of MGI used in weighting (comb, bb, mend, mhb) [default = %default]"),
   make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = %default]"),
-  make_option("--time_thresholds", type = "character", default = "0,0.5,1,2,3,5",
-              help = glue("Time thresholds for the phenome data ",
-                          "[default = %default]")),
-  make_option("--mod_type", type = "character", default = "glm",
-              help = glue("Type of model to use in cooccurrence analysis - ",
-                          "glm, logistf, or SPAtest [default = %default]"))
+              help = "Version of UKB data [default = %default]")
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args   <- parse_args(parser, positional_arguments = 0)

@@ -29,8 +29,10 @@ icd10[, date := as.Date(date)]
 
 ## sex and dob data
 cli::cli_alert_info("Pulling sex and DOB data...")
-dob   <- reformatUKB(fields=c(31, 33, 34, 52, 22001, 6141, 21000))
-setnames(dob, old = c("31", "33", "34", "52", "22001", "6141", "21000"), new = c("sex", "birth_date", "birth_year", "birth_month", "genetic_sex", "living_with", "ethnicity"))
+dob   <- reformatUKB(fields = c(31, 33, 34, 52, 22001, 6141, 21000, 20116, 20117, 21001))
+setnames(dob,
+         old = c("31", "33", "34", "52", "22001", "6141", "21000", "20116", "20117", "21001"),
+         new = c("sex", "birth_date", "birth_year", "birth_month", "genetic_sex", "living_with", "ethnicity", "smoker", "drinker", "bmi"))
 dob[, `:=` (
   dob = as.Date(paste0(birth_year,"-", ifelse(length(birth_month) == 2, birth_month, paste0("0", birth_month)), "-15")),
   sex = fcase(sex == "0", "Female", sex == "1", "Male"),
@@ -45,6 +47,17 @@ dob[, `:=` (
     living_with == "7", "Other related",
     living_with == "8", "Other unrelated",
     living_with == "-3", "Prefer not to answer"
+  ),
+  smoker = fcase(
+    smoker == "0", "Never",
+    smoker == "1", "Past",
+    smoker == "2", "Current"
+  ),
+  bmi_cat = fcase(
+    bmi < 18.5, "Underweight (<18.5)",
+    bmi < 25, "Healthy [18.5, 25)",
+    bmi < 30, "Overweight [25, 30)",
+    bmi >= 30, "Obese [30+)"
   )
   )]
 dob[ethnicity == "-1", ethnicity := "Do not know"]
@@ -286,6 +299,19 @@ fwrite(x = ukb_phecode,
 cli::cli_alert_success("File saved as './results/UKB_PHECODE_DSB_MAPPED_{save_stamp}.txt'!")
 
 # save sex data ----------------------------------------------------------------
+first_phe <- ukb_phecode[ ukb_phecode[, .I[which.min(dsb)], id]$V1 ]
+last_phe  <- ukb_phecode[ ukb_phecode[, .I[which.max(dsb)], id]$V1 ]
+ehr_followup <- merge.data.table(
+  first_phe[, .(id, first_dsb = dsb, age_at_first_diagnosis = round(dsb / 365.25, 1))],
+  last_phe[, .(id, last_dsb = dsb, age_at_last_diagnosis = round(dsb / 365.25, 1))],
+  by = "id"
+)[, ehr_days := as.numeric(last_dsb - first_dsb)][, ehr_years := round(ehr_days / 365.25, 1)]
+dob <- merge.data.table(
+  dob,
+  ehr_followup,
+  by = "id",
+  all.x = TRUE
+)
 fwrite(x = dob[, !c("birth_date", "birth_year", "birth_month")],
        file = paste0("./results/UKB_SEX_", save_stamp, ".txt"))
 cli::cli_alert_success("File save as './results/UKB_SEX_{save_stamp}.txt'!")
