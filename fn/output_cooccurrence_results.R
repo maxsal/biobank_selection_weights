@@ -93,7 +93,7 @@ output_cooccurrence_results <- function(
     model_type   = "logistf",
     w_data       = NULL,
     w_var        = NULL,
-    ncore        = parallel::detectCores() / 2,
+    ncore        = parallel::detectCores() / 4,
     parallel     = TRUE
     ) {
   
