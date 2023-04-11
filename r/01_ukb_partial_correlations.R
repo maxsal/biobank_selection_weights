@@ -6,14 +6,16 @@
 # 1. libraries, functions, and options -----------------------------------------
 options(stringsAsFactors = FALSE)
 
-library(data.table)
-library(fst)
-library(ppcor)
-library(glue)
-library(cli)
-library(doMC)
-library(optparse)
-library(progressr)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(fst)
+  library(ppcor)
+  library(glue)
+  library(cli)
+  library(doMC)
+  library(optparse)
+  library(progressr)
+})
 
 set.seed(61787)
 
@@ -50,16 +52,18 @@ demo <- fread(file_paths[["ukb"]][["demo_file"]])[, `:=` (
   age_today = as.numeric(round((as.Date("2022-11-17") - as.Date(dob))/365.25, 3))
   )][id %in% icd_phecode[, id]][]
 
-merge.data.table(
-  unique(demo[, .(id, age_today)][!is.na(age_today), ]),
+demo <- merge.data.table(
+  unique(demo[, .(id, age_today, sex)][!is.na(age_today), ]),
   icd_phecode[, .(id, age_at_last_first)],
   by = "id"
 )
 
 ## pc data
 if (opt$use_geno == TRUE) {
+  stop("script not ready to incorporate UKB genotype PCs data")
   pcs <- fread(glue("/net/junglebook/magic_data/MGI_GenotypeData_Freeze4/",
-                    "MGI_Freeze4_Sample_Info_60215samples.txt"))
+                    "MGI_Freeze4_Sample_Info_60215samples.txt"),
+                    colClasses = "character")
   setnames(pcs, old = "Deid_ID", new = "id")
   # merge pcs in demo data
   merged <- merge.data.table(demo, pcs)
@@ -72,14 +76,14 @@ merged  <- merged[id %in% sub_pim[, id]] # subset merged
 
 # covariates -------------------------------------------------------------------
 if (opt$use_geno == TRUE) {
-  x1_mgi <- merged[, .(
-    Age = age,
+  x1 <- merged[, .(
+    Age = age_at_last_first,
     FEMALE = as.numeric(sex == "F"),
     PC1, PC2, PC3, PC4)]
-  x2_mgi <- merged[, .(Age = age, PC1, PC2, PC3, PC4)]
+  x2 <- merged[, .(Age = age_at_last_first, PC1, PC2, PC3, PC4)]
 } else {
-  x1_mgi <- merged[, .(Age = age, FEMALE = as.numeric(sex == "F"))]
-  x2_mgi <- merged[, .(Age = age)]
+  x1 <- merged[, .(Age = age_at_last_first, FEMALE = as.numeric(sex == "F"))]
+  x2 <- merged[, .(Age = age_at_last_first)]
 }
 
 # MGI Partial Correlations -----------------------------------------------------
@@ -90,22 +94,24 @@ combos  <- combn(names(sub_pim), 2, simplify = FALSE)
 cli_alert("calculating pairwise partial correlations....")
 res_list <- partial_corr_veloce(
   pim   = sub_pim,
-  ncore = detectCores()/2,
-  covs1 = x1_mgi,
-  covs2 = x2_mgi
+  ncore = detectCores()/4,
+  covs1 = x1,
+  covs2 = x2
 )
 
 cli_alert_success("calculation complete! creating output table...")
 res_table <- rbindlist(res_list, fill = TRUE)
 
 # save results -----------------------------------------------------------------
-output_file <- glue("data/private/mgi/{opt$mgi_version}/",
-                    "mgi_phenome_partial_correlations_",
+output_file <- glue("data/private/ukb/{opt$ukb_version}/",
+                    "ukb_phenome_partial_correlations_",
                     "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
-                    "{opt$mgi_version}.fst")
+                    "{opt$ukb_version}.qs")
 cli_alert_info("saving results to: {.path {output_file}}")
 
-write_fst(x    = res_table,
-          path = output_file)
+save_qs(
+  x    = res_table,
+  file = output_file
+)
 
 cli_alert_success("script success! see {.path {output_file}}")
