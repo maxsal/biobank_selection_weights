@@ -17,7 +17,6 @@ calculate_prevalences <- function(
 
     # load pheinfo
     pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
-
     # identify sex specific phecodes
     both   <- pheinfo[sex == "Both", paste0("X", phecode)]
     male   <- pheinfo[sex == "Male", paste0("X", phecode)]
@@ -63,6 +62,6 @@ calculate_prevalences <- function(
     }
 
     # calculate prevalence
-    out <- out[phecode %in% names(mgi_pim)][]
+    out <- out[phecode %in% names(pim_data)][]
     out[, prev := n/N][]
 }
