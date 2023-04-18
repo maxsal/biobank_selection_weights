@@ -7,7 +7,6 @@
 suppressPackageStartupMessages({
   library(data.table)
   library(glue)
-  library(cli)
   library(qs)
   library(parallel)
   library(optparse)
@@ -25,7 +24,7 @@ args <- parse_args(parser, positional_arguments = 0)
 opt <- args$options
 print(opt)
 
-cli_alert_info("using cohort version {opt$mgi_version}; see {.path /net/junglebook/magic_data/EHRdata/}")
+message(glue("using cohort version {opt$mgi_version}; see /net/junglebook/magic_data/EHRdata/"))
 
 out_path <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$mgi_version}/")
 if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
@@ -34,7 +33,7 @@ source("fn/files-utils.R")
 file_paths <- get_files(mgi_version = opt$mgi_version)
 
 # load data --------------------------------------------------------------------
-cli_alert("loading data...")
+message("loading data...")
 study <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
 MGIcohort <- fread(file_paths[["mgi"]][["cov_file"]])
 load(file = file_paths[["mgi"]][["phe_overview_file"]])
@@ -92,19 +91,21 @@ comorbid <- list(
 )
 
 # identify cases and create indicator variables --------------------------------
-cli_alert("identifying cases and creating indicator variables...")
-cli_progress_bar("comorbid ids", total = length(names(comorbid)))
+message("identifying cases and creating indicator variables...")
+pb <- txtProgressBar(max = length(names(comorbid)), width = 50, style = 3)
 for (i in names(comorbid)) {
   comorbid[[i]][["ids"]] <- diagnoses_Phecodes[phecode %in% comorbid[[i]][["phecodes"]], IID] |>
     unique()
-  cli_progress_update()
+  setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
 }
+close(pb)
 
-cli_progress_bar("comorbid vars", total = length(names(comorbid)))
+pb <- txtProgressBar(max = length(names(comobird)), width = 50, style = 3)
 for (i in names(comorbid)) {
   set(MGIcohort, j = i, value = fifelse(MGIcohort[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
-  cli_progress_update()
+  pb <- setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
 }
+close(pb)
 
 MGIcohort[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
@@ -136,11 +137,11 @@ MGIcohort[
 MGIcohort[, female := as.numeric(Sex == "F")]
 
 # saving files -----------------------------------------------------------------
-cli_alert("saving processed files...")
+message("saving processed files...")
 
 save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"))
 for (i in c("MGI", "MGI-MEND", "MIPACT", "MHB2")) {
   save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"))
 }
 
-cli_alert_success("script success! see {.path {out_path}} for output files")
+message("script success! see {.path {out_path}} for output files")
