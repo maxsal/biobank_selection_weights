@@ -6,32 +6,34 @@
 suppressPackageStartupMessages({
   require(data.table)
   require(doMC)
-  require(progressr)
 })
 
-partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NULL) {
+partial_corr_veloce <- function(pim,
+                                ncore = detectCores() / 2,
+                                covs1,
+                                covs2 = NULL) {
   registerDoMC(cores = ncore)
   column <- colnames(pim)
-  cols   <- 1:ncol(pim)
-  p      <- progressor(along = cols)
+  cols <- 1:ncol(pim)
   output <- foreach(i = cols) %dopar% {
-    out  <- list()
-    p()
+    out <- list()
     for (j in cols) {
       if (j >= i) next
       cca <- complete.cases(pim[, .SD, .SDcols = c(column[c(i, j)])])
       if (sum(cca) == nrow(pim)) {
         cor_out <- pcor.test(pim[, ..i],
-                             pim[, ..j],
-                             covs1,
-                             method = "pearson")
+          pim[, ..j],
+          covs1,
+          method = "pearson"
+        )
       } else if (sum(cca) < nrow(pim) && sum(cca != 0)) {
         cor_out <- pcor.test(pim[cca, ..i],
-                             pim[cca, ..j],
-                             covs2[cca, ],
-                             method = "pearson")
+          pim[cca, ..j],
+          covs2[cca, ],
+          method = "pearson"
+        )
       }
-      
+
       if (exists("cor_out")) {
         out[[j]] <- data.table(
           "phe1" = column[i],
@@ -39,7 +41,7 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
           as.data.table(cor_out)
         )
       } else {
-        out[[j]] <-  data.table(
+        out[[j]] <- data.table(
           "phe1" = column[i],
           "phe2" = column[j]
         )
@@ -48,5 +50,5 @@ partial_corr_veloce <- function(pim, ncore = detectCores()/2, covs1, covs2 = NUL
     rbindlist(out, use.names = TRUE, fill = TRUE)
   }
   gc(verbose = FALSE)
-  return(output)
+  output
 }

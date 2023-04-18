@@ -1,7 +1,7 @@
-# calculate partial correlations
+# Calculate partial correlations in UKB
 # outputs: table of pairwise partial correlations
 # author:  max salvatore
-# date:    20230220
+# date:    20230418
 
 # 1. libraries, functions, and options -----------------------------------------
 options(stringsAsFactors = FALSE)
@@ -14,7 +14,6 @@ suppressPackageStartupMessages({
   library(cli)
   library(doMC)
   library(optparse)
-  library(progressr)
 })
 
 set.seed(61787)
@@ -36,17 +35,18 @@ print(opt)
 
 file_paths <- get_files(ukb_version = opt$ukb_version)
 
-handlers(global = TRUE)
-
 # 3. read data -----------------------------------------------------------------
-cli_alert("reading data...")
+message("reading data...")
 ## phecode indicator matrix (PEDMASTER_0)
 pim0 <- fread(file_paths[["ukb"]][["pim0_file"]])
 setnames(pim0, old = "IID", new = "id")
 
 ## demographics data
 icd_phecode <- fread(file_paths[["ukb"]][["icd_phecode_file"]])
-icd_phecode <- icd_phecode[ icd_phecode[, .I[which.max(dsb)], by = "id"][["V1"]] ][, .(id, dsb)][, age_at_last_first := round(dsb / 365.25, 3)][]
+icd_phecode <- icd_phecode[ icd_phecode[, .I[which.max(dsb)], by = "id"][["V1"]] ][
+  ,
+  .(id, dsb)][
+    , age_at_last_first := round(dsb / 365.25, 3)][]
 
 demo <- fread(file_paths[["ukb"]][["demo_file"]])[, `:=` (
   age_today = as.numeric(round((as.Date("2022-11-17") - as.Date(dob))/365.25, 3))
@@ -99,7 +99,7 @@ res_list <- partial_corr_veloce(
   covs2 = x2
 )
 
-cli_alert_success("calculation complete! creating output table...")
+message("calculation complete! creating output table...")
 res_table <- rbindlist(res_list, fill = TRUE)
 
 # save results -----------------------------------------------------------------
@@ -107,11 +107,11 @@ output_file <- glue("data/private/ukb/{opt$ukb_version}/",
                     "ukb_phenome_partial_correlations_",
                     "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
                     "{opt$ukb_version}.qs")
-cli_alert_info("saving results to: {.path {output_file}}")
+message("saving results to: {.path {output_file}}")
 
 save_qs(
   x    = res_table,
   file = output_file
 )
 
-cli_alert_success("script success! see {.path {output_file}}")
+message("script success! see {.path {output_file}}")

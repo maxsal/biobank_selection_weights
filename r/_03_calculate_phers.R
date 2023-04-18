@@ -5,20 +5,18 @@
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
 
-library(data.table)
-library(caret)
-library(purrr)
-library(progress)
-library(pROC)
-library(glue)
-library(logistf)
-library(cli)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(caret)
+  library(purrr)
+  library(pROC)
+  library(glue)
+  library(logistf)
+})
 
 set.seed(61787)
 
-for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
-source(glue("https://raw.githubusercontent.com/umich-cphds/",
-            "createUKBphenome/master/scripts/function.expandPhecodes.r"))
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # 2. specifications (specifies outcome) ----------------------------------------
 mgi_version           <- "20210318"       # mgi phenome version

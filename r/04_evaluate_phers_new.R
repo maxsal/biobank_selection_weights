@@ -1,6 +1,6 @@
 # evaluate a phers
 # author: max salvatore
-# date:   20230118
+# date:   20230418
 
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
@@ -13,65 +13,84 @@ suppressPackageStartupMessages({
   library(pROC)
   library(glue)
   library(logistf)
-  library(cli)
   library(optparse)
 })
 
 set.seed(61787)
 
-for (i in list.files("fn/", full.names = TRUE)) source(i) # load functions
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "157",
-              help = "Outcome phecode [default = 157]"),
-  make_option("--mgi_version", type = "character", default = "20210318",
-              help = "Version of MGI data [default = 20210318]"),
-  make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = 20221117]"),
-  make_option("--time_threshold", type = "numeric", default = "0",
-              help = glue("Time threshold for the phenome data ",
-                          "[default = 0]")),
-  make_option("--tophits_n", type = "numeric", default = "50",
-              help = glue("Number of top hits to use in top hits PheRS ",
-                          "[default = 50]")),
-  make_option("--pctile_or", type = "logical", default = "TRUE",
-              help = glue("Perform percentile-based OR diagnostics ",
-                          "which is relatively time consuming ",
-                          "[default = TRUE]"))
+  make_option("--outcome",
+    type = "character", default = "157",
+    help = "Outcome phecode [default = 157]"
+  ),
+  make_option("--mgi_version",
+    type = "character", default = "20210318",
+    help = "Version of MGI data [default = 20210318]"
+  ),
+  make_option("--ukb_version",
+    type = "character", default = "20221117",
+    help = "Version of UKB data [default = 20221117]"
+  ),
+  make_option("--time_threshold",
+    type = "numeric", default = "0",
+    help = glue(
+      "Time threshold for the phenome data ",
+      "[default = 0]"
+    )
+  ),
+  make_option("--tophits_n",
+    type = "numeric", default = "50",
+    help = glue(
+      "Number of top hits to use in top hits PheRS ",
+      "[default = 50]"
+    )
+  ),
+  make_option("--pctile_or",
+    type = "logical", default = "TRUE",
+    help = glue(
+      "Perform percentile-based OR diagnostics ",
+      "which is relatively time consuming ",
+      "[default = TRUE]"
+    )
+  )
 )
 
-####!!! ADD arguments specifying covariates
+#### !!! ADD arguments specifying covariates
 
-parser <- OptionParser(usage="%prog [options]", option_list = option_list)
-
+parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
 args <- parse_args(parser, positional_arguments = 0)
 opt <- args$options
 print(opt)
 
 # 2. specifications (specifies outcome) ----------------------------------------
-mgi_version    <- opt$mgi_version  # mgi phenome version
-ukb_version    <- opt$ukb_version  # ukb phenome version
-outcome        <- opt$outcome      # outcome phecode
-time_threshold <- opt$time_threshold
-
 ## extract file paths
-file_paths <- get_files(mgi_version = opt$mgi_version,
-                        ukb_version = opt$ukb_version)
+file_paths <- get_files(
+  mgi_version = opt$mgi_version,
+  ukb_version = opt$ukb_version
+)
 
 # read data --------------------------------------------------------------------
 ## mgi
 ### phers
 #### naive
-mgi_naive_phers <- fread(glue("results/mgi/{opt$mgi_version}/",
-                              "X{gsub('X', '', opt$outcome)}/phers/",
-                              "mgi_naive_phers_t{opt$time_threshold}.txt"))
+mgi_naive_phers <- fread(glue(
+  "results/mgi/{opt$mgi_version}/",
+  "X{gsub('X', '', opt$outcome)}/phers/",
+  "mgi_naive_phers_t{opt$time_threshold}.txt"
+))
 
 mgi_naive_phers_info <- list()
 for (i in grep(
-  list.files(glue("results/mgi/{opt$mgi_version}/",
-                "X{gsub('X', '', opt$outcome)}/phers"),
-             full.names = TRUE),
+  list.files(
+    glue(
+      "results/mgi/{opt$mgi_version}/",
+      "X{gsub('X', '', opt$outcome)}/phers"
+    ),
+    full.names = TRUE
+  ),
   pattern = glue("mgi_phers_t{opt$time_threshold}"),
   value = TRUE
 )) {
@@ -79,13 +98,15 @@ for (i in grep(
 }
 
 ### covariates
-mgi_covariates <- fread(glue("data/private/mgi/{opt$mgi_version}/",
-                             "X{gsub('X', '', opt$outcome)}/",
-                             "matched_covariates.txt"))[
-                               id %in% mgi_naive_phers[, id]
-                               ][
-                                 , age_at_threshold := round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 1)
-                               ]
+mgi_covariates <- fread(glue(
+  "data/private/mgi/{opt$mgi_version}/",
+  "X{gsub('X', '', opt$outcome)}/",
+  "matched_covariates.txt"
+))[
+  id %in% mgi_naive_phers[, id]
+][
+  , age_at_threshold := round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 1)
+]
 
 mgi_merged <- merge.data.table(
   mgi_naive_phers,
@@ -95,15 +116,21 @@ mgi_merged <- merge.data.table(
 
 ## ukb
 ### phers
-ukb_naive_phers <- fread(glue("results/ukb/{opt$ukb_version}/",
-                              "X{gsub('X', '', opt$outcome)}/phers/",
-                              "ukb_naive_phers_t{opt$time_threshold}.txt"))
+ukb_naive_phers <- fread(glue(
+  "results/ukb/{opt$ukb_version}/",
+  "X{gsub('X', '', opt$outcome)}/phers/",
+  "ukb_naive_phers_t{opt$time_threshold}.txt"
+))
 
 ukb_naive_phers_info <- list()
 for (i in grep(
-  list.files(glue("results/ukb/{opt$ukb_version}/",
-                  "X{gsub('X', '', opt$outcome)}/phers"),
-             full.names = TRUE),
+  list.files(
+    glue(
+      "results/ukb/{opt$ukb_version}/",
+      "X{gsub('X', '', opt$outcome)}/phers"
+    ),
+    full.names = TRUE
+  ),
   pattern = glue("ukb_phers_t{opt$time_threshold}"),
   value = TRUE
 )) {
@@ -111,13 +138,15 @@ for (i in grep(
 }
 
 ### covariates
-ukb_covariates <- fread(glue("data/private/ukb/{opt$ukb_version}/",
-                             "X{gsub('X', '', opt$outcome)}/",
-                             "matched_covariates.txt"))[
-                               id %in% ukb_naive_phers[, id]
-                             ][
-                               , age_at_threshold := round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 1)
-                             ]
+ukb_covariates <- fread(glue(
+  "data/private/ukb/{opt$ukb_version}/",
+  "X{gsub('X', '', opt$outcome)}/",
+  "matched_covariates.txt"
+))[
+  id %in% ukb_naive_phers[, id]
+][
+  , age_at_threshold := round(get(glue("t{opt$time_threshold}_threshold")) / 365.25, 1)
+]
 
 ukb_merged <- merge.data.table(
   ukb_naive_phers,
@@ -127,14 +156,15 @@ ukb_merged <- merge.data.table(
 
 ## phenome
 pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
-                 colClasses = "character")
+  colClasses = "character"
+)
 
 # scale phers ------------------------------------------------------------------
 # remove trailing number from phers - FIX THIS IN NAIVE PHERS SCRIPT
 setnames(
   mgi_merged,
   old = grep(x = names(mgi_merged), pattern = "phers", value = TRUE),
-  new = gsub("phers[0-9]", "phers",  grep(x = names(mgi_merged), pattern = "phers", value = TRUE)),
+  new = gsub("phers[0-9]", "phers", grep(x = names(mgi_merged), pattern = "phers", value = TRUE)),
   skip_absent = TRUE
 )
 for (i in grep(x = names(mgi_merged), pattern = "phers", value = TRUE)) {
@@ -144,7 +174,7 @@ for (i in grep(x = names(mgi_merged), pattern = "phers", value = TRUE)) {
 setnames(
   ukb_merged,
   old = grep(x = names(ukb_merged), pattern = "phers", value = TRUE),
-  new = gsub("phers[0-9]", "phers",  grep(x = names(ukb_merged), pattern = "phers", value = TRUE)),
+  new = gsub("phers[0-9]", "phers", grep(x = names(ukb_merged), pattern = "phers", value = TRUE)),
   skip_absent = TRUE
 )
 for (i in grep(x = names(ukb_merged), pattern = "phers", value = TRUE)) {
@@ -153,41 +183,57 @@ for (i in grep(x = names(ukb_merged), pattern = "phers", value = TRUE)) {
 
 # evaluate ---------------------------------------------------------------------
 # mgi_evals <- list()
-cli_progress_bar("mgi phers evaluation", total = length(grep("_scaled", names(mgi_merged))))
+pb <- txtProgressBar(
+  max = length(grep("_scaled", names(mgi_merged))),
+  width = 50, style = 3
+)
 for (i in grep(pattern = "_scaled", names(mgi_merged), value = TRUE)) {
   evaluate_phers(
-    merged_data     = mgi_merged,
-    covars          = c("age_at_threshold", "female"),
-    outcome         = opt$outcome,
-    n_phecodes      = mgi_naive_phers_info[[ grep(x = names(mgi_naive_phers_info),
-                                                  pattern = gsub("_scaled", "", i),
-                                                  value = TRUE) ]][["n_phecodes"]],
-    phers_name      = i,
-    pctile_or       = opt$pctile_or
+    merged_data = mgi_merged,
+    covars = c("age_at_threshold", "female"),
+    outcome = opt$outcome,
+    n_phecodes = mgi_naive_phers_info[[grep(
+      x = names(mgi_naive_phers_info),
+      pattern = gsub("_scaled", "", i),
+      value = TRUE
+    )]][["n_phecodes"]],
+    phers_name = i,
+    pctile_or = opt$pctile_or
   ) |>
-    fwrite(glue("results/mgi/{opt$mgi_version}/",
-                "X{gsub('X', '', opt$outcome)}/phers/",
-                "{i}_eval.txt"), sep = "\t")
-  cli_progress_update()
+    fwrite(glue(
+      "results/mgi/{opt$mgi_version}/",
+      "X{gsub('X', '', opt$outcome)}/phers/",
+      "{i}_eval.txt"
+    ), sep = "\t")
+  setTxtProgressBar(pb, i)
 }
+close(pb)
 
 # ukb_evals <- list()
-cli_progress_bar("ukb phers evaluation", total = length(grep("_scaled", names(ukb_merged))))
+pb <- txtProgressBar(
+  max = length(grep("_scaled", names(ukb_merged))),
+  width = 50, style = 3
+)
 for (i in grep(pattern = "_scaled", names(ukb_merged), value = TRUE)) {
   evaluate_phers(
-    merged_data     = ukb_merged,
-    covars          = c("age_at_threshold", "female"),
-    outcome         = opt$outcome,
-    n_phecodes      = ukb_naive_phers_info[[ grep(x = names(ukb_naive_phers_info),
-                                                  pattern = gsub("_scaled", "", i),
-                                                  value = TRUE) ]][["n_phecodes"]],
-    phers_name      = i,
-    pctile_or       = opt$pctile_or
+    merged_data = ukb_merged,
+    covars = c("age_at_threshold", "female"),
+    outcome = opt$outcome,
+    n_phecodes = ukb_naive_phers_info[[grep(
+      x = names(ukb_naive_phers_info),
+      pattern = gsub("_scaled", "", i),
+      value = TRUE
+    )]][["n_phecodes"]],
+    phers_name = i,
+    pctile_or = opt$pctile_or
   ) |>
-    fwrite(glue("results/ukb/{opt$ukb_version}/",
-               "X{gsub('X', '', opt$outcome)}/phers/",
-               "{i}_eval.txt"), sep = "\t")
-  cli_progress_update()
+    fwrite(glue(
+      "results/ukb/{opt$ukb_version}/",
+      "X{gsub('X', '', opt$outcome)}/phers/",
+      "{i}_eval.txt"
+    ), sep = "\t")
+  setTxtProgressBar(pb, i)
 }
+close(pb)
 
-cli_alert_success("script complete!")
+message("script complete!")

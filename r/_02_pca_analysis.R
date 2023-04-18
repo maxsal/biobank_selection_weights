@@ -15,7 +15,7 @@ set.seed(61787)
 for (i in list.files("fn/")) source(paste0("fn/", i)) # load functions
 
 # 2. specifications ------------------------------------------------------------
-mgi_version     <- "20210318"       # mgi version
+mgi_version     <- "20220822"       # mgi version
 ukb_version     <- "20221117"       # ukb  version
 
 ## extract file paths
@@ -25,9 +25,9 @@ file_paths <- get_files(mgi_version = mgi_version, ukb_version = ukb_version)
 ## mgi
 ### demographics
 mgi_demo <- fread(file_paths[["mgi"]]$demo_file)[, .(
-  id       = Deid_ID,
+  id       = DeID_PatientID,
   age      = Age,
-  sex      = Sex,
+  sex      = GenderCode,
   race     = RaceName)][, .(id, age, sex)]
 mgi_demo <- mgi_demo[complete.cases(mgi_demo), ]
 

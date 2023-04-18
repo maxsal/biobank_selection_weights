@@ -1,80 +1,113 @@
 # quickly perform phecode-phecode phewas using MGI data for multiple
 # time-thresholds for a selected outcome variable
-# requires: time-threshold phecode indicator matrices must already exist
-# outputs:  betas, sebetas, and p-values
 # author:   max salvatore
 # date:     20230220
 
 # libraries, functions, and options --------------------------------------------
-library(data.table)
-library(MatchIt)
-library(logistf)
-library(glue)
-library(qs)
-library(cli)
-library(optparse)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(MatchIt)
+  library(logistf)
+  library(glue)
+  library(qs)
+  library(optparse)
+})
 
 set.seed(61787)
 
-lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
-  invisible()
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
-  make_option("--outcome", type = "character", default = "157",
-              help = "Outcome phecode [default = %default]"),
-  make_option("--mgi_version", type = "character", default = "20220822",
-              help = "Version of MGI data [default = %default]"),
-  make_option("--mgi_cohort", type = "character", default = "comb",
-              help = "Cohort of MGI used in weighting (comb, bb, mend, mhb) [default = %default]"),
-  make_option("--ukb_version", type = "character", default = "20221117",
-              help = "Version of UKB data [default = %default]"),
-  make_option("--time_thresholds", type = "character", default = "0,0.5,1,2,3,5",
-              help = glue("Time thresholds for the phenome data ",
-                          "[default = %default]")),
-  make_option("--mod_type", type = "character", default = "glm",
-              help = glue("Type of model to use in cooccurrence analysis - ",
-                          "glm, logistf, or SPAtest [default = %default]"))
+  make_option("--outcome",
+    type = "character", default = "157",
+    help = "Outcome phecode [default = %default]"
+  ),
+  make_option("--mgi_version",
+    type = "character", default = "20220822",
+    help = "Version of MGI data [default = %default]"
+  ),
+  make_option("--mgi_cohort",
+    type = "character", default = "comb",
+    help = "Cohort of MGI used in weighting (comb, bb, mend, mhb) [default = %default]"
+  ),
+  make_option("--ukb_version",
+    type = "character", default = "20221117",
+    help = "Version of UKB data [default = %default]"
+  ),
+  make_option("--time_thresholds",
+    type = "character", default = "0,0.5,1,2,3,5",
+    help = glue(
+      "Time thresholds for the phenome data ",
+      "[default = %default]"
+    )
+  ),
+  make_option("--mod_type",
+    type = "character", default = "glm",
+    help = glue(
+      "Type of model to use in cooccurrence analysis - ",
+      "glm, logistf, or SPAtest [default = %default]"
+    )
+  )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args   <- parse_args(parser, positional_arguments = 0)
-opt    <- args$options
+args <- parse_args(parser, positional_arguments = 0)
+opt <- args$options
 print(opt)
 
 time_thresholds <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
 
 ## extract file paths
-file_paths <- get_files(mgi_version = opt$mgi_version,
-                        ukb_version = opt$ukb_version)
+file_paths <- get_files(
+  mgi_version = opt$mgi_version,
+  ukb_version = opt$ukb_version
+)
 
 # read data --------------------------------------------------------------------
 ## mgi
-mgi_tr_pims <- lapply(seq_along(time_thresholds),
-                      \(x) {glue("data/private/mgi/{opt$mgi_version}/X","{gsub('X', '', opt$outcome)}/",
-                                 "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
-                                 "{time_thresholds[x]}_{opt$mgi_version}.qs") |>
-                          read_qs()})
+mgi_tr_pims <- lapply(
+  seq_along(time_thresholds),
+  \(x) {
+    glue(
+      "data/private/mgi/{opt$mgi_version}/X", "{gsub('X', '', opt$outcome)}/",
+      "time_restricted_phenomes/mgi_X{gsub('X', '', opt$outcome)}_t",
+      "{time_thresholds[x]}_{opt$mgi_version}.qs"
+    ) |>
+      read_qs()
+  }
+)
 names(mgi_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-mgi_covariates <- read_qs(glue("data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
-                                "matched_covariates.qs"))
+mgi_covariates <- read_qs(glue(
+  "data/private/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+  "matched_covariates.qs"
+))
 
 ## ukb
-ukb_tr_pims <- lapply(seq_along(time_thresholds),
-                      \(x) {glue("data/private/ukb/{opt$ukb_version}/X","{gsub('X', '', opt$outcome)}/",
-                                 "time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t",
-                                 "{time_thresholds[x]}_{opt$ukb_version}.qs") |>
-                          read_qs()})
+ukb_tr_pims <- lapply(
+  seq_along(time_thresholds),
+  \(x) {
+    glue(
+      "data/private/ukb/{opt$ukb_version}/X", "{gsub('X', '', opt$outcome)}/",
+      "time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t",
+      "{time_thresholds[x]}_{opt$ukb_version}.qs"
+    ) |>
+      read_qs()
+  }
+)
 names(ukb_tr_pims) <- glue("t{time_thresholds}_threshold")
 
 ukb_covariates <- read_qs(
-  glue("data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
-             "matched_covariates.qs")
+  glue(
+    "data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
+    "matched_covariates.qs"
+  )
 )
 
 ## phenome
 pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
-  colClasses = "character")
+  colClasses = "character"
+)
 
 # cooccurrence analysis --------------------------------------------------------
 ## mgi
@@ -102,36 +135,32 @@ ukb_results <- lapply(
     covariates = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue("X{pheinfo[, phecode]}"),
     model_type = opt$mod_type,
-    parallel     = TRUE
+    parallel = TRUE
   )
 )
 names(ukb_results) <- glue("t{time_thresholds}")
 
 # save results -----------------------------------------------------------------
 ## mgi
-lapply(
-  seq_along(time_thresholds),
-  \(i) {
-    save_qs(
-      x = mgi_results[[i]],
-      file = glue("results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
-                  "mgi_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                  "{opt$mgi_version}_results.qs")
+for (i in seq_along(time_thresholds)) {
+  save_qs(
+    x = mgi_results[[i]],
+    file = glue(
+      "results/mgi/{opt$mgi_version}/X{gsub('X', '', opt$outcome)}/",
+      "mgi_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
+      "{opt$mgi_version}_results.qs"
     )
-  }
-) |> invisible()
+  )
+}
 
 ## ukb
-lapply(
-  seq_along(time_thresholds),
-  \(i) {
-    save_qs(
-      x = ukb_results[[i]],
-      file = glue("results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
-                  "ukb_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-                  "{opt$ukb_version}_results.qs")
+for (i in seq_along(time_thresholds)) {
+  save_qs(
+    x = ukb_results[[i]],
+    file = glue(
+      "results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
+      "ukb_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
+      "{opt$ukb_version}_results.qs"
     )
-  }
-) |> invisible()
-
-
+  )
+}

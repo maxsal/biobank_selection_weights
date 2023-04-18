@@ -1,13 +1,9 @@
-# construct phers
+# construct naive phers
 # author: max salvatore
-# date:   20230118
-
-suppressPackageStartupMessages({
-  library(cli)
-})
+# date:   20230418
 
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
-cli_alert("loading packages and initializing...")
+message("loading packages and initializing...")
 options(stringsAsFactors = FALSE)
 suppressPackageStartupMessages({
   library(data.table)
@@ -21,8 +17,7 @@ suppressPackageStartupMessages({
 
 set.seed(61787)
 
-lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
-  invisible()
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
@@ -67,9 +62,7 @@ out_path <- glue("results/{coh}/{coh_version}/X{outc}/naive/",
                                       ifelse(opt$discovery_cohort == "ukb",
                                              opt$ukb_version, NA)),
                  outc = gsub("X", "", opt$outcome))
-if (!dir.exists(out_path)) {
-  dir.create(out_path, recursive = TRUE)
-}
+if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
 
 # 2. specifications (specifies outcome) ----------------------------------------
 external_cohort <- ifelse(opt$discovery_cohort == "mgi", "ukb", "mgi")
@@ -84,7 +77,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
 
 # 3. read data -----------------------------------------------------------------
-cli_alert("loading data...")
+message("loading data...")
 ## mgi
 mgi_pim0    <- fread(file_paths[["mgi"]]$pim0_file)
 mgi_pim     <- read_qs(glue("data/private/mgi/{opt$mgi_version}/",
@@ -165,7 +158,7 @@ extractr_or <- function(x, r = 2) {
 }
 
 # 5. calculate naive phers -----------------------------------------------------
-cli_alert("calculating naive phers for phecode {gsub('X', '', opt$outcome)}...")
+message(glue("calculating naive phers for phecode {gsub('X', '', opt$outcome)}..."))
 ## naive
 if (opt$method == "pwide_sig") {
   phes <- cooccur[p_value < 0.05/.N, length(phecode)]
@@ -208,7 +201,7 @@ if (opt$discovery_cohort == "mgi") {
   )
 }
 
-cli_alert("generating outputs...")
+message("generating outputs...")
 suppressMessages({
   mgi_roc <- pROC::roc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers], smooth = TRUE, se = FALSE)
   mgi_auc <- pROC::ci.auc(mgi_phers[["data"]][, case], mgi_phers[["data"]][, phers])
@@ -248,7 +241,7 @@ auc_plot <- rbindlist(list(mgi_stuff, ukb_stuff))  |>
     label = auc_sum[, auc_print], color = palette_OkabeIto[1:nrow(auc_sum)]
   ) +
   labs(
-    title    = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
+    title   = glue("AUC for X{gsub('X', '', opt$outcome)} at t{opt$time_threshold}"),
     caption = str_wrap(glue("Discovery cohort: {toupper(opt$discovery_cohort)}; external cohort: {toupper(external_cohort)}; N_phecodes: {length(mgi_phers$phecodes$phecode)}; method: {opt$method}{ifelse(opt$method == 'tophits', paste0('; N_tophits = ', opt$tophits_n), '')}; exclude codes = {opt$exclude}{ifelse(!is.null(opt$corr_remove), paste0('; correlation threshold = ', opt$corr_remove), '')}"), 80)
   ) +
   coord_equal() +
@@ -319,4 +312,4 @@ save_qs(
   file = glue("{out_path}{ukb_out_prefix}summary.qs")
 )
 
-cli_alert_success("script success! see output in {.path {out_path}}")
+message(glue("script success! see output in {out_path}"))

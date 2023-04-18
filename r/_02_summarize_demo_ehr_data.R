@@ -1,7 +1,5 @@
 # quickly perform phecode-phecode phewas using MGI data for multiple
 # time-thresholds for a selected outcome variable
-# requires: time-threshold phecode indicator matrices must already exist
-# outputs:  betas, sebetas, and p-values
 # author:   max salvatore
 # date:     20230220
 
@@ -12,7 +10,6 @@ suppressPackageStartupMessages({
     library(logistf)
     library(glue)
     library(qs)
-    library(cli)
     library(optparse)
     library(purrr)
 })
@@ -60,7 +57,7 @@ if ("IID" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "IID", "id") }
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "DaysSinceBirth", "dsb") }
 
 ## ukb
-cli_alert("loading ukb data...")
+message("loading ukb data...")
 ### demographics
 ukb_demo <- fread(file_paths[["ukb"]][["demo_file"]],
                               na.strings = c("", "NA", "."),
