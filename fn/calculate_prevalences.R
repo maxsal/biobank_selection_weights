@@ -41,7 +41,7 @@ calculate_prevalences <- function(
             n = sum(pim_data[[i]], na.rm = TRUE),
             N = length(pim_data[[i]])
         )]
-        if (progress) setTxtProgressBar(pb, i)
+        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
     if (progress) close(pb)
 
@@ -51,7 +51,7 @@ calculate_prevalences <- function(
             n = sum(pim_data[pim_data[[pim_id_var]] %in% male_ids, ][[i]], na.rm = TRUE),
             N = length(pim_data[pim_data[[pim_id_var]] %in% male_ids, ][[i]])
         )]
-        if (progress) setTxtProgressBar(pb, i)
+        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
     if (progress) close(pb)
 
@@ -61,7 +61,7 @@ calculate_prevalences <- function(
             n = sum(pim_data[pim_data[[pim_id_var]] %in% female_ids, ][[i]], na.rm = TRUE),
             N = length(pim_data[pim_data[[pim_id_var]] %in% female_ids, ][[i]])
         )]
-        if (progress) setTxtProgressBar(pb, i)
+        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
     if (progress) close(pb)
 
