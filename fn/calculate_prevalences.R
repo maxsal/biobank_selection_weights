@@ -35,7 +35,7 @@ calculate_prevalences <- function(
     )
 
     # fill out count and length
-    if (progress) pb <- txtProgressBar(max = seq_len(both), width = 50, style = 3)
+    if (progress) pb <- txtProgressBar(max = length(both), width = 50, style = 3)
     for (i in both) {
         out[phecode == i, `:=` (
             n = sum(pim_data[[i]], na.rm = TRUE),
@@ -45,7 +45,7 @@ calculate_prevalences <- function(
     }
     if (progress) close(pb)
 
-    if (progress) pb <- txtProgressBar(max = seq_len(male), width = 50, style = 3)
+    if (progress) pb <- txtProgressBar(max = length(male), width = 50, style = 3)
     for (i in male) {
         out[phecode == i, `:=` (
             n = sum(pim_data[pim_data[[pim_id_var]] %in% male_ids, ][[i]], na.rm = TRUE),
@@ -55,7 +55,7 @@ calculate_prevalences <- function(
     }
     if (progress) close(pb)
 
-    if (progress) pb <- txtProgressBar(max = seq_len(male), width = 50, style = 3)
+    if (progress) pb <- txtProgressBar(max = length(female), width = 50, style = 3)
     for (i in female) {
         out[phecode == i, `:=` (
             n = sum(pim_data[pim_data[[pim_id_var]] %in% female_ids, ][[i]], na.rm = TRUE),
