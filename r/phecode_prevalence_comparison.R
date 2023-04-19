@@ -1,11 +1,15 @@
-library(qs)
-library(data.table)
-library(tidyverse)
-library(glue)
-library(cowplot)
-library(htmlwidgets)
-library(plotly)
+# libraries --------------------------------------------------------------------
+suppressPackageStartupMessages({
+  library(qs)
+  library(data.table)
+  library(tidyverse)
+  library(glue)
+  library(cowplot)
+  library(htmlwidgets)
+  library(plotly)
+})
 
+# load data --------------------------------------------------------------------
 mgi <- qread("~/Downloads/mgi_prevs.qs")
 setnames(mgi, c("n", "N", "prev"), c("mgi_n", "mgi_N", "mgi_prev"))
 
@@ -15,6 +19,7 @@ setnames(ukb, c("n", "N", "prev"), c("ukb_n", "ukb_N", "ukb_prev"))
 aou <- qread("~/Downloads/aou_20230309_prevalences.qs")
 setnames(aou, c("n", "N", "prev"), c("aou_n", "aou_N", "aou_prev"))
 
+# process data -----------------------------------------------------------------
 merged <- Reduce(
   \(x, y) merge.data.table(x, y, by = "phecode", all = TRUE),
   list(mgi, ukb, aou)
@@ -44,8 +49,7 @@ plot_dat <- merge.data.table(
   pheinfo[, .(phecode = paste0("X", phecode), description, group, color)]
 )
 
-mgi_rect <- data.table(xmin = 0.9, xmax = 1.1, ymin = -Inf, ymax = Inf)
-
+# plots ------------------------------------------------------------------------
 (full_plot <- plot_dat |>
   ggplot(aes(
     x = mgi_aou, y = ukb_aou, color = group, label = phecode,
@@ -165,6 +169,7 @@ mgi_rect <- data.table(xmin = 0.9, xmax = 1.1, ymin = -Inf, ymax = Inf)
   )
 )
 
+# save output ------------------------------------------------------------------
 ggsave(
   plot = full_plot,
   filename = "~/Downloads/full_prev_plot.pdf",
@@ -191,74 +196,7 @@ htmlwidgets::saveWidget(
   selfcontained = TRUE # creates a single html file
 )
 
-as_tibble(plot_dat) |>
-  mutate(mgi_ukb = mgi_prev / ukb_prev) |>
-  select(phecode, mgi_aou, ukb_aou, mgi_ukb) |>
-  pivot_longer(cols = -1) |>
-  filter(value < 1000) |>
-  left_join(
-    pheinfo[, .(phecode = paste0("X", phecode), group, color)],
-    by = "phecode"
-  ) |>
-  ggplot(aes(x = group, y = value, fill = group)) +
-  geom_hline(yintercept = 1) +
-  geom_boxplot() +
-  scale_fill_manual(values = phe_group_cols) +
-  scale_y_continuous(
-    trans = "log10",
-    breaks = 1 * 10^c(-3, -1, 0, 1, 3),
-    labels = as.character(1 * 10^c(-3, -1, 0, 1, 3))
-  ) +
-  coord_cartesian(ylim = c(0.001, 1000)) +
-  facet_wrap(vars(name), nrow = 3) +
-  labs(
-    x = "",
-    y = "Prevalence ratios",
-    title = str_wrap(paste0("Boxplots of ratio of phecodes in All of Us, the ",
-                            "Michigan Genomics Initiative, and the UK Biobank"),
-                     width = 75)
-  ) +
-  cowplot::theme_half_open() +
-  theme(
-    axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5)
-  )
-
-as_tibble(plot_dat) |>
-  mutate(mgi_ukb = mgi_prev / ukb_prev) |>
-  select(phecode, mgi_aou, ukb_aou, mgi_ukb) |>
-  pivot_longer(cols = -1) |>
-  filter(value < 1000 & name == "mgi_aou") |>
-  left_join(
-    pheinfo[, .(phecode = paste0("X", phecode), group, color)],
-    by = "phecode"
-  ) |>
-  ggplot(aes(x = group, y = value, fill = group)) +
-  geom_hline(yintercept = 1) +
-  geom_boxplot() +
-  scale_fill_manual(values = phe_group_cols) +
-  scale_y_continuous(
-    trans = "log10",
-    breaks = 1 * 10^c(-2, -1, 0, 1, 3),
-    labels = as.character(1 * 10^c(-2, -1, 0, 1, 3))
-  ) +
-  coord_cartesian(ylim = c(0.01, 1000)) +
-  labs(
-    x = "",
-    y = "Prevalence ratios (MGI / AoU)",
-    title = str_wrap(paste0(
-      "Boxplots of phecode prevalence ratios in ",
-      "Michigan Genomics Initiative and All of Us"
-    ),
-    width = 75
-    )
-  ) +
-  theme_half_open() +
-  theme(
-    axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5),
-    legend.position = "none",
-    plot.margin = margin(t = 0, r = 5, b = 0, l = 0, unit = "mm")
-  )
-
+# prevalence ratio plots -------------------------------------------------------
 prevalence_ratio_plot <- function(prevalence_data,
                                   ratio_var,
                                   alt_title_text = NULL,

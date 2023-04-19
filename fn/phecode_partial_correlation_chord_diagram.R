@@ -1,7 +1,9 @@
-require(GGally)
-require(network)
-require(ComplexHeatmap)
-require(circlize)
+suppressPackageStartupMessages({
+  library(GGally)
+  library(network)
+  library(ComplexHeatmap)
+  library(circlize)
+})
 
 phenome_partial_correlation_chord_diagram <- function(
     x,
@@ -19,7 +21,7 @@ phenome_partial_correlation_chord_diagram <- function(
     edges <- as.data.table(x)[, ..vars]
     names(edges) <- c("from", "to", "Freq")
     edges <- as.data.frame(edges[!is.na(Freq), ][abs(Freq) >= thresh, ])
-    cli_alert_info("plotting correlations with absolute value >= {thresh} (n = {nrow(edges)})")
+    message("plotting correlations with absolute value >= {thresh} (n = {nrow(edges)})")
     edges[, 1] = as.character(edges[, 1])
     edges[, 2] = as.character(edges[, 2])
 
@@ -74,6 +76,6 @@ phenome_partial_correlation_chord_diagram <- function(
     circos.clear()
     if (!is.null(savefile)) {
         dev.off()
-        cli_alert_info("chord diagram saved to {.path {savefile}}")
+        message(paste0("chord diagram saved to ", savefile))
         }
 }

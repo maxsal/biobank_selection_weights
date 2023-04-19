@@ -1,5 +1,7 @@
-require(ggnetwork)
-require(network)
+suppressPackageStartupMessages({
+  library(ggnetwork)
+  library(network)
+})
 
 phenome_partial_correlation_network <- function(
     x,
@@ -17,7 +19,7 @@ phenome_partial_correlation_network <- function(
     edges <- as.data.table(x)[, ..vars]
     names(edges) <- c("from", "to", "Freq")
     edges <- as.data.frame(edges[!is.na(Freq), ][abs(Freq) >= thresh, ])
-    cli_alert_info("plotting correlations with absolute value >= {thresh} (n = {nrow(edges)})")
+    message(paste0("plotting correlations with absolute value >= ", thresh, " (n = ", nrow(edges), ")"))
     edges[, 1] = as.character(edges[, 1])
     edges[, 2] = as.character(edges[, 2])
     if (is.null(plot_title)) { plot_title <- "Correlations" }
@@ -66,7 +68,7 @@ phenome_partial_correlation_network <- function(
             width    = out_width,
             height   = out_height
         )
-        cli_alert_info("plot saved to {.path {savefile}}")
+        message(paste0("plot saved to ", savefile))
     }
 
     return(p)

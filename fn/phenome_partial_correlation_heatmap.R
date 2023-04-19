@@ -1,7 +1,8 @@
-require(PheWAS)
-require(ComplexHeatmap)
-require(igraph)
-require(cli)
+suppressPackageStartupMessages({
+  library(PheWAS)
+  library(ComplexHeatmap)
+  library(igraph)
+})
 
 phenome_partial_correlation_heatmap <- function(
     x,
@@ -43,7 +44,7 @@ phenome_partial_correlation_heatmap <- function(
             right_annotation = HeatmapAnnotation(group = gd, col = list(group = color_named), which = 'row'))
     draw(ht)
     if (!is.null(savefile)) {
-        cli_alert_info("heatmap saved to {.path {savefile}}")
+        message("heatmap saved to {.path {savefile}}")
         dev.off()
     }
 }

@@ -1,9 +1,10 @@
-require(qgraph)
-require(igraph)
-require(data.table)
-require(cli)
-require(gridExtra)
-require(scales)
+suppressPackageStartupMessages({
+  library(qgraph)
+  library(igraph)
+  library(data.table)
+  library(gridExtra)
+  library(scales)
+})
 
 phenome_partial_correlation_neoqgraph <- function(
     x,
@@ -83,7 +84,7 @@ phenome_partial_correlation_neoqgraph <- function(
             minimum = 0, maximum = 1, color = colors,
             negCol = 'red', posCol = 'gray42', cut = qcut))
     if  (!is.null(savefile)) {
-        cli_alert_info("qgraph saved to {.path {savefile}}")
+        message(paste0("qgraph saved to ", savefile))
         dev.off()
     }
     
