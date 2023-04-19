@@ -1,4 +1,4 @@
-suppressPackageStartupMessage({
+suppressPackageStartupMessages({
   library(data.table)
 })
 
