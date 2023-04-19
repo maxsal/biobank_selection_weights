@@ -1309,12 +1309,6 @@
       "Version": "1.1.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "RemoteType": "standard",
-      "RemotePkgRef": "dplyr",
-      "RemoteRef": "dplyr",
-      "RemoteRepos": "https://cran.rstudio.com",
-      "RemotePkgPlatform": "source",
-      "RemoteSha": "1.1.1",
       "Requirements": [
         "R",
         "R6",
@@ -2207,6 +2201,19 @@
         "utils"
       ],
       "Hash": "3e476b375c746d899fd53a7281d78191"
+    },
+    "intervals": {
+      "Package": "intervals",
+      "Version": "0.15.3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R",
+        "graphics",
+        "methods",
+        "utils"
+      ],
+      "Hash": "7ba902ba284030a7791e0d6dc54eda13"
     },
     "ipred": {
       "Package": "ipred",

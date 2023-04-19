@@ -214,7 +214,7 @@ as_tibble(plot_dat) |>
   labs(
     x = "",
     y = "Prevalence ratios",
-    title = str_wrap(paste0("Boxplots of ratio of phecodes in All of Us, the "
+    title = str_wrap(paste0("Boxplots of ratio of phecodes in All of Us, the ",
                             "Michigan Genomics Initiative, and the UK Biobank"),
                      width = 75)
   ) +
