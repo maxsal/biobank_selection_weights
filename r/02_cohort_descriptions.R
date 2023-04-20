@@ -21,7 +21,6 @@ suppressPackageStartupMessages({
   library(optparse)
 })
 
-
 option_list <- list(
   make_option("--mgi_version",
     type = "character", default = "20220822",
@@ -33,8 +32,8 @@ option_list <- list(
   )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 for (i in c(
@@ -86,7 +85,7 @@ save_qs(
 )
 save_qs(
   x    = ukb_prevs,
-  file = blue("results/ukb/{opt$ukb_version}/ukb_prevs.qs")
+  file = glue("results/ukb/{opt$ukb_version}/ukb_prevs.qs")
 )
 
 # network plot
@@ -116,7 +115,7 @@ phenome_partial_correlation_chord_diagram(
 # neoplasm qgraph
 phenome_partial_correlation_neoqgraph(
   x        = mgi,
-  savefile = glue("results/mgi/{opt_mgi_version}/MGI_qgraph.pdf")
+  savefile = glue("results/mgi/{opt$mgi_version}/MGI_qgraph.pdf")
 )
 phenome_partial_correlation_neoqgraph(
   x        = ukb,

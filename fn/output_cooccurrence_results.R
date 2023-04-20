@@ -1,6 +1,7 @@
 suppressPackageStartupMessages({
-  require(SPAtest)
-  require(logistf)
+  library(SPAtest)
+  library(logistf)
+  library(EValue)
 })
 
 ### quick_mod -----------
@@ -11,7 +12,8 @@ quick_cooccur_mod <- function(
     covs       = c("age_at_threshold", "female", "length_followup"),
     ex_code    = "X157",
     mod_type   = "glm",
-    weight_var = NULL
+    weight_var = NULL,
+    evalue     = TRUE
 ) {
   
   ### SPAtest
@@ -67,16 +69,24 @@ quick_cooccur_mod <- function(
       mod <- glm(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat, family = binomial())
     }
     
-    data.table(
+    est <- summary(mod)$coef[ex_code, c(1, 2)]
+    
+    out <- data.table(
       phecode = ex_code,
       beta    = coef(mod)[[ex_code]],
       se_beta = coef(summary(mod))[ex_code, 2],
       p_value = coef(summary(mod))[ex_code, 4],
       log10p  = log10(coef(summary(mod))[ex_code, 4])
     )
-    
+    if (evalue == TRUE) {
+      out[, `:=` (
+        evalue_est = eval[2, 1],
+        evalue_lo  = eval[2, 2],
+        evalue_hi  = eval[2, 3]
+      )]
+    }
   }
-  
+  out
 }
 
 ### output_mgi_cooccur_results -----------

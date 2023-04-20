@@ -21,7 +21,7 @@ phenome_partial_correlation_chord_diagram <- function(
     edges <- as.data.table(x)[, ..vars]
     names(edges) <- c("from", "to", "Freq")
     edges <- as.data.frame(edges[!is.na(Freq), ][abs(Freq) >= thresh, ])
-    message("plotting correlations with absolute value >= {thresh} (n = {nrow(edges)})")
+    message(paste0("plotting correlations with absolute value >= ", thresh, " (n = ", nrow(edges), ")"))
     edges[, 1] = as.character(edges[, 1])
     edges[, 2] = as.character(edges[, 2])
 
