@@ -102,8 +102,8 @@ poststratification <- function(
     use_female         = FALSE
 ) {
   
-  if (!all(covs %in% c("cad", "smoke", "diabetes"))) {
-    stop("function only supports covs 'cad', 'smoke', and 'diabetes' right now")
+  if (!all(covs %in% c("cad", "smoke", "diabetes", "female"))) {
+    stop("function only supports covs 'cad', 'smoke', 'diabetes', and 'female' right now")
   }
   
   if (use_female == TRUE) {
