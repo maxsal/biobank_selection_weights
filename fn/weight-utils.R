@@ -4,19 +4,16 @@ ipw <- function(
   stacked_data,
   dataset_name = "MGI",
   id_var       = "id",
-  use_female   = FALSE) {
+  covs         = c("as.numeric(age_cat == 5)",
+                   "as.numeric(age_cat == 6)", "cad", "diabetes",
+                   "smoking_current", "smoking_former", "bmi_under",
+                   "bmi_overweight", "bmi_obese", "nhanes_nhw")
+  ) {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
                                       sum(weight_nhanes, na.rm = TRUE)]
   
-  select_mod_covs <- paste(c("as.numeric(age_cat == 5)",
-                             "as.numeric(age_cat == 6)", "cad", "diabetes",
-                             "smoking_current", "smoking_former", "bmi_under",
-                             "bmi_overweight", "bmi_obese", "nhanes_nhw"),
-                             collapse = " + ")
-  if (use_female == TRUE) { select_mod_covs <- paste(c(select_mod_covs,
-                                                     "female"),
-                                                     collapse = " + ") }
+  select_mod_covs <- paste0(covs, collapse = " + ")
 
   # modeling nhanes sampling weights
   nhanes_select_mod <- simplexreg(as.formula(paste0("samp_nhanes ~ ",
@@ -100,9 +97,14 @@ poststratification <- function(
     smoke_var          = "smoking_current",
     diabetes_var       = "diabetes",
     female_var         = "female",
+    covs               = c("cad", "smoke", "diabetes"),
     chop               = FALSE,
     use_female         = FALSE
 ) {
+  
+  if (!all(covs %in% c("cad", "smoke", "diabetes"))) {
+    stop("function only supports covs 'cad', 'smoke', and 'diabetes' right now")
+  }
   
   if (use_female == TRUE) {
     cli_alert_warning(glue("Estimating poststratification weights with ",
@@ -119,74 +121,82 @@ poststratification <- function(
   
   # cancer prevalence by age (US) 
   # https://seer.cancer.gov/csr/1975_2016/results_merged/topic_prevalence.pdf
-  cancer_prevalence <- age_grp_table(
-    lower_ages   = c(0, 10, 20, 30, 40, 50, 60, 70, 80),
-    num_vec      = c(0.0899, 0.2023, 0.3922, 0.8989, 2.1532, 4.9326, 10.4420,
-                      18.3168, 21.5939) / 100,
-    num_var_name = "prevalence"
-  )
-  
-  cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]],
-                             y = c(0, cancer_prevalence[["prevalence"]]),
-                             right = FALSE)
-  b               <- aggregate(as.formula(paste0(cancer_var, " ~ ",
-                                          last_entry_age_var)),
-                               FUN = mean,
-                               data = mgi_data)
-  cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
+  if ("cancer" %in% covs) {
+    cancer_prevalence <- age_grp_table(
+      lower_ages   = c(0, 10, 20, 30, 40, 50, 60, 70, 80),
+      num_vec      = c(0.0899, 0.2023, 0.3922, 0.8989, 2.1532, 4.9326, 10.4420,
+                        18.3168, 21.5939) / 100,
+      num_var_name = "prevalence"
+    )
+    
+    cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]],
+                               y = c(0, cancer_prevalence[["prevalence"]]),
+                               right = FALSE)
+    b               <- aggregate(as.formula(paste0(cancer_var, " ~ ",
+                                            last_entry_age_var)),
+                                 FUN = mean,
+                                 data = mgi_data)
+    cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
+  }
   
   # diabetes prevalence by age (US)
   # https://www.cdc.gov/diabetes/pdfs/data/statistics/national-diabetes-statistics-report.pdf 
   # youngest group will have no people, no number provided in documentation
-  diabetes_prevalence <- age_grp_table(
-    lower_ages   = c(0, 18, 45, 65),
-    num_vec      = c(0.01, 0.030, 0.138, 0.214),
-    num_var_name = "prevalence"
-  )
-  
-  diabetes_func_pop <- stepfun(x = diabetes_prevalence[["lower"]],
-  y = c(0, diabetes_prevalence[["prevalence"]]), right = FALSE)
-  d_b               <- aggregate(as.formula(paste0(diabetes_var, " ~ ",
-                                                    last_entry_age_var)),
-                                 FUN = mean,
-                                 data = mgi_data)
-  diabetes_func_mgi <- stepfun(x = d_b[, 1], y = c(0, d_b[, 2]), right = FALSE)
+  if ("diabetes" %in% covs) {
+    diabetes_prevalence <- age_grp_table(
+      lower_ages   = c(0, 18, 45, 65),
+      num_vec      = c(0.01, 0.030, 0.138, 0.214),
+      num_var_name = "prevalence"
+    )
+    
+    diabetes_func_pop <- stepfun(x = diabetes_prevalence[["lower"]],
+    y = c(0, diabetes_prevalence[["prevalence"]]), right = FALSE)
+    d_b               <- aggregate(as.formula(paste0(diabetes_var, " ~ ",
+                                                      last_entry_age_var)),
+                                   FUN = mean,
+                                   data = mgi_data)
+    diabetes_func_mgi <- stepfun(x = d_b[, 1], y = c(0, d_b[, 2]), right = FALSE)
+  }
   
   # chd prevalence by age (us)
   # https://www.cdc.gov/nchs/fastats/heart-disease.htm
   # youngest group will have no people, no number provided in documentation
-  chd_prevalence <- age_grp_table(
-    lower_ages   = c(0, 18, 45, 65, 75),
-    num_vec      = c(0.01, 0.01, 0.060, 0.155, 0.239),
-    num_var_name = "prevalence"
-  )
-  
-  chd_func_pop <- stepfun(x = chd_prevalence[["lower"]],
-                          y = c(0, chd_prevalence[["prevalence"]]),
-                          right = FALSE)
-  chd_b        <- aggregate(as.formula(paste0(chd_var, " ~ ",
-                                       last_entry_age_var)),
-                            FUN = mean,
-                            data = mgi_data)
-  chd_func_mgi <- stepfun(x = chd_b[, 1], y = c(0, chd_b[, 2]), right = FALSE)
+  if ("cad" %in% covs) {
+    chd_prevalence <- age_grp_table(
+      lower_ages   = c(0, 18, 45, 65, 75),
+      num_vec      = c(0.01, 0.01, 0.060, 0.155, 0.239),
+      num_var_name = "prevalence"
+    )
+    
+    chd_func_pop <- stepfun(x = chd_prevalence[["lower"]],
+                            y = c(0, chd_prevalence[["prevalence"]]),
+                            right = FALSE)
+    chd_b        <- aggregate(as.formula(paste0(chd_var, " ~ ",
+                                         last_entry_age_var)),
+                              FUN = mean,
+                              data = mgi_data)
+    chd_func_mgi <- stepfun(x = chd_b[, 1], y = c(0, chd_b[, 2]), right = FALSE)
+  }
   
   # smoking prevalence by age (us)
   # https://www.cdc.gov/nchs/fastats/heart-disease.htm
   # youngest group will have no people, no number provided in documentation
-  smoke_prevalence <- age_grp_table(
-    lower_ages   = c(0, 18, 25, 45, 65),
-    num_vec      = c(0.01, 0.074, 0.141, 0.149, 0.09),
-    num_var_name = "prevalence"
-  )
-  
-  smoke_func_pop <- stepfun(x = smoke_prevalence[["lower"]],
-                            y = c(0, smoke_prevalence[["prevalence"]]),
-                            right = FALSE)
-  smoke_b        <- aggregate(as.formula(paste0(smoke_var, " ~ ",
-                                         last_entry_age_var)),
-                              FUN = mean, data = mgi_data)
-  smoke_func_mgi <- stepfun(x = smoke_b[, 1], y = c(0, smoke_b[, 2]),
-                            right = FALSE)
+  if ("smoke" %in% covs) {
+    smoke_prevalence <- age_grp_table(
+      lower_ages   = c(0, 18, 25, 45, 65),
+      num_vec      = c(0.01, 0.074, 0.141, 0.149, 0.09),
+      num_var_name = "prevalence"
+    )
+    
+    smoke_func_pop <- stepfun(x = smoke_prevalence[["lower"]],
+                              y = c(0, smoke_prevalence[["prevalence"]]),
+                              right = FALSE)
+    smoke_b        <- aggregate(as.formula(paste0(smoke_var, " ~ ",
+                                           last_entry_age_var)),
+                                FUN = mean, data = mgi_data)
+    smoke_func_mgi <- stepfun(x = smoke_b[, 1], y = c(0, smoke_b[, 2]),
+                              right = FALSE)
+  }
   
   # age distribution (us)
   # https://www.census.gov/data/tables/2000/dec/phc-t-09.html
@@ -237,57 +247,69 @@ poststratification <- function(
   
   # sex distribution by age (us)
   # same source as above for age
-  if (use_female == TRUE) {
-  female_prevalence <- age_grp_table(
-    lower_ages   = low_ages,
-    upper_offset = 0,
-    num_vec      = age_counts_female[["counts"]] /
-                     (age_counts_male[["counts"]] +
-                     age_counts_female[["counts"]]),
-    num_var_name = "prevalence"
-  )
-  female_func_pop <- stepfun(x = female_prevalence[["lower"]],
-                             y = c(0, female_prevalence[["prevalence"]]),
-                             right = FALSE)
-  female_b        <- aggregate(as.formula(paste0(female_var, " ~ ",
-                                          last_entry_age_var)),
-                               FUN = mean, data = mgi_data)
-  female_func_mgi <- stepfun(x = female_b[, 1], y = c(0, female_b[, 2]),
-                             right = FALSE)
+  if ("female" %in% covs) {
+    female_prevalence <- age_grp_table(
+      lower_ages   = low_ages,
+      upper_offset = 0,
+      num_vec      = age_counts_female[["counts"]] /
+                       (age_counts_male[["counts"]] +
+                       age_counts_female[["counts"]]),
+      num_var_name = "prevalence"
+    )
+    female_func_pop <- stepfun(x = female_prevalence[["lower"]],
+                               y = c(0, female_prevalence[["prevalence"]]),
+                               right = FALSE)
+    female_b        <- aggregate(as.formula(paste0(female_var, " ~ ",
+                                            last_entry_age_var)),
+                                 FUN = mean, data = mgi_data)
+    female_func_mgi <- stepfun(x = female_b[, 1], y = c(0, female_b[, 2]),
+                               right = FALSE)
   }
   
   # without cancer
-  population <- fifelse(mgi_data[[diabetes_var]] == 1,
-                        diabetes_func_pop(age_vec),
-                        1 - diabetes_func_pop(age_vec))
-  population <- population * fifelse(mgi_data[[chd_var]] == 1,
-                                     chd_func_pop(age_vec),
-                                     1 - chd_func_pop(age_vec))
-  population <- population * fifelse(mgi_data[[smoke_var]] == 1,
-                                     smoke_func_pop(age_vec),
-                                     1 - smoke_func_pop(age_vec))
-  if (use_female == TRUE) {
+  population <- age_func_pop(age_vec)
+  if ("diabetes" %in% covs) {
+    population <- fifelse(mgi_data[[diabetes_var]] == 1,
+                          diabetes_func_pop(age_vec),
+                          1 - diabetes_func_pop(age_vec))
+  }
+  if ("cad" %in% covs) {
+    population <- population * fifelse(mgi_data[[chd_var]] == 1,
+                                       chd_func_pop(age_vec),
+                                       1 - chd_func_pop(age_vec))
+  }
+  if ("smoke" %in% covs) {
+    population <- population * fifelse(mgi_data[[smoke_var]] == 1,
+                                       smoke_func_pop(age_vec),
+                                       1 - smoke_func_pop(age_vec))
+  }
+  if ("female" %in% covs) {
     population <- population * fifelse(mgi_data[[female_var]] == 1,
                                        female_func_pop(age_vec),
                                        1 - female_func_pop(age_vec))
     }
-  population <- population * age_func_pop(age_vec)
   
-  mgi <- fifelse(mgi_data[[diabetes_var]] == 1,
-                 diabetes_func_mgi(age_vec),
-                 1 - diabetes_func_mgi(age_vec))
-  mgi <- mgi * fifelse(mgi_data[[chd_var]] == 1,
-                       chd_func_mgi(age_vec),
-                       1 - chd_func_mgi(age_vec))
-  mgi <- mgi * fifelse(mgi_data[[smoke_var]] == 1,
-                       smoke_func_mgi(age_vec),
-                       1 - smoke_func_mgi(age_vec))
-  if (use_female == TRUE) {
+  mgi <- age_func_mgi(age_vec)
+  if ("diabetes" %in% covs) {
+    mgi <- fifelse(mgi_data[[diabetes_var]] == 1,
+                   diabetes_func_mgi(age_vec),
+                   1 - diabetes_func_mgi(age_vec))
+  }
+  if ("cad" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[chd_var]] == 1,
+                         chd_func_mgi(age_vec),
+                         1 - chd_func_mgi(age_vec))
+  }
+  if ("smoke" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[smoke_var]] == 1,
+                         smoke_func_mgi(age_vec),
+                         1 - smoke_func_mgi(age_vec))
+  }
+  if ("female" %in% covs) {
     mgi <- mgi * fifelse(mgi_data[[female_var]] == 1,
                          female_func_mgi(age_vec),
                          1 - female_func_mgi(age_vec))
   }
-  mgi <- mgi * age_func_mgi(age_vec)
   
   if (chop == TRUE) {
     post_no_cancer <- chopr(population / mgi)
