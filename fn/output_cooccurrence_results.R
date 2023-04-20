@@ -27,7 +27,6 @@ quick_cooccur_mod <- function(
       beta.out    = TRUE,
       beta.Cutoff = 1
     )
-    
     data.table(
       phecode = ex_code,
       beta    = mod$beta,
@@ -46,7 +45,6 @@ quick_cooccur_mod <- function(
     } else {
       mod <- logistf(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat)
     }
-    
     data.table(
       phecode = ex_code,
       beta    = mod$coefficients[[ex_code]],
@@ -54,7 +52,6 @@ quick_cooccur_mod <- function(
       p_value = mod$prob[[ex_code]],
       log10p  = log10(mod$prob[[ex_code]])
     )
-    
   }
   
   ### glm
@@ -68,9 +65,7 @@ quick_cooccur_mod <- function(
     } else {
       mod <- glm(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat, family = binomial())
     }
-    
     est <- summary(mod)$coef[ex_code, c(1, 2)]
-    
     out <- data.table(
       phecode = ex_code,
       beta    = coef(mod)[[ex_code]],
@@ -79,6 +74,8 @@ quick_cooccur_mod <- function(
       log10p  = log10(coef(summary(mod))[ex_code, 4])
     )
     if (evalue == TRUE) {
+      rare <- sum(mod$data[[exposure]], na.rm = TRUE) / nrow(mod$data)
+      eval <- evalues.OR(est = out[["est"]], lo = out[["est_lo"]], hi = out[["est_hi"]], rare = ifelse(rare >= 0.15, FALSE, TRUE))
       out[, `:=` (
         evalue_est = eval[2, 1],
         evalue_lo  = eval[2, 2],
