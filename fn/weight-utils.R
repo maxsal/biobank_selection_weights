@@ -13,6 +13,10 @@ ipw <- function(
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
                                       sum(weight_nhanes, na.rm = TRUE)]
   
+  if ("cancer" %in% covs) {
+    cancer <- TRUE
+    covs <- covs[covs != "cancer"]
+  }
   select_mod_covs <- paste0(covs, collapse = " + ")
 
   # modeling nhanes sampling weights
@@ -53,35 +57,36 @@ ipw <- function(
                           sum(nhanes_weight, na.rm = TRUE)
   
   ## With Cancer
-  nhanes_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
-                             data = stacked_data[dataset == "NHANES", ],
-                             weights = weight_nhanes, family = quasibinomial())
-  
-  nhanes_cancer <- predict(nhanes_cancer_mod, type = "response",
-                              newdata = stacked_data)
-  
-  mgi_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
-                          data = stacked_data[dataset == dataset_name, ],
-                          family = quasibinomial())
-  
-  mgi_cancer <- predict(mgi_cancer_mod, type = "response",
-                          newdata = stacked_data)
-  denom      <- ifelse(stacked_data[, cancer] == 1, mgi_cancer,
-                       1 - mgi_cancer)
-  num        <- ifelse(stacked_data[, cancer] == 1, nhanes_cancer,
-                       1 - nhanes_cancer)
-  cancer_factor <- (num[stacked_data[, dataset] == dataset_name] /
-                      denom[stacked_data[, dataset] == dataset_name])
-  cancer_factor <- chopr(cancer_factor)
-  nhanes_cancer_weight = cancer_factor * nhanes_weight
-  nhanes_cancer_weight  = stacked_data[dataset == dataset_name, .N] *
-                                nhanes_cancer_weight /
-                                sum(nhanes_cancer_weight, na.rm = TRUE)
+  if (cancer == TRUE) {
+    nhanes_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
+                               data = stacked_data[dataset == "NHANES", ],
+                               weights = weight_nhanes, family = quasibinomial())
+    
+    nhanes_cancer <- predict(nhanes_cancer_mod, type = "response",
+                                newdata = stacked_data)
+    
+    mgi_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
+                            data = stacked_data[dataset == dataset_name, ],
+                            family = quasibinomial())
+    
+    mgi_cancer <- predict(mgi_cancer_mod, type = "response",
+                            newdata = stacked_data)
+    denom      <- ifelse(stacked_data[, cancer] == 1, mgi_cancer,
+                         1 - mgi_cancer)
+    num        <- ifelse(stacked_data[, cancer] == 1, nhanes_cancer,
+                         1 - nhanes_cancer)
+    cancer_factor <- (num[stacked_data[, dataset] == dataset_name] /
+                        denom[stacked_data[, dataset] == dataset_name])
+    cancer_factor <- chopr(cancer_factor)
+    nhanes_weight <- cancer_factor * nhanes_weight
+    nhanes_weight <- stacked_data[dataset == dataset_name, .N] *
+                                  nhanes_weight /
+                                  sum(nhanes_weight, na.rm = TRUE)
+  }
 
   data.table(
-    "id"                  = stacked_data[dataset == dataset_name, ][[id_var]],
-    "no_cancer_ipw"       = nhanes_weight,
-    "cancer_ipw"          = nhanes_cancer_weight
+    "id"        = stacked_data[dataset == dataset_name, ][[id_var]],
+    "ip_weight" = nhanes_weight,
   )
 
 }
@@ -96,20 +101,15 @@ poststratification <- function(
     chd_var            = "cad",
     smoke_var          = "smoking_current",
     diabetes_var       = "diabetes",
+    depression_var     = "depression",
     female_var         = "female",
+    hypertension_var   = "hypertension",
     covs               = c("cad", "smoke", "diabetes"),
-    chop               = FALSE,
-    use_female         = FALSE
+    chop               = FALSE
 ) {
   
-  if (!all(covs %in% c("cad", "smoke", "diabetes", "female"))) {
-    stop("function only supports covs 'cad', 'smoke', 'diabetes', and 'female' right now")
-  }
-  
-  if (use_female == TRUE) {
-    cli_alert_warning(glue("Estimating poststratification weights with ",
-                           "`female` variable. IPW estimation does not include",
-                           " female by default."))
+  if (!all(covs %in% c("cad", "smoke", "diabetes", "female", "depression"))) {
+    stop("function only supports covs 'cad', 'smoke', 'diabetes', 'female', 'depression', 'hypertension', and 'cancer' right now")
   }
   
   Nobs    <- nrow(mgi_data)
@@ -154,6 +154,24 @@ poststratification <- function(
                                    FUN = mean,
                                    data = mgi_data)
     diabetes_func_mgi <- stepfun(x = d_b[, 1], y = c(0, d_b[, 2]), right = FALSE)
+  }
+  
+  # depression prevalence by age (us)
+  # https://ourworldindata.org/grapher/prevalence-of-depression-by-age?country=~USA
+  if ("depression" %in% covs) {
+    depression_prevalence <- age_grp_table(
+      lower_ages   = c(0, 10, 15, 50, 70),
+      num_vec      = c(0.01, 0.0272, 0.0657, 0.0469, 0.0381),
+      num_var_name = "prevalence"
+    )
+    
+    depression_func_pop <- stepfun(x = depression_prevalence[["lower"]],
+                                 y = c(0, depression_prevalence[["prevalence"]]), right = FALSE)
+    dep_b                 <- aggregate(as.formula(paste0(depression_var, " ~ ",
+                                                     last_entry_age_var)),
+                                   FUN = mean,
+                                   data = mgi_data)
+    depression_func_mgi <- stepfun(x = dep_b[, 1], y = c(0, dep_b[, 2]), right = FALSE)
   }
   
   # chd prevalence by age (us)
@@ -264,6 +282,46 @@ poststratification <- function(
                                right = FALSE)
   }
   
+  # hypertension distribution by age (us)
+  # https://www.cdc.gov/nchs/data/databriefs/db289.pdf
+  if ("hypertension" %in% covs) {
+    hypertension_prevalence <- age_grp_table(
+      lower_ages   = c(0, 18, 40, 60),
+      upper_offset = 0,
+      num_vec      = c(0.01, 0.075, 0.332, 0.631),
+      num_var_name = "prevalence"
+    )
+    hypertension_func_pop <- stepfun(x = hypertension_prevalence[["lower"]],
+                               y = c(0, hypertension_prevalence[["prevalence"]]),
+                               right = FALSE)
+    hypertension_b        <- aggregate(as.formula(paste0(hypertension_var, " ~ ",
+                                                   last_entry_age_var)),
+                                 FUN = mean, data = mgi_data)
+    hypertension_func_mgi <- stepfun(x = hypertension_b[, 1], y = c(0, hypertension_b[, 2]),
+                               right = FALSE)
+  }
+  
+  # non-hispanic white distribution by age (us)
+  # https://data.census.gov/table?q=age,+race,+ethnicity&tid=ACSDT5Y2021.B01001H
+  # calculated from 2021 5-year ACS estimates (tables B01001H and S0101)
+  if ("nhw" %in% covs) {
+    nhw_prevalence <- age_grp_table(
+      lower_ages   = c(0, 5, 10, 15, 20, 25, 30, 35, 45, 55, 65, 75, 85),
+      upper_offset = 0,
+      num_vec      = c(0.48087, 0.49008, 0.49306, 0.51711, 0.53047, 0.53652, 0.55121, 
+                       0.55932, 0.6119, 0.68936, 0.74374, 0.7696, 0.7898),
+      num_var_name = "prevalence"
+    )
+    nhw_func_pop <- stepfun(x = nhw_prevalence[["lower"]],
+                                     y = c(0, nhw_prevalence[["prevalence"]]),
+                                     right = FALSE)
+    nhw_b        <- aggregate(as.formula(paste0(nhw_var, " ~ ",
+                                                         last_entry_age_var)),
+                                       FUN = mean, data = mgi_data)
+    nhw_func_mgi <- stepfun(x = nhw_b[, 1], y = c(0, nhw_b[, 2]),
+                                     right = FALSE)
+  }
+  
   # without cancer
   population <- age_func_pop(age_vec)
   if ("diabetes" %in% covs) {
@@ -285,7 +343,28 @@ poststratification <- function(
     population <- population * fifelse(mgi_data[[female_var]] == 1,
                                        female_func_pop(age_vec),
                                        1 - female_func_pop(age_vec))
-    }
+  }
+  if ("depression" %in% covs) {
+    population <- population * fifelse(mgi_data[[depression_var]] == 1,
+                                       depression_func_pop(age_vec),
+                                       1 - depression_func_pop(age_vec))
+  }
+  if ("hypertension" %in% covs) {
+    population <- population * fifelse(mgi_data[[hypertension_var]] == 1,
+                                       hypertension_func_pop(age_vec),
+                                       1 - hypertension_func_pop(age_vec))
+  }
+  if ("nhw" %in% covs) {
+    population <- population * fifelse(mgi_data[[nhw_var]] == 1,
+                                       nhw_func_pop(age_vec),
+                                       1 - nhw_func_pop(age_vec))
+  }
+  if ("cancer" %in% covs) {
+    population <- population * fifelse(mgi_data[[cancer_var]] == 1,
+                                       cancer_func_pop(age_vec),
+                                       1 - cancer_func_pop(age_vec))
+  }
+  
   
   mgi <- age_func_mgi(age_vec)
   if ("diabetes" %in% covs) {
@@ -308,34 +387,39 @@ poststratification <- function(
                          female_func_mgi(age_vec),
                          1 - female_func_mgi(age_vec))
   }
+  if ("depression" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[depression_var]] == 1,
+                         depression_func_mgi(age_vec),
+                         1 - depression_func_mgi(age_vec))
+  }
+  if ("hypertension" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[hypertension_var]] == 1,
+                         hypertension_func_mgi(age_vec),
+                         1 - hypertension_func_mgi(age_vec))
+  }
+  if ("nhw" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[nhw_var]] == 1,
+                         nhw_func_mgi(age_vec),
+                         1 - nhw_func_mgi(age_vec))
+  }
+  if ("cancer" %in% covs) {
+    mgi <- mgi * fifelse(mgi_data[[cancer_var]] == 1,
+                         cancer_func_mgi(age_vec),
+                         1 - cancer_func_mgi(age_vec))
+  }
   
   if (chop == TRUE) {
-    post_no_cancer <- chopr(population / mgi)
+    poststrat_weights <- chopr(population / mgi)
   } else {
-    post_no_cancer <- population / mgi
+    poststrat_weights <- population / mgi
   }
-  post_no_cancer <- (Nobs * post_no_cancer) / sum(post_no_cancer, na.rm = TRUE)
   
-  # with cancer
-  population <- population * fifelse(mgi_data[[cancer_var]] == 1,
-                                     cancer_func_pop(age_vec),
-                                     1 - cancer_func_pop(age_vec))
-  mgi        <- mgi * fifelse(mgi_data[[cancer_var]] == 1,
-                              cancer_func_mgi(age_vec),
-                              1 - cancer_func_mgi(age_vec))
-  
-  if (chop == TRUE) {
-    post_cancer <- chopr(population / mgi)
-  } else {
-    post_cancer <- population / mgi
-  }
-  post_cancer <- (Nobs * post_cancer) / sum(post_cancer, na.rm = TRUE)
+  poststrat_weights <- (Nobs * poststrat_weights) / sum(poststrat_weights, na.rm = TRUE)
   
   return(
     data.table(
-      id              = mgi_data[[id_var]],
-      no_cancer_postw = post_no_cancer,
-      cancer_postw    = post_cancer
+      id       = mgi_data[[id_var]],
+      ps_weight = poststrat_weights
     )
   )
   
