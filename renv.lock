@@ -1135,14 +1135,9 @@
     },
     "cowplot": {
       "Package": "cowplot",
-      "Version": "1.1.2",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "cowplot",
-      "RemoteUsername": "wilkelab",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "1f35f385b0631c74daecaf6366725a8573242bde",
+      "Version": "1.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
       "Requirements": [
         "R",
         "ggplot2",
@@ -1153,7 +1148,7 @@
         "rlang",
         "scales"
       ],
-      "Hash": "16b89966be53b9dea8f0baf688b2d8d9"
+      "Hash": "b418e8423699d11c7f2087c2bfd07da2"
     },
     "cpp11": {
       "Package": "cpp11",
@@ -1349,12 +1344,6 @@
       "Version": "1.1.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "RemoteType": "standard",
-      "RemotePkgRef": "dplyr",
-      "RemoteRef": "dplyr",
-      "RemoteRepos": "https://cran.rstudio.com",
-      "RemotePkgPlatform": "source",
-      "RemoteSha": "1.1.1",
       "Requirements": [
         "R",
         "R6",
