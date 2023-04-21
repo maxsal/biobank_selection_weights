@@ -87,6 +87,12 @@ prepare_nhanes_data <- function(
   merged[, depression := fifelse(phq9_score >= 10, 1, 0)]
   merged[is.na(DPQ010), depression := NA_real_]
   
+  merged[, hypertension := fcase(
+    BPQ020 == 1, 1,
+    BPQ020 == 2, 0,
+    default = NA_real_
+  )]
+  
   tidy_table <- data.table(
     dataset          = rep("NHANES", nrow(merged)),
     age              = merged[, get(age_var)],
@@ -113,7 +119,8 @@ prepare_nhanes_data <- function(
     weight_nhanes    = merged[, NHANES_MEC_WT],
     bmi              = merged[, BMXBMI],
     phq9_score       = merged[, phq9_score],
-    depression       = merged[, depression]
+    depression       = merged[, depression],
+    hypertension     = merged[, hypertension]
   )
   
   tidy_table[, weight_nhanes := length(weight_nhanes) * weight_nhanes /

@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
 
 download_nhanes_data <- function(wave_letter = "J",
                                  wave_years = "2017-2018",
-                                 datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ")) {
+                                 datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ", "BPQ")) {
   # get urls
   if (wave_letter == "P") {
     url_paths <- glue(
