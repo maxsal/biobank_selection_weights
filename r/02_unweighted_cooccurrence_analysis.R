@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(glue)
   library(qs)
   library(optparse)
+  library(EValue)
 })
 
 set.seed(61787)
@@ -111,33 +112,39 @@ pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
 
 # cooccurrence analysis --------------------------------------------------------
 ## mgi
-mgi_results <- lapply(
-  seq_along(time_thresholds),
-  \(x) output_cooccurrence_results(
-    pim_data     = mgi_tr_pims[[glue("t{time_thresholds[x]}_threshold")]],
-    t_thresh     = time_thresholds[x],
+mgi_results <- list()
+pb <- txtProgressBar(max = length(time_thresholds), width = 50, style = 3)
+for (i in seq_along(time_thresholds)) {
+  mgi_results[[i]] <- output_cooccurrence_results(
+    pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
+    t_thresh     = time_thresholds[i],
     cov_data     = mgi_covariates,
     covariates   = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue("X{pheinfo[, phecode]}"),
     model_type   = opt$mod_type,
     parallel     = TRUE
   )
-)
+  setTxtProgressBar(pb, i)
+}
+close(pb)
 names(mgi_results) <- glue("t{time_thresholds}")
 
 ## ukb
-ukb_results <- lapply(
-  seq_along(time_thresholds),
-  \(i) output_cooccurrence_results(
-    pim_data = ukb_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-    t_thresh = time_thresholds[i],
-    cov_data = ukb_covariates,
-    covariates = c("age_at_threshold", "female", "length_followup"),
+ukb_results <- list()
+pb <- txtProgressBar(max = length(time_thresholds), width = 50, style = 3)
+for (i in seq_along(time_thresholds)) {
+  ukb_results[[i]] <- output_cooccurrence_results(
+    pim_data     = ukb_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
+    t_thresh     = time_thresholds[i],
+    cov_data     = ukb_covariates,
+    covariates   = c("age_at_threshold", "female", "length_followup"),
     all_phecodes = glue("X{pheinfo[, phecode]}"),
-    model_type = opt$mod_type,
-    parallel = TRUE
+    model_type   = opt$mod_type,
+    parallel     = TRUE
   )
-)
+  setTxtProgressBar(pb, i)
+}
+close(pb)
 names(ukb_results) <- glue("t{time_thresholds}")
 
 # save results -----------------------------------------------------------------

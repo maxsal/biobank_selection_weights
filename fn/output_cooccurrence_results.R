@@ -75,7 +75,7 @@ quick_cooccur_mod <- function(
     )
     if (evalue == TRUE) {
       rare <- sum(mod$data[[ex_code]], na.rm = TRUE) / nrow(mod$data)
-      eval <- evalues.OR(est = exp(est[[1]]), lo = exp(est[[1]] - qnorm(0.975) * est[[2]]), hi = exp(est[[1]] + qnorm(0.975) * est[[2]]), rare = ifelse(rare >= 0.15, FALSE, TRUE))
+      eval <- suppressMessages(evalues.OR(est = exp(est[[1]]), lo = exp(est[[1]] - qnorm(0.975) * est[[2]]), hi = exp(est[[1]] + qnorm(0.975) * est[[2]]), rare = ifelse(rare >= 0.15, FALSE, TRUE)))
       out[, `:=` (
         or         = exp(est[[1]]),
         evalue_est = eval[2, 1],
