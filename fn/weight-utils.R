@@ -14,7 +14,7 @@ ipw <- function(
                                       sum(weight_nhanes, na.rm = TRUE)]
   
   if ("cancer" %in% covs) {
-    cancer <- TRUE
+    cancer_TF <- TRUE
     covs <- covs[covs != "cancer"]
   }
   select_mod_covs <- paste0(covs, collapse = " + ")
@@ -57,7 +57,7 @@ ipw <- function(
                           sum(nhanes_weight, na.rm = TRUE)
   
   ## With Cancer
-  if (cancer == TRUE) {
+  if (cancer_TF == TRUE) {
     nhanes_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
                                data = stacked_data[dataset == "NHANES", ],
                                weights = weight_nhanes, family = quasibinomial())
