@@ -88,7 +88,7 @@ ipw <- function(
 
   data.table(
     "id"        = stacked_data[dataset == dataset_name, ][[id_var]],
-    "ip_weight" = nhanes_weight,
+    "ip_weight" = nhanes_weight
   )
 
 }
