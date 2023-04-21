@@ -16,6 +16,8 @@ ipw <- function(
   if ("cancer" %in% covs) {
     cancer_TF <- TRUE
     covs <- covs[covs != "cancer"]
+  } else {
+    cancer_TF <- FALSE
   }
   select_mod_covs <- paste0(covs, collapse = " + ")
 
