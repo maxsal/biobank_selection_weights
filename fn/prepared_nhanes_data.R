@@ -81,6 +81,12 @@ prepare_nhanes_data <- function(
     between(BMXBMI, 30, 120), 4
   )]
   
+  dep_cols <- paste0("DPQ0", 1:9, "0")
+  merged[, (dep_cols) := lapply(.SD, \(x) fifelse(x %in% c(7, 9), NA_real_, x)), .SDcols = dep_cols]
+  merged[, phq9_score := rowSums(.SD, na.rm = TRUE), .SDcols = dep_cols]
+  merged[, depression := fifelse(phq9_score >= 10, 1, 0)]
+  merged[is.na(DPQ010), depression := NA_real_]
+  
   tidy_table <- data.table(
     dataset          = rep("NHANES", nrow(merged)),
     age              = merged[, get(age_var)],
@@ -105,7 +111,9 @@ prepare_nhanes_data <- function(
     race_other       = as.numeric(merged[, RACE_ETH] == "Other"),
     samp_nhanes      = merged[, SAMP_NHANES],
     weight_nhanes    = merged[, NHANES_MEC_WT],
-    bmi              = merged[, BMXBMI]
+    bmi              = merged[, BMXBMI],
+    phq9_score       = merged[, phq9_score],
+    depression       = merged[, depression]
   )
   
   tidy_table[, weight_nhanes := length(weight_nhanes) * weight_nhanes /

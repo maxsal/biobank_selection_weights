@@ -45,7 +45,7 @@ option_list <- list(
   ),
   make_option("--nhanes_survey_names",
     type = "character",
-    default = "DEMO,BMX,SMQ,DIQ,MCQ",
+    default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ",
     help = glue(
       "NHANES wave years corresponding to wave ",
       "[default = %default]"
@@ -75,7 +75,7 @@ nhanes_merged <- download_nhanes_data(
 keep_vars <- c(
   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "MCQ220",
   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU"
+  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0")
 )
 
 if ("WTMECPRP" %in% names(nhanes_merged)) {
@@ -108,6 +108,24 @@ stacked <- rbindlist(list(
 # estimate ipw and postratification weights ------------------------------------
 cli_alert("estimating ipw weights...")
 estimated_weights <- ipw(stacked_data = stacked)
+# female
+fweights <- ipw(stacked_data = stacked, 
+                cov = c("as.numeric(age_cat == 5)",
+                        "as.numeric(age_cat == 6)", "cad", "diabetes",
+                        "smoking_current", "smoking_former", "bmi_under",
+                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "female"))
+# anxiety
+aweights <- ipw(stacked_data = stacked,
+                cov = c("as.numeric(age_cat == 5)",
+                        "as.numeric(age_cat == 6)", "cad", "diabetes",
+                        "smoking_current", "smoking_former", "bmi_under",
+                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "anxiety"))
+# depression
+dweights <- ipw(stacked_data = stacked,
+                cov = c("as.numeric(age_cat == 5)",
+                        "as.numeric(age_cat == 6)", "cad", "diabetes",
+                        "smoking_current", "smoking_former", "bmi_under",
+                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "depression"))
 
 cli_alert("estimating poststratification weights...")
 post <- poststratification(mgi_data = mgi, chop = TRUE)
