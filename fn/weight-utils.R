@@ -121,23 +121,21 @@ poststratification <- function(
   
   # cancer prevalence by age (US) 
   # https://seer.cancer.gov/csr/1975_2016/results_merged/topic_prevalence.pdf
-  if ("cancer" %in% covs) {
-    cancer_prevalence <- age_grp_table(
-      lower_ages   = c(0, 10, 20, 30, 40, 50, 60, 70, 80),
-      num_vec      = c(0.0899, 0.2023, 0.3922, 0.8989, 2.1532, 4.9326, 10.4420,
-                        18.3168, 21.5939) / 100,
-      num_var_name = "prevalence"
-    )
-    
-    cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]],
-                               y = c(0, cancer_prevalence[["prevalence"]]),
-                               right = FALSE)
-    b               <- aggregate(as.formula(paste0(cancer_var, " ~ ",
-                                            last_entry_age_var)),
-                                 FUN = mean,
-                                 data = mgi_data)
-    cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
-  }
+  cancer_prevalence <- age_grp_table(
+    lower_ages   = c(0, 10, 20, 30, 40, 50, 60, 70, 80),
+    num_vec      = c(0.0899, 0.2023, 0.3922, 0.8989, 2.1532, 4.9326, 10.4420,
+                      18.3168, 21.5939) / 100,
+    num_var_name = "prevalence"
+  )
+  
+  cancer_func_pop <- stepfun(x = cancer_prevalence[["lower"]],
+                             y = c(0, cancer_prevalence[["prevalence"]]),
+                             right = FALSE)
+  b               <- aggregate(as.formula(paste0(cancer_var, " ~ ",
+                                          last_entry_age_var)),
+                               FUN = mean,
+                               data = mgi_data)
+  cancer_func_mgi <- stepfun(x = b[, 1], y = c(0, b[, 2]), right = FALSE)
   
   # diabetes prevalence by age (US)
   # https://www.cdc.gov/diabetes/pdfs/data/statistics/national-diabetes-statistics-report.pdf 
