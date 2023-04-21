@@ -74,7 +74,7 @@ quick_cooccur_mod <- function(
       log10p  = log10(coef(summary(mod))[ex_code, 4])
     )
     if (evalue == TRUE) {
-      rare <- sum(mod$data[[exposure]], na.rm = TRUE) / nrow(mod$data)
+      rare <- sum(mod$data[[ex_code]], na.rm = TRUE) / nrow(mod$data)
       eval <- evalues.OR(est = out[["est"]], lo = out[["est_lo"]], hi = out[["est_hi"]], rare = ifelse(rare >= 0.15, FALSE, TRUE))
       out[, `:=` (
         evalue_est = eval[2, 1],
