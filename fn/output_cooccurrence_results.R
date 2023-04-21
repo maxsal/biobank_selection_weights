@@ -75,7 +75,7 @@ quick_cooccur_mod <- function(
     )
     if (evalue == TRUE) {
       rare <- sum(mod$data[[ex_code]], na.rm = TRUE) / nrow(mod$data)
-      eval <- evalues.OR(est = out[["est"]], lo = out[["est_lo"]], hi = out[["est_hi"]], rare = ifelse(rare >= 0.15, FALSE, TRUE))
+      eval <- evalues.OR(est = exp(out[["est"]]), lo = exp(out[["est_lo"]]), hi = exp(out[["est_hi"]]), rare = ifelse(rare >= 0.15, FALSE, TRUE))
       out[, `:=` (
         evalue_est = eval[2, 1],
         evalue_lo  = eval[2, 2],
