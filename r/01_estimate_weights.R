@@ -62,6 +62,7 @@ data_path <- glue("data/private/mgi/{opt$cohort_version}/")
 for (i in list.files("fn", full.names = TRUE)) source(i)
 
 # load data --------------------------------------------------------------------
+message("loading data...")
 mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
@@ -75,7 +76,7 @@ nhanes_merged <- download_nhanes_data(
 keep_vars <- c(
   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "MCQ220",
   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0")
+  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020"
 )
 
 if ("WTMECPRP" %in% names(nhanes_merged)) {
@@ -106,7 +107,7 @@ stacked <- rbindlist(list(
 ), use.names = TRUE, fill = TRUE)
 
 # estimate ipw and postratification weights ------------------------------------
-cli_alert("estimating ipw weights...")
+message("estimating ipw weights...")
 estimated_weights <- ipw(stacked_data = stacked)
 # female
 fweights <- ipw(stacked_data = stacked, 
@@ -114,26 +115,41 @@ fweights <- ipw(stacked_data = stacked,
                         "as.numeric(age_cat == 6)", "cad", "diabetes",
                         "smoking_current", "smoking_former", "bmi_under",
                         "bmi_overweight", "bmi_obese", "nhanes_nhw", "female"))
-# anxiety
-aweights <- ipw(stacked_data = stacked,
-                cov = c("as.numeric(age_cat == 5)",
-                        "as.numeric(age_cat == 6)", "cad", "diabetes",
-                        "smoking_current", "smoking_former", "bmi_under",
-                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "anxiety"))
+setnames(fweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_fipw", "cancer_fipw"))
+
 # depression
 dweights <- ipw(stacked_data = stacked,
                 cov = c("as.numeric(age_cat == 5)",
                         "as.numeric(age_cat == 6)", "cad", "diabetes",
                         "smoking_current", "smoking_former", "bmi_under",
                         "bmi_overweight", "bmi_obese", "nhanes_nhw", "depression"))
+setnames(dweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_dipw", "cancer_dipw"))
 
-cli_alert("estimating poststratification weights...")
+# no cad
+ncadweights <- ipw(stacked_data = stacked,
+                   cov = c("as.numeric(age_cat == 5)",
+                           "as.numeric(age_cat == 6)", "diabetes",
+                           "smoking_current", "smoking_former", "bmi_under",
+                           "bmi_overweight", "bmi_obese", "nhanes_nhw"))
+setnames(ncadweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_ncadipw", "cancer_ncadipw"))
+
+# no diabetes
+ndiaweights <- ipw(stacked_data = stacked,
+                   cov = c("as.numeric(age_cat == 5)",
+                           "as.numeric(age_cat == 6)", "cad",
+                           "smoking_current", "smoking_former", "bmi_under",
+                           "bmi_overweight", "bmi_obese", "nhanes_nhw"))
+setnames(ndiaweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_ndiaipw", "cancer_ndiaipw"))
+
+ipws <- Reduce(\(x, y) merge.data.table(x, y, "id"), list(estimated_weights, fweights, dweights, ncadweights, ndiaweights))
+
+message("estimating poststratification weights...")
 post <- poststratification(mgi_data = mgi, chop = TRUE)
 
-merged <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, estimated_weights, post))
+merged <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, ipws, post))
 
 # estimate cancer~female log(OR) -----------------------------------------------
-cli_alert("estimating cancer~female log(OR) as sanity check...")
+message("estimating cancer~female log(OR) as sanity check...")
 ## ipw
 m0 <- glm(cancer ~ as.numeric(Sex == "F"),
           family = quasibinomial(), data = merged)
@@ -205,4 +221,4 @@ save_qs(
   file = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
 )
 
-cli_alert_success("script success! see {.path {data_path}} and suffix {.emph {opt$mgi_cohort}}")
+message(glue("script success! see {data_path} and suffix {opt$mgi_cohort}"))

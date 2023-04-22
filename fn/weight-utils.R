@@ -106,11 +106,12 @@ poststratification <- function(
     depression_var     = "depression",
     female_var         = "female",
     hypertension_var   = "hypertension",
+    nhw_var            = "nhw",
     covs               = c("cad", "smoke", "diabetes"),
     chop               = FALSE
 ) {
   
-  if (!all(covs %in% c("cad", "smoke", "diabetes", "female", "depression"))) {
+  if (!all(covs %in% c("cad", "smoke", "diabetes", "female", "depression", "hypertension", "cancer"))) {
     stop("function only supports covs 'cad', 'smoke', 'diabetes', 'female', 'depression', 'hypertension', and 'cancer' right now")
   }
   
@@ -327,7 +328,7 @@ poststratification <- function(
   # without cancer
   population <- age_func_pop(age_vec)
   if ("diabetes" %in% covs) {
-    population <- fifelse(mgi_data[[diabetes_var]] == 1,
+    population <- population * fifelse(mgi_data[[diabetes_var]] == 1,
                           diabetes_func_pop(age_vec),
                           1 - diabetes_func_pop(age_vec))
   }
@@ -370,7 +371,7 @@ poststratification <- function(
   
   mgi <- age_func_mgi(age_vec)
   if ("diabetes" %in% covs) {
-    mgi <- fifelse(mgi_data[[diabetes_var]] == 1,
+    mgi <- mgi* fifelse(mgi_data[[diabetes_var]] == 1,
                    diabetes_func_mgi(age_vec),
                    1 - diabetes_func_mgi(age_vec))
   }
