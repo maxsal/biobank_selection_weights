@@ -111,8 +111,8 @@ poststratification <- function(
     chop               = FALSE
 ) {
   
-  if (!all(covs %in% c("cad", "smoke", "diabetes", "female", "depression", "hypertension", "cancer"))) {
-    stop("function only supports covs 'cad', 'smoke', 'diabetes', 'female', 'depression', 'hypertension', and 'cancer' right now")
+  if (!all(covs %in% c("cad", "smoke", "diabetes", "female", "depression", "hypertension", "cancer", "nhw"))) {
+    stop("function only supports covs 'cad', 'smoke', 'diabetes', 'female', 'depression', 'hypertension', 'cancer', and 'nhw' right now")
   }
   
   Nobs    <- nrow(mgi_data)
