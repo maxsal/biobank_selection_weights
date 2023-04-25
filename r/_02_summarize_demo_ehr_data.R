@@ -124,29 +124,33 @@ ukb_demo[, `:=` (
     ]
 
 # summarize demo data ----------------------------------------------------------
-mgi_demo_summary <- lqsum(
-  mgi_cov,
-  vars = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-           "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus", "Drinker")
-)
+# mgi_demo_summary <- lqsum(
+#   mgi_cov,
+#   vars = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+#            "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus", "Drinker")
+# )
+# 
+# ukb_demo_summary <- lqsum(
+#   ukb_demo,
+#   vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+#            "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
+# )
+# ukb_demo_summary_ip <- lqsum(
+#   ukb_demo[in_phenome == 1, ],
+#   vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+#            "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
+# )
 
-ukb_demo_summary <- lqsum(
-  ukb_demo,
-  vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-           "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
-)
-ukb_demo_summary_ip <- lqsum(
-  ukb_demo[in_phenome == 1, ],
-  vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-           "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
-)
-# (mgi_demo_summary <- mgi_cov[id %in% unique(mgi_full_phe[, id]), ] |>
-#     summarizer(col_names = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-#                              "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus")))
+(mgi_demo_summary <- mgi_cov[id %in% unique(mgi_full_phe[, id]), ] |>
+    summarizer(col_names = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+                             "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus")))
 
-# (ukb_demo_summary <- ukb_demo[id %in% unique(ukb_full_phe[, id]), ] |>
-#     summarizer(col_names = c("age", "age_verbose", "sex", "race_eth",
-#                              "cancer", "diabetes", "cad", "anxiety", "depression", "smoker")))
+(ukb_demo_summary <- ukb_demo |>
+    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
+(ukb_demo_summary_ip <- ukb_demo[id %in% unique(ukb_full_phe[, id]), ] |>
+    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
 
 # summarize ehr data -----------------------------------------------------------
 (mgi_ehr_summary <- phecode_dsb_summarizer(mgi_full_phe))
