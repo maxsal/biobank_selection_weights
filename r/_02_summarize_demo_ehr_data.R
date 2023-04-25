@@ -16,8 +16,7 @@ suppressPackageStartupMessages({
 
 set.seed(61787)
 
-lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
-  invisible()
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
@@ -33,8 +32,6 @@ args   <- parse_args(parser, positional_arguments = 0)
 opt    <- args$options
 print(opt)
 
-time_thresholds <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
-
 ## extract file paths
 file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
@@ -45,11 +42,10 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
 mgi_cov <- read_qs(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.qs"))
 setnames(mgi_cov,
          old = c("DeID_PatientID", "Age", "AliveYN", "Deceased_DaysSinceBirth",
-                 "Ethnicity", "MaritalStatusCode", "Sex", "Race", "AgeFirstEntry",
-                 "AgeLastEntry", "YearsInEHR", "FirstDaySinceBirth", "LastDaySinceBirth"),
+                 "Ethnicity", "MaritalStatusCode", "Sex", "Race",
+                 "YearsInEHR", "FirstDaySinceBirth", "LastDaySinceBirth"),
          new = c("id", "age", "alive", "dead_dsb", "ethn", "marital",
-                 "sex", "race", "age_at_first_diagnosis", "age_at_last_diagnosis",
-                 "length_followup", "first_dsb", "last_dsb"))
+                 "sex", "race", "length_followup", "first_dsb", "last_dsb"))
 
 ### icd-phecode data
 mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
@@ -65,10 +61,16 @@ ukb_demo <- fread(file_paths[["ukb"]][["demo_file"]],
 ukb_demo <- ukb_demo[, .(
   id   = as.character(id),
   dob  = as.Date(dob),
-  age  = floor(as.numeric(as.Date("2022-11-17") - as.Date(dob)) / 365.25),
+  age  = as.numeric(age_at_consent),
   ethn = ethnicity,
-  sex)]
-ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
+  sex,
+  smoker,
+  bmi = as.numeric(bmi),
+  bmi_cat,
+  drinker,
+  cancer, diabetes, cad, anxiety, depression, in_phenome)]
+# cc_vars <- c("id", "age", "ethn", "sex", "smoker", "bmi", "drinker")
+# ukb_demo <- ukb_demo[complete.cases(ukb_demo[, ..cc_vars]), ]
 
 ### icd-phecode data
 ukb_full_phe <- fread(file_paths[["ukb"]][["icd_phecode_file"]], colClasses = "character")
@@ -121,41 +123,30 @@ ukb_demo[, `:=` (
                           )
     ]
 
-
-comorbid <- list(
-  "cad"                = list("phecodes" = c("411.4")),
-  "diabetes"           = list("phecodes" = c("250")),
-  "hypertension"       = list("phecodes" = c("272.12")),
-  "mixed_hypertension" = list("phecodes" = c("272.13")),
-  "vitamin_d"          = list("phecodes" = c("261.4")),
-  "depression"         = list("phecodes" = c("296.2")),
-  "anxiety"            = list("phecodes" = c("300")),
-  "bipolar"            = list("phecodes" = c("296.1")),
-  "cancer"             = list("phecodes" = cancer_phecodes)
+# summarize demo data ----------------------------------------------------------
+mgi_demo_summary <- lqsum(
+  mgi_cov,
+  vars = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+           "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus", "Drinker")
 )
 
-cli_alert("identifying cases and creating indicator variables...")
-cli_progress_bar("comorbid ids", total = length(names(comorbid)))
-for (i in names(comorbid)) {
-  comorbid[[i]][["ids"]] <- ukb_full_phe[phecode %in% comorbid[[i]][["phecodes"]], id] |>
-    unique()
-  cli_progress_update()
-}
+ukb_demo_summary <- lqsum(
+  ukb_demo,
+  vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+           "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
+)
+ukb_demo_summary_ip <- lqsum(
+  ukb_demo[in_phenome == 1, ],
+  vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+           "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
+)
+# (mgi_demo_summary <- mgi_cov[id %in% unique(mgi_full_phe[, id]), ] |>
+#     summarizer(col_names = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+#                              "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus")))
 
-cli_progress_bar("comorbid vars", total = length(names(comorbid)))
-for (i in names(comorbid)) {
-  set(ukb_demo, j = i, value = fifelse(ukb_demo[["id"]] %in% comorbid[[i]][["ids"]], 1, 0))
-  cli_progress_update()
-}
-
-# summarize demo data ----------------------------------------------------------
-(mgi_demo_summary <- mgi_cov[id %in% unique(mgi_full_phe[, id]), ] |>
-    summarizer(col_names = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-                             "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus")))
-
-(ukb_demo_summary <- ukb_demo[id %in% unique(ukb_full_phe[, id]), ] |>
-    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth",
-                             "cancer", "diabetes", "cad", "anxiety", "depression")))
+# (ukb_demo_summary <- ukb_demo[id %in% unique(ukb_full_phe[, id]), ] |>
+#     summarizer(col_names = c("age", "age_verbose", "sex", "race_eth",
+#                              "cancer", "diabetes", "cad", "anxiety", "depression", "smoker")))
 
 # summarize ehr data -----------------------------------------------------------
 (mgi_ehr_summary <- phecode_dsb_summarizer(mgi_full_phe))
@@ -171,6 +162,10 @@ for (i in names(comorbid)) {
     ukb_demo_summary,
     ukb_ehr_summary
 ), use.names = TRUE, fill = TRUE))
+(ukb_stacked_summary_ip <- rbindlist(list(
+  ukb_demo_summary_ip,
+  ukb_ehr_summary
+), use.names = TRUE, fill = TRUE))
 
 # save -------------------------------------------------------------------------
 fwrite(
@@ -182,4 +177,9 @@ fwrite(
     x    = ukb_stacked_summary,
     file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_ehr_summary.txt"),
     sep  = "\t"
+)
+fwrite(
+  x    = ukb_stacked_summary_ip,
+  file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_ehr_summary_ip.txt"),
+  sep  = "\t"
 )

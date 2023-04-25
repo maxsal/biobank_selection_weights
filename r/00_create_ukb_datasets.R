@@ -114,6 +114,11 @@ dob[, `:=`(
     smoker == "0", "Never",
     smoker == "1", "Past",
     smoker == "2", "Current"
+  ),
+  drinker = fcase(
+    drinker == "0", "Never",
+    drinker == "1", "Past",
+    drinker == "2", "Current"
   )
 )]
 
@@ -413,7 +418,7 @@ message(paste0("File saved as './results/UKB_PHECODE_DSB_MAPPED_", save_stamp, "
 
 # save sex data ----------------------------------------------------------------
 first_phe <- ukb_phecode[ukb_phecode[, .I[which.min(dsb)], id]$V1]
-last_phe <- ukb_phecode[ukb_phecode[, .I[which.max(dsb)], id]$V1]
+last_phe  <- ukb_phecode[ukb_phecode[, .I[which.max(dsb)], id]$V1]
 ehr_followup <- merge.data.table(
   first_phe[, .(id, first_dsb = dsb, age_at_first_diagnosis = round(dsb / 365.25, 1))],
   last_phe[, .(id, last_dsb = dsb, age_at_last_diagnosis = round(dsb / 365.25, 1))],
@@ -456,6 +461,12 @@ for (i in names(comorbid)) {
 
 dob[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
+dob[, in_phenome := fifelse(id %in% ukb_phecode[, unique(id)], 1, 0)]
+
+comorbids <- c(names(comorbid), "triglycerides")
+for (i in comorbids) {
+  dob[in_phenome == 0, (i) := NA_real_]
+}
 
 ## save
 fwrite(

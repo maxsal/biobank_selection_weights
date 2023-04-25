@@ -1,7 +1,8 @@
 # functions for obtaining quick summaries from datasets
 library(data.table)
 
-summarizer_func <- function(x, var_name = NULL) {
+summarizer_bin <- function(x, var_name = NULL) {
+  if (!is.numeric(x)) stop("variable must be numeric to use summarizer_bin()")
   if (is.numeric(x) & all(x %in% c(0:1, NA_real_))) {
     # dichotomous
     out <- data.table(
@@ -10,11 +11,11 @@ summarizer_func <- function(x, var_name = NULL) {
       nas = sum(is.na(x))
     )[,
       prop := round(N * 100 / length(na.omit(x)), 1)
-      ][, `:=` (
-            print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
-            print_unit = "% (n)"
-        )
-      ][]
+    ][, `:=` (
+      print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
+      print_unit = "% (n)"
+    )
+    ][]
   } else if (is.numeric(x)) {
     # numeric
     out <- data.table(
@@ -30,32 +31,8 @@ summarizer_func <- function(x, var_name = NULL) {
         " (",
         format(round(sd, 2), big.mark = ",", nsmall = 2),
         ")"),
-        print_unit = "mean (sd)"
-        )
-      ][]
-  } else if (is.factor(x)) {
-    out <- data.table(
-      val = levels(x),
-      N   = map_dbl(levels(x), \(level) sum(x == level, na.rm = TRUE)),
-      nas = sum(is.na(x))
-    )[,
-      prop := round(N * 100 / length(na.omit(x)), 1)
-      ][, `:=` (
-        print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
-        print_unit = "% (n)"
-        )
-        ][]
-  } else if (is.character(x)) {
-    out <- data.table(
-      val = unique(x),
-      N   = map_dbl(unique(x), \(level) sum(x == level, na.rm = TRUE)),
-      nas = sum(is.na(x))
-    )[,
-      prop := round(N * 100 / length(na.omit(x)), 1)
-    ][, `:=` (
-      print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
-      print_unit = "% (n)"
-      )
+      print_unit = "mean (sd)"
+    )
     ][]
   } else {
     out <- data.table()
@@ -68,7 +45,54 @@ summarizer_func <- function(x, var_name = NULL) {
   return(out)
 }
 
-summarizer <- function(x, col_names = NULL, as_tibble = FALSE) {
+summarize_ch <- function(x, var_name = NULL) {
+  if (is.factor(x)) {
+    out <- data.table(
+      val = levels(x),
+      N   = map_dbl(levels(x), \(level) sum(x == level, na.rm = TRUE)),
+      nas = sum(is.na(x))
+    )[,
+      prop := round(N * 100 / length(na.omit(x)), 1)
+    ][, `:=` (
+      print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
+      print_unit = "% (n)"
+    )
+    ][]
+  } else if (is.character(x)) {
+    out <- data.table(
+      val = unique(x),
+      N   = map_dbl(unique(x), \(level) sum(x == level, na.rm = TRUE)),
+      nas = sum(is.na(x))
+    )[,
+      prop := round(N * 100 / length(na.omit(x)), 1)
+    ][, `:=` (
+      print      = paste0(format(round(prop, 1), nsmall = 1), " (", trimws(format(N, big.mark = ",")), ")"),
+      print_unit = "% (n)"
+    )
+    ][]
+  } else {
+    out <- data.table()
+  }
+  if (!is.null(var_name)) {
+    out[, variable := var_name]
+  }
+  first_cols <- c("variable", "val", "print", "print_unit")
+  setcolorder(out, c(first_cols, setdiff(names(out), first_cols)))
+  return(out)
+}
+
+summarizer_func <- function(x, var_name = NULL) {
+  if (is.numeric(x)) {
+    out <- summarizer_bin(x, var_name)
+  } else if (is.factor(x) | is.character(x)) {
+    out <- summarizer_ch(x, var_name)
+  } else {
+    out <- data.table()
+  }
+  out
+}
+
+summarizer <- function(x, col_names = NULL) {
   if (is.null(col_names)) {
     out <- rbindlist(list(
         data.table(variable = "N", val = "Count", print = format(x[, .N], big.mark = ",")),
@@ -80,11 +104,7 @@ summarizer <- function(x, col_names = NULL, as_tibble = FALSE) {
         rbindlist(mapply(summarizer_func, x[, ..col_names], col_names), use.names = TRUE, fill = TRUE)
     ), use.names = TRUE, fill = TRUE)
   }
-  if (as_tibble) {
-    tibble::as_tibble(out)
-  } else {
-    out
-  }
+  out
 }
 
 # summarize EHR data
