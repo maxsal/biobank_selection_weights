@@ -45,7 +45,7 @@ option_list <- list(
   ),
   make_option("--nhanes_survey_names",
     type = "character",
-    default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ",
+    default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ",
     help = glue(
       "NHANES wave years corresponding to wave ",
       "[default = %default]"
@@ -108,116 +108,164 @@ stacked <- rbindlist(list(
 
 # estimate ipw and postratification weights ------------------------------------
 message("estimating ipw weights...")
-estimated_weights <- ipw(stacked_data = stacked)
-# female
-fweights <- ipw(stacked_data = stacked, 
-                cov = c("as.numeric(age_cat == 5)",
-                        "as.numeric(age_cat == 6)", "cad", "diabetes",
-                        "smoking_current", "smoking_former", "bmi_under",
-                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "female"))
-setnames(fweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_fipw", "cancer_fipw"))
 
-# depression
-dweights <- ipw(stacked_data = stacked,
-                cov = c("as.numeric(age_cat == 5)",
-                        "as.numeric(age_cat == 6)", "cad", "diabetes",
-                        "smoking_current", "smoking_former", "bmi_under",
-                        "bmi_overweight", "bmi_obese", "nhanes_nhw", "depression"))
-setnames(dweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_dipw", "cancer_dipw"))
+ip_weights_list <- list(
+  "simple" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+               "smoking_current", "smoking_former", "bmi_under",
+               "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+  "simple_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+               "smoking_current", "smoking_former", "bmi_under",
+               "bmi_overweight", "bmi_obese", "nhanes_nhw", "female"),
+  "selection" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+  "selection_c" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw",
+                  "cancer"),
+  "selection_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw",
+                  "female", "cancer"),
+  "cancer" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+              "smoking_current", "smoking_former", "bmi_under",
+              "bmi_overweight", "bmi_obese", "nhanes_nhw", "cancer"),
+  "depression" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+               "smoking_current", "smoking_former", "bmi_under",
+               "bmi_overweight", "bmi_obese", "nhanes_nhw", "depression"),
+  "cad" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+               "smoking_current", "smoking_former", "bmi_under",
+               "bmi_overweight", "bmi_obese", "nhanes_nhw", "cad"),
+  "diabetes" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+            "smoking_current", "smoking_former", "bmi_under",
+            "bmi_overweight", "bmi_obese", "nhanes_nhw", "diabetes"),
+  "hypertension" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+            "smoking_current", "smoking_former", "bmi_under",
+            "bmi_overweight", "bmi_obese", "nhanes_nhw", "hypertension")
+)
 
-# no cad
-ncadweights <- ipw(stacked_data = stacked,
-                   cov = c("as.numeric(age_cat == 5)",
-                           "as.numeric(age_cat == 6)", "diabetes",
-                           "smoking_current", "smoking_former", "bmi_under",
-                           "bmi_overweight", "bmi_obese", "nhanes_nhw"))
-setnames(ncadweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_ncadipw", "cancer_ncadipw"))
+ip_weights <- list()
+pb <- txtProgressBar(max = length(names(ip_weights_list)), width = 50, style = 3)
+for (i in seq_along(names(ip_weights_list))) {
+  tmp_weights <- ipw(stacked_data = stacked,
+                     covs = ip_weights_list[[names(ip_weights_list)[i]]])
+  setnames(tmp_weights, "ip_weight", paste0("ip_", names(ip_weights_list)[i]))
+  ip_weights[[i]] <- tmp_weights
+  setTxtProgressBar(pb, i)
+}
+close(pb)
 
-# no diabetes
-ndiaweights <- ipw(stacked_data = stacked,
-                   cov = c("as.numeric(age_cat == 5)",
-                           "as.numeric(age_cat == 6)", "cad",
-                           "smoking_current", "smoking_former", "bmi_under",
-                           "bmi_overweight", "bmi_obese", "nhanes_nhw"))
-setnames(ndiaweights, c("no_cancer_ipw", "cancer_ipw"), c("no_cancer_ndiaipw", "cancer_ndiaipw"))
-
-ipws <- Reduce(\(x, y) merge.data.table(x, y, "id"), list(estimated_weights, fweights, dweights, ncadweights, ndiaweights))
+ipws <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), ip_weights)
 
 message("estimating poststratification weights...")
-post <- poststratification(mgi_data = mgi, chop = TRUE)
+post_weights_list <- list(
+  "selection"    = c("smoke", "cad", "diabetes"),
+  "selection_c"  = c("smoke", "cad", "diabetes", "cancer"),
+  "selection_f"  = c("smoke", "cad", "diabetes", "cancer", "female"),
+  "nhw"          = c("smoke", "cad", "diabetes", "cancer", "nhw"),
+  "nhw_f"        = c("smoke", "cad", "diabetes", "cancer", "nhw", "female"),
+  "depression"   = c("smoke", "cad", "diabetes", "cancer", "depression"),
+  "diabetes"     = c("smoke", "cad", "diabetes", "cancer", "diabetes"),
+  "hypertension" = c("smoke", "cad", "diabetes", "cancer", "hypertension")
+)
 
-merged <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, ipws, post))
+post_weights <- list()
+pb <- txtProgressBar(max = length(names(post_weights_list)), width = 50, style = 3)
+for (i in seq_along(names(post_weights_list))) {
+  tmp_weights <- poststratification(mgi_data = mgi, chop = TRUE, nhw_var = "nhanes_nhw",
+                                    covs = post_weights_list[[names(post_weights_list)[i]]])
+  setnames(tmp_weights, "ps_weight", paste0("ps_", names(post_weights_list)[i]))
+  post_weights[[i]] <- tmp_weights
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+
+posts <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), post_weights)
+
+weights <- merge.data.table(ipws, posts, by = "id")
+merged  <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, ipws, posts))
 
 # estimate cancer~female log(OR) -----------------------------------------------
 message("estimating cancer~female log(OR) as sanity check...")
-## ipw
-m0 <- glm(cancer ~ as.numeric(Sex == "F"),
-          family = quasibinomial(), data = merged)
-m1 <- glm(cancer ~ as.numeric(Sex == "F"),
-          family = quasibinomial(), data = merged, weights = no_cancer_ipw)
-m2 <- glm(cancer ~ as.numeric(Sex == "F"),
-          family = quasibinomial(), data = merged, weights = cancer_ipw)
 
-m0_bb <- glm(cancer ~ as.numeric(Sex == "F"),
-             family = quasibinomial(), data = merged[StudyName == "MGI", ])
-m1_bb <- glm(cancer ~ as.numeric(Sex == "F"),
-             family = quasibinomial(), data = merged[StudyName == "MGI", ],
-             weights = no_cancer_ipw)
-m2_bb <- glm(cancer ~ as.numeric(Sex == "F"), 
-             family = quasibinomial(), data = merged[StudyName == "MGI", ],
-             weights = cancer_ipw)
-##
+extract_estimates <- function(
+  outcome,
+  exposure,
+  data,
+  weights = NULL
+) {
+  if (is.null(weights)) {
+    mod <- glm(
+      as.formula(paste0(outcome, " ~ ", exposure)),
+      family  = "quasibinomial",
+      data    = data)
+  } else {
+    mod <- glm(
+      as.formula(paste0(outcome, " ~ ", exposure)),
+      family  = "quasibinomial",
+      data    = data,
+      weights = data[[weights]]
+  )
+  }
 
-## poststrat
-m1_ps <- glm(cancer ~ as.numeric(Sex == "F"),
-             family = quasibinomial(), data = merged, weights = no_cancer_postw)
-m2_ps <- glm(cancer ~ as.numeric(Sex == "F"),
-             family = quasibinomial(), data = merged, weights = cancer_postw)
-
-m1_ps_bb <- glm(cancer ~ as.numeric(Sex == "F"),
-                family = quasibinomial(), data = merged[StudyName == "MGI", ],
-                weights = no_cancer_postw)
-m2_ps_bb <- glm(cancer ~ as.numeric(Sex == "F"),
-                family = quasibinomial(), data = merged[StudyName == "MGI", ],
-                weights = cancer_postw)
-##
-
-extractr <- function(x, weight_name) {
-  suppressMessages({
-    y <- confint(x)
-  })
+  est     <- summary(mod)$coef[exposure, 1:2]
+  beta_lo <- est[[1]] - qnorm(0.975) * est[[2]]
+  beta_hi <- est[[1]] + qnorm(0.975) * est[[2]]
+  rare <- ifelse(sum(mod$data[[outcome]], na.rm = TRUE) /
+    length(na.omit(mod$data[[outcome]])) >= 0.15, FALSE, TRUE)
+  evals <- suppressMessages(evalues.OR(
+    est  = exp(est[[1]]),
+    lo   = exp(beta_lo),
+    hi   = exp(beta_hi),
+    rare = rare
+  ))
   data.table(
-    "weights" = weight_name,
-    "est"     = coef(x)[[2]],
-    "lower"   = y[2, 1],
-    "upper"   = y[2, 2],
-    "var"     = diag(summary(x)$cov.scaled)[[2]]
+    outcome  = outcome,
+    exposure = exposure,
+    weights  = ifelse(is.null(weights), "None", weights),
+    beta     = est[[1]],
+    beta_lo  = beta_lo,
+    beta_hi  = beta_hi,
+    or       = exp(est[[1]]),
+    or_lo    = exp(beta_lo),
+    or_hi    = exp(beta_hi),
+    eval     = evals[2, 1],
+    eval_lo  = evals[2, 2],
+    eval_hi  = evals[2, 3]
   )
 }
 
-log_or_est <- rbindlist(list(
-  extractr(x = m0, weight_name = "None"),
-  extractr(x = m1, weight_name = "IPW: No cancer"),
-  extractr(x = m2, weight_name = "IPW: Cancer"),
-  extractr(x = m0_bb, weight_name = "None [BB]"),
-  extractr(x = m1_bb, weight_name = "IPW: No cancer [BB]"),
-  extractr(x = m2_bb, weight_name = "IPW: Cancer [BB]"),
-  extractr(x = m1_ps, weight_name = "Poststrat: without cancer"),
-  extractr(x = m2_ps, weight_name = "Poststrat: with cancer"),
-  extractr(x = m1_ps_bb, weight_name = "Poststrat: without cancer [BB]"),
-  extractr(x = m2_ps_bb, weight_name = "Poststrat: with cancer [BB]")
-))
-log_or_est
+est_out <- list()
+weight_vars <- names(weights)[names(weights) != "id"]
+pb <- txtProgressBar(max = length(weight_vars),
+                     width = 50, style = 3)
+for (i in seq_along(weight_vars)) {
+  est_out[[i]] <- extract_estimates(
+    outcome  = "cancer",
+    exposure = 'as.numeric(Sex == "F")',
+    data     = merged,
+    weights  = weight_vars[i]
+  )
+  setTxtProgressBar(pb, i)
+}
+close(pb)
+est_out[[i+1]] <- extract_estimates(
+        outcome  = "cancer",
+        exposure = 'as.numeric(Sex == "F")',
+        data     = merged
+      )
+
+est_out <- rbindlist(est_out)
 
 fwrite(
-  x    = log_or_est,
+  x    = est_out,
   file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.txt"),
   sep  = "\t"
 )
 
 # save -------------------------------------------------------------------------
 save_qs(
-  x = merged[, .(id, no_cancer_ipw, cancer_ipw, no_cancer_postw, cancer_postw)],
+  x    = weights,
   file = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
 )
 
