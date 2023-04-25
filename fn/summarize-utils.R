@@ -45,7 +45,7 @@ summarizer_bin <- function(x, var_name = NULL) {
   return(out)
 }
 
-summarize_ch <- function(x, var_name = NULL) {
+summarizer_ch <- function(x, var_name = NULL) {
   if (is.factor(x)) {
     out <- data.table(
       val = levels(x),
