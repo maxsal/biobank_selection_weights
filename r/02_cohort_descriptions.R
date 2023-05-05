@@ -18,6 +18,7 @@ suppressPackageStartupMessages({
   library(ComplexHeatmap)
   library(PheWAS)
   library(glue)
+  library(survey)
   library(optparse)
 })
 
@@ -41,6 +42,7 @@ for (i in c(
   "phenome_partial_correlation_network.R",
   "phenome_partial_correlation_neoqgraph.R",
   "calculate_prevalences.R",
+  "calculate_weighted_prevalences.R",
   "files-utils.R"
 )) {
   source(paste0("fn/", i))
@@ -55,36 +57,70 @@ mgi <- read_qs(glue(
 ))
 mgi_pim <- fread(gsub("_0", "", file_paths[["mgi"]][["pim0_file"]]))
 mgi_cov <- fread(file_paths[["mgi"]][["cov_file"]])
+mgi_weights <- read_qs(paste0("data/private/mgi/", opt$mgi_version, "/weights_", opt$mgi_version, "_comb.qs"))
+mgi_pim <- merge.data.table(mgi_pim, mgi_weights[, .(id, weights = ps_selection)], by.x = "IID", by.y = "id")
 
 ukb <- read_qs(glue(
   "data/private/ukb/{opt$ukb_version}/",
   "ukb_phenome_partial_correlations_{opt$ukb_version}.qs"
 ))
-ukb_pim <- fread(file_paths[["ukb"]][["pim0_file"]])
-ukb_cov <- fread(file_paths[["ukb"]][["demo_file"]])
+ukb_pim     <- fread(file_paths[["ukb"]][["pim0_file"]])
+ukb_cov     <- fread(file_paths[["ukb"]][["demo_file"]])
+ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSelectionWeights.tab")[, .(id = f.eid, weights = LassoWeight)]
+ukb_pim     <- merge.data.table(ukb_pim, ukb_weights, by.x = "IID", by.y = "id")
 
-pheinfo <- fread("https://gitlab.com/maxsal/public_data/-/raw/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character", showProgress = FALSE
 )
 
-# calculate prevalences
-mgi_prevs <- calculate_prevalences(pim_data = mgi_pim, cov_data = mgi_cov)
+# calculate prevalences --------------------------------------------------------
+## unweighted
+mgi_prevs <- calculate_prevalences(
+  pim_data = mgi_pim,
+  cov_data = mgi_cov
+)
 ukb_prevs <- calculate_prevalences(
+  pim_data   = ukb_pim,
+  cov_data   = ukb_cov,
+  cov_id_var = "id",
+  sex_var    = "sex",
+  male_val   = "Male",
+  female_val = "Female"
+)
+
+## weighted
+mgi_prevs_w <- calculate_weighted_prevalences(
+  pim_data = mgi_pim,
+  cov_data = mgi_cov,
+  weight   = "weights"
+)
+ukb_prevs_w <- calculate_weighted_prevalences(
   pim_data = ukb_pim,
   cov_data = ukb_cov,
-  cov_id_var = "id",
-  sex_var = "sex",
-  male_val = "Male",
-  female_val = "Female"
+  weight   = "weights",
+)
+
+# merge weighted and unweighted prevalences ------------------------------------
+mgi_merged_prevs <- merge.data.table(
+  mgi_prevs,
+  mgi_prevs_w,
+  by = "phecode",
+  suffixes = c("_unweighted", "_weighted")
+)
+ukb_merged_prevs <- merge.data.table(
+  ukb_prevs,
+  ukb_prevs_w,
+  by = "phecode",
+  suffixes = c("_unweighted", "_weighted")
 )
 
 # save prevalences
 save_qs(
-  x    = mgi_prevs,
+  x    = mgi_merged_prevs,
   file = glue("results/mgi/{opt$mgi_version}/mgi_prevs.qs")
 )
 save_qs(
-  x    = ukb_prevs,
+  x    = ukb_merged_prevs,
   file = glue("results/ukb/{opt$ukb_version}/ukb_prevs.qs")
 )
 

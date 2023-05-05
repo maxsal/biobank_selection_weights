@@ -10,7 +10,7 @@ calculate_prevalences <- function(
     sex_var      = "Sex",
     male_val     = "M",
     female_val   = "F",
-    pheinfo_path = "https://gitlab.com/maxsal/public_data/-/raw/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+    pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
     progress     = TRUE
 ) {
     if (!is.data.table(pim_data)) { pim_data <- as.data.table(pim_data) }
@@ -34,12 +34,16 @@ calculate_prevalences <- function(
         N = NA_real_
     )
 
+    # subset pim data by sex
+    male_pim_data   <- pim_data[which(pim_data[[pim_id_var]] %in% male_ids), ]
+    female_pim_data <- pim_data[which(pim_data[[pim_id_var]] %in% female_ids), ]
+
     # fill out count and length
     if (progress) pb <- txtProgressBar(max = length(both), width = 50, style = 3)
     for (i in both) {
         out[phecode == i, `:=` (
             n = sum(pim_data[[i]], na.rm = TRUE),
-            N = length(pim_data[[i]])
+            N = length(na.omit(pim_data[[i]]))
         )]
         if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
@@ -48,8 +52,8 @@ calculate_prevalences <- function(
     if (progress) pb <- txtProgressBar(max = length(male), width = 50, style = 3)
     for (i in male) {
         out[phecode == i, `:=` (
-            n = sum(pim_data[pim_data[[pim_id_var]] %in% male_ids, ][[i]], na.rm = TRUE),
-            N = length(pim_data[pim_data[[pim_id_var]] %in% male_ids, ][[i]])
+            n = sum(male_pim_data[[i]], na.rm = TRUE),
+            N = length(na.omit(male_pim_data[[i]]))
         )]
         if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
@@ -58,8 +62,8 @@ calculate_prevalences <- function(
     if (progress) pb <- txtProgressBar(max = length(female), width = 50, style = 3)
     for (i in female) {
         out[phecode == i, `:=` (
-            n = sum(pim_data[pim_data[[pim_id_var]] %in% female_ids, ][[i]], na.rm = TRUE),
-            N = length(pim_data[pim_data[[pim_id_var]] %in% female_ids, ][[i]])
+            n = sum(female_pim_data[[i]], na.rm = TRUE),
+            N = length(na.omit(female_pim_data[[i]]))
         )]
         if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
     }
