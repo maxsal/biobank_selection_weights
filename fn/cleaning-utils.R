@@ -53,11 +53,10 @@ age_grp_table <- function(lower_ages,
 }
 
 ## helper for truncating probabilities
-chopr <- function(x) {
-  quant2.5 <- quantile(x, probs = 0.025, na.rm = TRUE)
-  quant97.5 <- quantile(x, probs = 0.975, na.rm = TRUE)
-  x[x < quant2.5] <- quant2.5
-  x[x > quant97.5] <- quant97.5
+chopr <- function(x, probs = c(0.025, 0.975)) {
+  quant <- quantile(x, probs = probs, na.rm = TRUE)
+  x[x < quant[1L]] <- quant[1L]
+  x[x > quant[2L]] <- quant[2L]
   x
 }
 
