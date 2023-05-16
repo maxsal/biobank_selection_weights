@@ -1,4 +1,8 @@
 # functions for obtaining quick summaries from datasets
+suppressPackageStartupMessages({
+  library(data.table)
+  library(survey)
+})
 library(data.table)
 
 summarizer_bin <- function(x, var_name = NULL) {
@@ -161,4 +165,63 @@ v_sum <- function(x, var_name, mean_round = 1, other_round = 0) {
             format(round(max(x, na.rm = TRUE), other_round), big.mark = ",", nsmall = other_round)
             )
     )
+}
+
+# count number of occurrences of phecodes in a phecode indicator matrix
+pim_counter <- function(pim, id_var) {
+  keep <- setdiff(names(pim), id_var)
+  short_pim <- pim[, ..keep]
+  counter <- colSums(short_pim, na.rm = TRUE)
+  data.table(
+    phecode = names(counter),
+    N = counter
+  )
+}
+
+# weighted summary statistics --------------------------------------------------
+weighted_summary <- function(var, dsn) {
+  tmp <- svymean(as.formula(paste0("~", var)), dsn, na.rm = TRUE)
+  out <- as.data.table(tmp)
+  if (is.character(model.frame(dsn)[[var]]) | is.factor(model.frame(dsn)[[var]])) {
+    names <- gsub(var, "", names(tmp))
+    out[, `:=`(
+      variable = var,
+      val      = names,
+      print    = paste0(format(round(mean * 100, 1), nsmall = 1), " (", trimws(format(round(SE * 100, 1), big.mark = ",", nsmall = 1)), ")")
+    )]
+  } else {
+    out[, `:=`(
+      variable = var,
+      val      = var
+    )]
+    setnames(out, var, "SE")
+    out[, `:=`(
+      print = paste0(format(round(mean, 1), nsmall = 1), " (", trimws(format(round(SE, 1), big.mark = ",", nsmall = 1)), ")")
+    )]
+  }
+  out[]
+}
+
+weighted_summary_wrapper <- function(data,
+                                     weight,
+                                     vars,
+                                     dsn = NULL) {
+  if (is.null(dsn)) {
+    pre <- nrow(data)
+    data2 <- data[!is.na(get(weight)), ]
+    post <- nrow(data2)
+    if (pre != post) {
+      message(paste0("Dropped ", pre - post, " rows due to missingness in ", weight))
+    }
+    dsn <- svydesign(
+      id = ~1,
+      weights = ~ get(weight),
+      data = data2
+    )
+  }
+  res <- lapply(
+    vars,
+    \(x) weighted_summary(var = x, dsn = dsn)
+  )
+  rbindlist(res)
 }

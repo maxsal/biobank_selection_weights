@@ -71,7 +71,7 @@ if (opt$use_geno == TRUE) {
 }
 
 sub_pim <- pim0[id %in% merged[, id]] # subset pim
-merged <- merged[id %in% sub_pim[, id]] # subset merged
+merged  <- merged[id %in% sub_pim[, id]] # subset merged
 
 # covariates -------------------------------------------------------------------
 if (opt$use_geno == TRUE) {
@@ -88,10 +88,10 @@ if (opt$use_geno == TRUE) {
 
 # MGI Partial Correlations -----------------------------------------------------
 sub_pim <- sub_pim[, 2:ncol(sub_pim)]
-cli_alert("identifying pairwise combinations...")
+message("identifying pairwise combinations...")
 combos <- combn(names(sub_pim), 2, simplify = FALSE)
 
-cli_alert("calculating pairwise partial correlations....")
+message("calculating pairwise partial correlations....")
 res_list <- partial_corr_veloce(
   pim   = sub_pim,
   ncore = detectCores() / 2,
@@ -99,7 +99,7 @@ res_list <- partial_corr_veloce(
   covs2 = x2_mgi
 )
 
-cli_alert_success("calculation complete! creating output table...")
+message("calculation complete! creating output table...")
 res_table <- rbindlist(res_list, fill = TRUE)
 
 # save results -----------------------------------------------------------------
@@ -109,11 +109,11 @@ output_file <- glue(
   "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
   "{opt$mgi_version}.qs"
 )
-cli_alert_info("saving results to: {.path {output_file}}")
+message(paste0("saving results to: ", output_file))
 
 save_qs(
   x    = res_table,
   file = output_file
 )
 
-cli_alert_success("script success! see {.path {output_file}}")
+message("script success! see {.path {output_file}}")

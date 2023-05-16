@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(glue)
   library(optparse)
 })
+options(datatable.print.class = TRUE)
 
 set.seed(61787)
 
@@ -43,16 +44,15 @@ file_paths <- get_files(
 # 3. read data -----------------------------------------------------------------
 ## mgi
 ### demographics
-mgi_demo <- fread(file_paths[["mgi"]]$demo_file)[, .(
-  id       = Deid_ID,
-  age      = Age,
-  sex      = Sex,
-  race     = RaceName
-)][, .(id, age, sex)]
-mgi_demo <- mgi_demo[complete.cases(mgi_demo), ]
+mgi_demo <- read_qs(file_paths[["mgi"]][["cov_processed_file"]])[, .(
+  id  = DeID_PatientID,
+  age = Age,
+  sex = Sex
+)]
+mgi_demo[complete.cases(mgi_demo), ]
 
 ### phecode indicator matrix (PEDMASTER_0)
-mgi_pim0 <- fread(file_paths[["mgi"]]$pim0_file)
+mgi_pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
 mgi_pim0 <- merge(
   mgi_pim0,
   data.frame(IID = mgi_demo[, id]),
@@ -64,35 +64,29 @@ short_mgi_pim[is.na(short_mgi_pim)] <- 0
 
 ## ukb
 ### demographics
-ukb_demo <- fread(file_paths[["ukb"]]$demo_file,
-  na.strings = c("", "NA", "."),
-  colClass = "character"
-)
-ukb_demo <- ukb_demo[, .(
+ukb_demo <- read_qs(file_paths[["ukb"]][["demo_file"]])[in_phenome == 1, .(
   id   = as.character(id),
-  dob  = as.Date(dob),
-  age  = floor(as.numeric(as.Date("2022-11-17") - as.Date(dob)) / 365.25),
-  ethn = ethnicity,
-  sex
-)][, .(id, age, sex)]
+  age  = age_at_consent,
+  ethn = race_eth,
+  sex 
+)]
 ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
 
 ### phecode indicator matrix (PEDMASTER_0)
-ukb_pim0 <- fread(file_paths[["ukb"]]$pim0_file)
-ukb_pim0[, IID := as.character(IID)]
+ukb_pim0 <- read_qs(file_paths[["ukb"]][["pim0_file"]])
 ukb_pim0 <- merge(
   ukb_pim0,
-  data.frame(IID = ukb_demo[, id]),
-  by = "IID",
+  ukb_demo[, .(id)],
+  by = "id",
   all.x = FALSE
 )
-short_ukb_pim <- ukb_pim0[, !c("IID")]
+short_ukb_pim <- ukb_pim0[, !c("id")]
 short_ukb_pim[is.na(short_ukb_pim)] <- 0
 
 # 4. calculates pcs ------------------------------------------------------------
 ## mgi
 ### calculate
-mgi_pca <- prcomp(short_mgi_pim, center = FALSE, scale. = FALSE)
+mgi_pca     <- prcomp(short_mgi_pim, center = FALSE, scale. = FALSE)
 mgi_pca_sum <- summary(mgi_pca)$importance
 ### save data
 save_qs(

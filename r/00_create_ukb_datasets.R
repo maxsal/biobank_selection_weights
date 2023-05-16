@@ -1,179 +1,332 @@
 # read and prepare UKB data
 # based almost exclusively on lars' scripts from: https://github.com/umich-cphds/createUKBphenome
 # author: max salvatore
-# date:   20230418
+# date:   20230511
 
 # libraries --------------------------------------------------------------------
-library(data.table)
+suppressPackageStartupMessages({
+  library(data.table)
+  library(optparse)
+  library(janitor)
+  library(PheWAS)
+})
+options(datatable.print.class = TRUE)
 
-if (getwd() != "/net/junglebook/home/mmsalva/createUKBphenome") {
-  message("Changing directory to '/net/junglebook/home/mmsalva/createUKBphenome'")
-  setwd("/net/junglebook/home/mmsalva/createUKBphenome")
-}
-message(paste0(
-  "Make sure your working directory is set to '/net/junglebook/",
-  "home/mmsalve/createUKBphenome/', the './data/baskets.txt' and ",
-  "withdrawn ('./data/w***_***.txt') files are up-to-date, and ",
-  "that you've recently sourced './scripts/function.",
-  "summarizeAvailableData.r' and './scripts/function.",
-  "createUKBphenome.r'!"
-))
+# optparse list ----
+option_list <- list(
+  make_option("--ukb_version",
+    type = "character", default = "20221117",
+    help = "UKB cohort version [default = %default]"
+  )
+)
+parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
+args <- parse_args(parser, positional_arguments = 0)
+opt <- args$options
+print(opt)
 
-source("./scripts/function.reformatUKB.r")
-source("./scripts/function.harmonizeICD9.r")
+source("/net/junglebook/home/mmsalva/projects/ukb_data_explorations/scripts/function.extractUKBdata.r")
+source("/net/junglebook/home/mmsalva/projects/ukb_data_explorations/scripts/function.harmonizeICD9.r")
 source("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/fn/files-utils.R")
+
+out_path <- paste0("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/", opt$ukb_version, "/")
 
 # pull data --------------------------------------------------------------------
 ## icd9 data
 message("Pulling ICD9 data...")
-icd9 <- reformatUKB(fields = c(41271, 41281), dataCoding = FALSE, onlyInfo = FALSE)
-setnames(icd9, old = c("41271", "41281"), new = c("diagnosis_code", "date"))
+icd9 <- reformat_ukb(fields = c(41271, 41281), data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE)
+icd9 <- merge.data.table(icd9$data[[1]], icd9$data[[2]], by.x = c("f.eid", "i.41271"), by.y = c("f.eid", "i.41281"))
+setnames(icd9, old = c("f.41271", "f.41281"), new = c("diagnosis_code", "date"))
 icd9[, date := as.Date(date)]
+icd9 <- icd9[, .(id = as.character(f.eid), diagnosis_code, date)]
 
 ## icd10 data
 message("Pulling ICD10 data...")
-icd10 <- reformatUKB(fields = c(41270, 41280), dataCoding = FALSE, onlyInfo = FALSE)
-setnames(icd10, old = c("41270", "41280"), new = c("diagnosis_code", "date"))
+icd10 <- reformat_ukb(fields = c(41270, 41280), data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE)
+icd10 <- merge.data.table(icd10$data[[1]], icd10$data[[2]], by.x = c("f.eid", "i.41270"), by.y = c("f.eid", "i.41280"))
+setnames(icd10, old = c("f.41270", "f.41280"), new = c("diagnosis_code", "date"))
 icd10[, date := as.Date(date)]
+icd10 <- icd10[, .(id = as.character(f.eid), diagnosis_code, date)]
 
-# function - pull all fields including subfields
-# reformatUKB drops fields with multiple subfields :(
-pull_ukb_subfields <- function(fields, fieldnames) {
-  named_fields        <- fields
-  names(named_fields) <- fieldnames
-  named_fields        <- sort(named_fields)
-  fieldinfo <- all.tables[which(all.tables$"Field ID" %in% named_fields & !is.na(all.tables$basket)), ]
-  keep <- which(fieldinfo[, subfield_id] != "n/a")
-  if (nrow(fieldinfo) != length(keep)) {
-    message(paste0(nrow(fieldinfo) - length(keep), " field(s) are unavailable. continuing with available fields"))
-    fieldinfo    <- fieldinfo[keep, ]
-    named_fields <- named_fields[which(named_fields %in% fieldinfo[, `Field ID`])]
-  }
-  allfields <- fieldinfo$subfield_id[which(fieldinfo$subfield_id != "n/a")]
+# pull UKB covariate data by field
+# dob <- reformat_ukb(
+#   fields = c(31, 34, 52, 22001, 21000, 20116, 20117, 21001, 200, 6142, 680, 728, 709, 2178, 6138),
+#   data_coding    = TRUE,
+#   only_info      = FALSE,
+#   keep_instances = TRUE,
+#   recode         = TRUE
+# )
 
-  field_subfields <- strsplit(allfields, ",")
-  out <- list()
-  for (i in seq_along(named_fields)) {
-    out[[i]] <- data.table(
-      field    = named_fields[[i]],
-      subfield = field_subfields[[i]],
-      name     = gsub("_0", "", paste0(names(named_fields)[[i]], "_", seq_len(length(field_subfields[[i]])) - 1))
-    )
-  }
-  out <- do.call(rbind, out)
+# ### save raw pull
+# save_qs(
+#   dob,
+#   paste0("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/", opt$ukb_version, "/dob_raw.qs")
+#   )
 
-  selected_columns <- c("id", unique(unlist(field_subfields)))
-  message(paste("Reading all entries across", length(selected_columns), "columns"))
-
-  colnumbers <- which(ukb_data_columns %in% selected_columns)
-
-  reformatted <- fread(
-    cmd = paste("cut -f", getRanges(colnumbers), data.file), header = T,
-    colClasses = "character"
-  )
-
-  fieldpattern <- "f\\.(.+)\\..+\\..+"
-  entrypattern <- "f\\..+\\.(.+\\..+)"
-  keep <- which(rowSums(is.na(reformatted[, -1]) | reformatted[, -1] == "", na.rm = T) != ncol(reformatted[, -1]))
-  reformatted <- reformatted[keep, ]
-
-  setnames(
-    reformatted,
-    out[["subfield"]],
-    out[["name"]]
-  )
-
-  keep <- which(rowSums(is.na(reformatted[, -1]) | reformatted[, -1] == "", na.rm = T) != ncol(reformatted[, -1]))
-  reformatted <- reformatted[keep, ]
-  print(paste0(nrow(reformatted), " lines after filtering empty lines"))
-  dim(reformatted[keep, ])
-
-  reformatted
-}
-
-# pull UKB data by field
-dob <- pull_ukb_subfields(
-  fields = c(31, 33, 34, 52, 22001, 6141, 21000, 20116, 20117, 21001, 200),
-  fieldnames = c("sex", "birth_date", "birth_year", "birth_month", "genetic_sex", "living_with", "ethnicity", "smoker", "drinker", "bmi", "consent_date")
+### read raw pull
+dob <- read_qs(
+  paste0("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/", opt$ukb_version, "/dob_raw.qs")
 )
 
+###
+## smoking [f.20116] -----------------------------------------------------------
+smk <- dob$data[["f.20116"]]
+# make c.20116 a character variable
+smk[, c.20116 := as.character(c.20116)]
+
+# inital assessment
+smk_init <- smk[i.20116 == 0, ]
+
+# create ever/never variable
+smk[, smk_ev := NA_character_]
+
+# Individuals who responded "Current" or "Previous" will be recoded to Ever
+smk2 <- unique(smk[c.20116 %in% c("Current", "Previous"), f.eid])
+smk[f.eid %in% smk2, smk_ev := "Ever"]
+
+# Individuals who responded "Never" and have no other smoking status will be recoded to Never
+smk3 <- unique(smk[c.20116 %in% c("Never") & !(f.eid %in% smk2), f.eid])
+smk[f.eid %in% smk3, smk_ev := "Never"]
+
+# Individuals with missing smk_ev will be recoded to Unknown
+smk[is.na(smk_ev), smk_ev := "Unknown"]
+
+# create cleaned smoking data
+smk <- merge.data.table(
+    smk_init,
+    unique(smk[, .(f.eid, smk_ev)]),
+)[, .(f.eid, smk_status = c.20116, smk_ev)]
+
+## drinking [f.20117] ----------------------------------------------------------
+alc <- dob$data[["f.20117"]]
+# make c.20117 a character variable
+alc[, c.20117 := as.character(c.20117)]
+
+# inital assessment
+alc_init <- alc[i.20117 == 0, ]
+
+# create ever/never variable
+alc[, alc_ev := NA_character_]
+
+# Individuals who responded "Current" or "Previous" will be recoded to Ever
+alc2 <- unique(alc[c.20117 %in% c("Current", "Previous"), f.eid])
+alc[f.eid %in% alc2, alc_ev := "Ever"]
+
+# Individuals who responded "Never" and have no other drinking status will be recoded to Never
+alc3 <- unique(alc[c.20117 %in% c("Never") & !(f.eid %in% alc2), f.eid])
+alc[f.eid %in% alc3, alc_ev := "Never"]
+
+# Individuals with missing alc_ev will be recoded to Unknown
+alc[is.na(alc_ev), alc_ev := "Unknown"]
+
+# create cleaned drinking data
+alc <- merge.data.table(
+    alc_init,
+    unique(alc[, .(f.eid, alc_ev)]),
+)[, .(f.eid, alc_status = c.20117, alc_ev)]
+
+## ethnic [f.21000] ------------------------------------------------------------
+ethn_coding <- fread("./data/coding/coding1001.tsv")
+ethnicity <- list(
+    White = c("White", "British", "Irish", "Any other white background"),
+    Other = c(
+        "Other ethnic group", "Mixed", "White and Black Caribbean",
+        "White and Black African", "White and Asian", "Any other mixed background"
+    ),
+    Asian = c(
+        "Asian or Asian British", "Indian", "Pakistani", "Bangladeshi",
+        "Any other Asian background", "Chinese"
+    ),
+    Black = c("Black or Black British", "Caribbean", "African", "Any other Black background"),
+    Unknown = c("Do not know", "Prefer not to answer")
+)
+ethn <- dob$data$f.21000[, .(id = f.eid, f.21000)]
+
+# recode the data
+ethn[, ethnic_group := as.character(factor(f.21000, levels = ethn_coding$coding, labels = ethn_coding$meaning))]
+
+# add column with race_eth
+ethn[, race_eth := as.character(NA)]
+for (i in 1:5) {
+    ethn[ethnic_group %in% ethnicity[[i]], race_eth := names(ethnicity)[i]]
+}
+
+# Individuals who responded multiple time with different specific ethnic_group will be recoded to "Other"
+ethn2 <- unique(ethn[!race_eth %in% c("Unknown", "Other"), .(id, race_eth)])
+dups <- ethn2[duplicated(id), id]
+for (i in seq_along(dups)) {
+    print(ethn[id == dups[i], race_eth])
+    ethn[id == dups[i], `:=`(race_eth, "Other")]
+}
+
+# Individuals who responded "Other" and a specific ethnic_group will also be recoded to Other
+ethn2 <- unique(ethn[!race_eth %in% c("Unknown"), .(id, race_eth)])
+dups <- ethn2[duplicated(id), id]
+for (i in seq_along(dups)) {
+    print(ethn[id == dups[i], race_eth])
+    ethn[id == dups[i], `:=`(race_eth, "Other")]
+}
+
+# Remove redundant rows
+ethn <- unique(ethn[, .(f.eid = id, race_eth)])
+
+# Individuals who responded "Unknown" but also had a specific answer will be recoded to the specific answer
+ethn1 <- ethn[race_eth == "Unknown", ]
+ethn2 <- ethn[race_eth != "Unknown", ]
+ethn <- rbind(ethn2, ethn1[!f.eid %in% ethn2[, f.eid]])
+
+# bmi [f.21001] ----------------------------------------------------------------
+# filter bmi data to only include initial assessment
+bmi_init <- dob$data$f.21001[i.21001 == 0, .(f.eid, f.21001)]
+bmi_init[, bmi_init_cat := fcase(
+    f.21001 < 18.5, "Underweight",
+    f.21001 >= 18.5 & f.21001 < 25, "Healthy weight",
+    f.21001 >= 25 & f.21001 < 30, "Overweight",
+    f.21001 >= 30, "Obese",
+    TRUE, NA_character_
+    )
+]
+
+# calculate median bmi
+bmi_med <- dob$data$f.21001[, .(f.eid, f.21001)][, median(f.21001, na.rm = TRUE), by = f.eid]
+bmi_med[, bmi_med_cat := fcase(
+    V1 < 18.5, "Underweight",
+    V1 >= 18.5 & V1 < 25, "Healthy weight",
+    V1 >= 25 & V1 < 30, "Overweight",
+    V1 >= 30, "Obese",
+    TRUE, NA_character_
+    )
+]
+
+# merge initial assessment and median bmi values
+bmi <- merge.data.table(
+    bmi_init[, .(f.eid, bmi_init = f.21001, bmi_init_cat)],
+    bmi_med[, .(f.eid, bmi_med = V1, bmi_med_cat)],
+    by = "f.eid"
+    )
+
+# year of birth [f.34] ---------------------------------------------------------
+yob <- dob$data$f.34
+
+# make 5-year year of birth bins consistent with Van Alten et al. (2022)
+yob[, year_cat := cut(f.34, breaks = seq(1935.5, 1970.5, by = 5), include.lowest = TRUE)]
+
+yob <- yob[, .(f.eid, birth_year = f.34, year_cat)]
+
+# economic status [f.6142] -----------------------------------------------------
+econ <- dob$data$f.6142[i.6142 == 0, ]
+
+# “Employed” (1-6, 8), “Retired” (10), “Stay-at-home” (12), “Incapacitated” (13), “Unemployed” (7), and “Student” (9, 11)
+econ[, econ_status := as.character(c.6142)]
+econ[c.6142 %in% c("Doing unpaid or voluntary work", "Looking after home and/or family"), econ_status := "Stay-at-home"]
+econ[c.6142 %in% c("Unable to work because of sickness or disability"), econ_status := "Incapacitated"]
+econ[c.6142 %in% c("Full or part-time student"), econ_status := "Student"]
+econ[c.6142 %in% c("In paid employment or self-employed"), econ_status := "Employed"]
+econ[c.6142 %in% c("None of the above", "Prefer not to answer"), econ_status := NA_character_]
+
+econ <- econ[, .(f.eid, econ_status)]
+
+# tenure of household [f.680] --------------------------------------------------
+tenure <- dob$data$f.680[i.680 == 0, ]
+
+tenure[, house_tenure := as.character(c.680)]
+tenure[house_tenure %in% c("None of the above", "Prefer not to answer"), house_tenure := NA_character_]
+
+tenure <- tenure[, .(f.eid, house_tenure)]
+
+# vehicle ownership [f.728] ----------------------------------------------------
+veh_own <- dob$data$f.728[i.728 == 0, ]
+veh_own <- veh_own[, veh_own := as.character(c.728)]
+veh_own[c.728 %in% c("Prefers not to answer", "None of the above"), veh_own := NA_character_]
+
+veh_own <- veh_own[, .(f.eid, veh_own)]
+
+# living with [f.709] ----------------------------------------------------------
+live_with <- dob$data$f.709[i.709 == 0, ]
+live_with[, one_person := as.numeric(f.709 == 1)]
+live_with[c.709 %in% c("Prefer not to answer", "None of the above"), one_person := NA_integer_]
+
+live_with <- live_with[, .(f.eid, one_person)]
+
+# self-reported health [f.2178] ------------------------------------------------
+srh <- dob$data$f.2178[i.2178 == 0, ]
+
+srh[c.2178 %in% c("Poor"), health := "Bad"]
+srh[c.2178 %in% c("Fair"), health := "Fair"]
+srh[c.2178 %in% c("Good", "Excellent"), health := "Good/Excellent"]
+srh[c.2178 %in% c("Prefer not to answer", "None of the above"), health := NA_character_]
+
+srh <- srh[, .(f.eid, health)]
+
+# education [f.6138] -----------------------------------------------------------
+edu <- dob$data$f.6138[i.6138 == 0, ]
+edu <- edu[, .(f.eid, edu = c.6138)]
+
+# clean up data ----------------------------------------------------------------
+# remove the following datasets from the dob object
+multiple <- c(
+    "f.20116", "f.20117", "f.21000", "f.21001", "f.34", "f.6142",
+    "f.680", "f.728", "f.709", "f.2178", "f.6138"
+)
+dob$data <- dob$data[!names(dob$data) %in% multiple]
+
+# using dob$info, rename the last columns in the dob$data object
+dob$data <- lapply(
+    seq_along(dob$data),
+    \(x) {
+        setnames(
+            dob$data[[x]],
+            tail(names(dob$data[[x]]), n = 1L),
+            make_clean_names(dob$info[`Field ID` == as.numeric(gsub("f.", "", names(dob$data)[x])), Description])
+        )
+    }
+)
+
+# keep first and last column of each dataset in dob$data
+dob$data <- lapply(
+    dob$data,
+    \(x) {
+        x[, .SD, .SDcols = c(1L, ncol(x))]
+    }
+)
+
+# add cleaned data to dob$data
+dob$data <- c(
+    dob$data,
+    list(smk),
+    list(alc),
+    list(ethn),
+    list(bmi),
+    list(yob),
+    list(econ),
+    list(tenure),
+    list(veh_own),
+    list(live_with),
+    list(srh)
+)
+
+# combine pulled data ----------------------------------------------------------
+dob <- Reduce(\(x, y) merge.data.table(x, y, by = "f.eid", all = TRUE), dob$data)
+setnames(dob, c("f.eid", "date_of_consenting_to_join_uk_biobank"), c("id", "consent_date"))
+dob[, consent_date := as.Date(consent_date)]
+
+# calculate age at consent
+dob[, birth_date := as.Date(paste0(birth_year, "-", month_of_birth, "-15"), "%Y-%B-%d")]
+dob[, age_at_consent := round(as.numeric(consent_date - birth_date) / 365.25, 1)]
+
 dob[, id := as.character(id)]
-
-dob[, `:=`(
-  consent_date = as.Date(consent_date),
-  dob = as.Date(paste0(birth_year, "-", ifelse(nchar(birth_month) == 2, birth_month, paste0("0", birth_month)), "-15")),
-  sex = fcase(
-    sex == "0", "Female",
-    sex == "1", "Male"
-  ),
-  genetic_sex = fcase(
-    sex == "0", "Female",
-    sex == "1", "Male"
-  ),
-  smoker = fcase(
-    smoker == "0", "Never",
-    smoker == "1", "Past",
-    smoker == "2", "Current"
-  ),
-  drinker = fcase(
-    drinker == "0", "Never",
-    drinker == "1", "Past",
-    drinker == "2", "Current"
-  )
-)]
-
-bmi_cols <- grep("bmi", names(dob), value = TRUE)
-dob[, (bmi_cols) := lapply(.SD, as.numeric), .SDcols = bmi_cols]
-
-lw_cols <- grep("living_with", names(dob), value = TRUE)
-dob[, (lw_cols) := lapply(.SD, \(x) fcase(
-  x == "1", "Husband, wife, or partner",
-  x == "2", "Son and/or daughter (include step-children)",
-  x == "3", "Brother and/or sister",
-  x == "4", "Mother and/or father",
-  x == "5", "Grandparent",
-  x == "6", "Grandchild",
-  x == "7", "Other related",
-  x == "8", "Other unrelated",
-  x == "-3", "Prefer not to answer"
-)), .SDcols = lw_cols]
-
-dob[, `:=`(
-  bmi_cat = fcase(
-    bmi < 18.5, "Underweight (<18.5)",
-    bmi < 25, "Healthy [18.5, 25)",
-    bmi < 30, "Overweight [25, 30)",
-    bmi >= 30, "Obese [30+)"
-  ),
-  ethnicity = fcase(
-    ethnicity == "-1", "Do not know",
-    ethnicity == "-3", "Prefer not to answer",
-    ethnicity == "5", "Chinese",
-    ethnicity == "6", "Other ethnic group",
-    stringr::str_ends(ethnicity, "1"), "White",
-    stringr::str_ends(ethnicity, "2"), "Mixed",
-    stringr::str_ends(ethnicity, "3"), "Asian",
-    stringr::str_ends(ethnicity, "4"), "Black",
-    ethnicity == "", NA_character_,
-    default = NA_character_
-  ),
-  age_at_consent = round(as.numeric(consent_date - dob) / 365.25, 1)
-)][, `:=` (
-  age_cat = cut(age_at_consent, seq(0, 85, 10), right = FALSE)
-)]
-
+dob[, consent_date := as.Date(consent_date)]
 
 # process data -----------------------------------------------------------------
 message("Calculating DSB for ICD9 data")
-icd9 <- merge(icd9, dob[, .(id, dob)], by = "id", all.x = TRUE)
-icd9[, dsb := round(as.numeric(((date - dob))))]
-icd9[, c("date", "dob") := NULL][, lexicon := "icd9"]
+icd9 <- merge.data.table(icd9, dob[, .(id, birth_date)], by = "id", all.x = TRUE)
+icd9[, dsb := round(as.numeric(((date - birth_date))))]
+icd9[, c("date", "birth_date") := NULL][, lexicon := "icd9"]
 print(paste(nrow(icd9), "lines of ICD9 codes for", length(unique(icd9[, id])), "people"))
 
 message("Calculating DSB for ICD10 data")
-icd10 <- merge(icd10, dob[, .(id, dob)], by = "id", all.x = TRUE)
-icd10[, dsb := round(as.numeric(((date - dob))))]
-icd10[, c("date", "dob") := NULL][, lexicon := "icd10"]
+icd10 <- merge.data.table(icd10, dob[, .(id, birth_date)], by = "id", all.x = TRUE)
+icd10[, dsb := round(as.numeric(((date - birth_date))))]
+icd10[, c("date", "birth_date") := NULL][, lexicon := "icd10"]
 print(paste(nrow(icd10), "lines of ICD10 codes for", length(unique(icd10[, id])), "people"))
 
 ## stack icd9 and icd10 data
@@ -186,26 +339,31 @@ ukb_icd_dsb[, diagnosis_code := gsub("\"", "", diagnosis_code)]
 print(paste(nrow(ukb_icd_dsb), "lines of ICD codes for", length(unique(ukb_icd_dsb[, id])), "people"))
 
 ## save
-save_stamp <- format(as.Date(file.info("./data/merged_baskets.txt")$ctime), "%Y%m%d")
 fwrite(
   x = ukb_icd_dsb,
-  file = paste0("./results/UKB_PHENOME_ICD_DSB_", save_stamp, ".txt")
+  file = paste0(out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".txt")
 )
 save_qs(
   x = ukb_icd_dsb,
-  file = paste0("./results/UKB_PHENOME_ICD_DSB_", save_stamp, ".qs")
+  file = paste0(out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".qs")
 )
-message(paste0("File saved as './results/UKB_PHENOME_ICD_DSB_", save_stamp, ".txt'!"))
+message(paste0("File saved as '", out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".txt/.qs'!"))
 
 # load necessary information for phecode mapping -------------------------------
 # Phecode information
-load(file = "./PheWAS/data/pheinfo.rda")
-pheinfo <- data.table(pheinfo)
+pheinfo <- as.data.table(PheWAS::pheinfo)
 pheinfo <- pheinfo[, .(phecode, description, groupnum, group, color)]
+phecat_alt_col <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/phecat_alt_colors.txt")
+pheinfo <- merge.data.table(
+  pheinfo[, !c("color")],
+  phecat_alt_col,
+  by = "group",
+  all.x = TRUE
+)
+
 
 # Gender rules
-load(file = "./PheWAS/data/gender_restriction.rda")
-gender_restriction <- data.table(gender_restriction)
+gender_restriction <- data.table(PheWAS::gender_restriction)
 gender_restriction <- rbind(
   data.table("phecode" = gender_restriction[male_only == FALSE & female_only == FALSE, phecode], "sex" = "Both"),
   data.table("phecode" = gender_restriction[male_only == TRUE, phecode], "sex" = "Male"),
@@ -213,7 +371,7 @@ gender_restriction <- rbind(
 )
 
 # Exclusion / roll up rules
-pheinfo2 <- unique(fread("./data/phecode_icd9_rolled.csv",
+pheinfo2 <- unique(fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phecode_icd9_rolled.csv",
   colClasses = "character",
   select = c("PheCode", "Excl. Phecodes", "Excl. Phenotypes", "Rollup", "Leaf"),
   col.names = c("phecode", "phecode_exclude_range", "phecode_exclude_phenotypes", "rollup", "leaf")
@@ -225,21 +383,21 @@ pheinfo <- merge(pheinfo, gender_restriction, by = "phecode")
 pheinfo <- pheinfo[, c("phecode", "description", "sex", "rollup", "leaf", "groupnum", "group", "color", "phecode_exclude_range", "phecode_exclude_phenotypes")]
 
 # add phecode information that's missing (collected form earlier versions)
-pheinfoOLD <- fread("./data/Phecode_Definitions_FullTable_Modified.txt", colClasses = "character")
+pheinfoOLD <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/Phecode_Definitions_FullTable_Modified.txt", colClasses = "character")
 pheinfo <- rbind(pheinfo, pheinfoOLD[!phecode %in% pheinfo$phecode, ])
 
 # Phecode that should not be rolled up
 norollup <- pheinfo$phecode[which(pheinfo$rollup == 0)]
 # add manual no rollup rules:
-norollup <- c(norollup, fread("./data/no_rollup_extra.txt", colClasses = "character")$phecode)
+norollup <- c(norollup, fread("/net/junglebook/home/mmsalva/createUKBphenome/data/no_rollup_extra.txt", colClasses = "character")$phecode)
 
 # map ICD9 codes to phecodes ---------------------------------------------------
 message("Mapping ICD9 codes to phecodes")
 
 # read PheWAS map (downloaded from https://phewascatalog.org/phecodes; selected "export all" top right corner)
-icd9map <- fread("./data/phecode_icd9_rolled.csv", colClasses = "character")
+icd9map <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phecode_icd9_rolled.csv", colClasses = "character")
 
-ICD9codes <- fread("./data/coding87.tsv")
+ICD9codes <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/coding87.tsv")
 ICD9codes[!grepl("Block", coding), ICD9 := sapply(coding, harmonizeICD9)]
 codeICD9 <- ICD9codes[, sort(unique(ICD9))]
 
@@ -299,7 +457,7 @@ icd9key <- icd9key[, c(
 )]
 
 # remove any issues you might have found
-icd9map_remove <- fread("./data/remove_icd9_map.txt", colClasses = "character")
+icd9map_remove <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/remove_icd9_map.txt", colClasses = "character")
 icd9key <- icd9key[!paste(ICD9, phecode, sep = ":") %in% icd9map_remove[, paste(ICD9, phecode, sep = ":")], ]
 
 ## map ICD9 data
@@ -316,10 +474,10 @@ phecode1 <- merge(icd9, icd9key[, .(ICD9, phecode)],
 message("Mapping ICD10 codes to phecodes")
 
 # read PheWAS map (downloaded from https://phewascatalog.org/phecodes_icd10; selected "export all" top right corner)
-icd10map <- fread("./data/phecode_icd10.csv", colClasses = "character")
+icd10map <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phecode_icd10.csv", colClasses = "character")
 
 # read UKB coding
-ICD10codes <- fread("./data/coding19.tsv")
+ICD10codes <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/coding19.tsv")
 ICD10codes <- ICD10codes[!grepl("Block", coding), ]
 ICD10codes[, ICD10category := gsub("([A-Z][0-9]{2}).+", "\\1", coding)]
 ICD10codes[, ICD10suffix := gsub("[A-Z].+", "", gsub("^[A-Z][0-9]{2}", "", coding))]
@@ -383,7 +541,7 @@ icd10key <- icd10key[, c(
 
 
 ## remove any issues you might have found
-icd10map_remove <- fread("./data/remove_icd10_map.txt", colClasses = "character")
+icd10map_remove <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/remove_icd10_map.txt", colClasses = "character")
 icd10key <- icd10key[!paste(ICD10, phecode, sep = ":") %in% icd10map_remove[, paste(ICD10, phecode, sep = ":")], ]
 
 ## map ICD10 data
@@ -408,13 +566,13 @@ ukb_phecode <- unique(rbindlist(list(
 # save mapped data -------------------------------------------------------------
 fwrite(
   x = ukb_phecode,
-  file = paste0("./results/UKB_PHECODE_DSB_MAPPED_", save_stamp, ".txt")
+  file = paste0(out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".txt")
 )
 save_qs(
   x = ukb_phecode,
-  file = paste0("./results/UKB_PHECODE_DSB_MAPPED_", save_stamp, ".qs")
+  file = paste0(out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".qs")
 )
-message(paste0("File saved as './results/UKB_PHECODE_DSB_MAPPED_", save_stamp, ".txt'!"))
+message(paste0("File saved as '", out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".txt/.qs'!"))
 
 # save sex data ----------------------------------------------------------------
 first_phe <- ukb_phecode[ukb_phecode[, .I[which.min(dsb)], id]$V1]
@@ -430,7 +588,6 @@ dob <- merge.data.table(
   by = "id",
   all.x = TRUE
 )
-drop <- c("birth_year", "birth_month", lw_cols)
 
 ## add comorbidity indicators
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
@@ -461,7 +618,8 @@ for (i in names(comorbid)) {
 
 dob[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
-dob[, in_phenome := fifelse(id %in% ukb_phecode[, unique(id)], 1, 0)]
+# keep individuals whose sex == genetic_sex as in_phenome
+dob[, in_phenome := fifelse(id %in% ukb_phecode[, unique(id)] | genetic_sex == sex, 1, 0)]
 
 comorbids <- c(names(comorbid), "triglycerides")
 for (i in comorbids) {
@@ -470,11 +628,38 @@ for (i in comorbids) {
 
 ## save
 fwrite(
-  x    = dob[, !..drop],
-  file = paste0("./results/UKB_SEX_", save_stamp, ".txt")
+  x = dob,
+  file = paste0(out_path, "UKB_PHENOME_COV_", opt$ukb_version, ".txt")
 )
-message(paste0("File save as './results/UKB_SEX_", save_stamp, ".txt'!"))
 save_qs(
-  x    = dob[, !..drop],
-  file = paste0("./results/UKB_SEX_", save_stamp, ".qs")
+  x = dob,
+  file = paste0(out_path, "UKB_PHENOME_COV_", opt$ukb_version, ".qs")
+)
+message(paste0("File saved as '", out_path, "UKB_PHENOME_COV_", opt$ukv_version, ".txt/.qs'!"))
+
+# save phecode indicator matrix ------------------------------------------------
+pim <- dcast(
+    ukb_phecode[, .(id, phecode = paste0("X", phecode))],
+    id ~ phecode,
+    value.var     = "phecode",
+    fun.aggregate = length,
+    fill          = 0
+  )
+save_qs(
+  x = pim,
+  file = paste0(out_path, "UKB_PHENOME_PIM_codes_only_", opt$ukb_version, ".qs")
+)
+
+pim2 <- rbindlist(
+  list(
+    pim,
+    dob[!(id %in% pim[, id]) & in_phenome == 1, .(id)]
+  ),
+  fill = TRUE,
+  use.names = TRUE
+)
+pim2[is.na(pim2)] <- 0 
+save_qs(
+  x = pim2,
+  file = paste0(out_path, "UKB_PHENOME_PIM0_", opt$ukb_version, ".qs")
 )

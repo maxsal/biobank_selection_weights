@@ -6,6 +6,8 @@ prepare_nhanes_data <- function(
     nhanes_data,
     age_var        = "RIDAGEYR",
     mec_wt_var     = "WTMEC2YR",
+    psu_var        = "SDMVPSU",
+    strata_var     = "SDMVSTRA",
     sex_var        = "RIAGENDR",
     cancer_var     = "MCQ220",
     chd_var        = "MCQ160C",
@@ -80,6 +82,13 @@ prepare_nhanes_data <- function(
     between(BMXBMI, 25.0, 29.999), 3,
     between(BMXBMI, 30, 120), 4
   )]
+  merged[, bmi_cat := fcase(
+    NHANES_BMICAT == 1, "Underweight",
+    NHANES_BMICAT == 2, "Healthy weight",
+    NHANES_BMICAT == 3, "Overweight",
+    NHANES_BMICAT == 4, "Obese",
+    default = NA_character_
+  )]
   
   dep_cols <- paste0("DPQ0", 1:9, "0")
   merged[, (dep_cols) := lapply(.SD, \(x) fifelse(x %in% c(7, 9), NA_real_, x)), .SDcols = dep_cols]
@@ -92,12 +101,23 @@ prepare_nhanes_data <- function(
     BPQ020 == 2, 0,
     default = NA_real_
   )]
+
+  merged[, race_eth := fcase(
+    RIDRETH3 %in% c(1, 2), "Hispanic",
+    RIDRETH3 == 3, "Non-Hispanic White",
+    RIDRETH3 == 4, "Non-Hispanic Black",
+    RIDRETH3 == 6, "Non-Hispanic Asian",
+    RIDRETH3 == 7, "Other",
+    default = NA_character_
+  )]
   
   tidy_table <- data.table(
     dataset          = rep("NHANES", nrow(merged)),
     age              = merged[, get(age_var)],
+    sex              = merged[, SEX],
     female           = as.numeric(merged[, SEX] == "Female"),
     age_cat          = merged[, NHANES_AGECAT],
+    race_eth         = merged[, race_eth],
     nhanes_nhw       = merged[, NHANES_NHW],
     cancer           = as.numeric(merged[, get(cancer_var)] == "Yes"),
     cancer_missing   = as.numeric(is.na(merged[, get(cancer_var)])),
@@ -105,10 +125,13 @@ prepare_nhanes_data <- function(
     diabetes_missing = as.numeric(is.na(merged[, DIABETES])),
     cad              = as.numeric(merged[, get(chd_var)] == "Yes"),
     cad_missing      = as.numeric(is.na(merged[, get(chd_var)])),
+    bmi              = merged[, BMXBMI],
+    bmi_cat          = merged[, bmi_cat],
     bmi_under        = as.numeric(merged[, NHANES_BMICAT] == 1),
     bmi_overweight   = as.numeric(merged[, NHANES_BMICAT] == 3),
     bmi_obese        = as.numeric(merged[, NHANES_BMICAT] == 4),
     bmi_missing      = as.numeric(is.na(merged[, NHANES_BMICAT])),
+    smoking_status   = merged[, Smoking],
     smoking_current  = as.numeric(merged[, Smoking] == "Current"),
     smoking_former   = as.numeric(merged[, Smoking] == "Former"),
     smoking_missing  = as.numeric(is.na(merged[, Smoking])),
@@ -117,7 +140,8 @@ prepare_nhanes_data <- function(
     race_other       = as.numeric(merged[, RACE_ETH] == "Other"),
     samp_nhanes      = merged[, SAMP_NHANES],
     weight_nhanes    = merged[, NHANES_MEC_WT],
-    bmi              = merged[, BMXBMI],
+    strata_nhanes    = merged[, get(strata_var)],
+    psu_nhanes       = merged[, get(psu_var)],
     phq9_score       = merged[, phq9_score],
     depression       = merged[, depression],
     hypertension     = merged[, hypertension]

@@ -13,6 +13,7 @@ suppressPackageStartupMessages({
     library(optparse)
     library(purrr)
 })
+options(datatable.print.class = TRUE)
 
 set.seed(61787)
 
@@ -49,34 +50,53 @@ setnames(mgi_cov,
 
 ### icd-phecode data
 mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
-if ("IID" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "IID", "id") }
-if ("DaysSinceBirth" %in% names(mgi_full_phe)) { setnames(mgi_full_phe, "DaysSinceBirth", "dsb") }
+if ("IID" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "IID", "id")
+if ("DaysSinceBirth" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "DaysSinceBirth", "dsb")
+
+### weights data
+mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
+
+mgi <- merge.data.table(
+    mgi_cov,
+    mgi_weights,
+    by = "id",
+    all.x = TRUE
+)
 
 ## ukb
 message("loading ukb data...")
 ### demographics
-ukb_demo <- fread(file_paths[["ukb"]][["demo_file"]],
-                              na.strings = c("", "NA", "."),
-                              colClass = "character")
+ukb_demo <- read_qs(file_paths[["ukb"]][["demo_file"]])
 ukb_demo <- ukb_demo[, .(
-  id   = as.character(id),
-  dob  = as.Date(dob),
-  age  = as.numeric(age_at_consent),
-  ethn = ethnicity,
+  id,
+  dob  = birth_date,
+  age  = age_at_consent,
+  race_eth,
   sex,
-  smoker,
-  bmi = as.numeric(bmi),
-  bmi_cat,
-  drinker,
+  smoker = smk_status,
+  bmi = bmi_med,
+  bmi_cat = bmi_med_cat,
+  drinker = as.numeric(alc_ev == "Ever"),
   cancer, diabetes, cad, anxiety, depression, in_phenome)]
 # cc_vars <- c("id", "age", "ethn", "sex", "smoker", "bmi", "drinker")
 # ukb_demo <- ukb_demo[complete.cases(ukb_demo[, ..cc_vars]), ]
 
 ### icd-phecode data
-ukb_full_phe <- fread(file_paths[["ukb"]][["icd_phecode_file"]], colClasses = "character")
-if ("IID" %in% names(ukb_full_phe)) { setnames(ukb_full_phe, "IID", "id") }
-if ("DaysSinceBirth" %in% names(ukb_full_phe)) { setnames(ukb_full_phe, "DaysSinceBirth", "dsb") }
+ukb_full_phe <- read_qs(file_paths[["ukb"]][["icd_phecode_file"]])
+if ("IID" %in% names(ukb_full_phe)) setnames(ukb_full_phe, "IID", "id")
+if ("DaysSinceBirth" %in% names(ukb_full_phe)) setnames(ukb_full_phe, "DaysSinceBirth", "dsb")
 ukb_full_phe[, dsb := as.numeric(dsb)]
+
+### weights data
+ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSelectionWeights.tab",
+    colClasses = "character")[, .(id = f.eid, ip_weight = as.numeric(LassoWeight))]
+
+ukb <- merge.data.table(
+    ukb_demo,
+    ukb_weights,
+    by = "id",
+    all.x = TRUE
+)
 
 ## other
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
@@ -91,7 +111,7 @@ tmp_age_cat <- age_grp_table(
     num_var_name = "counts"
 )
 ## mgi
-mgi_cov[, `:=` (
+mgi[, `:=` (
     race_eth      = factor(fifelse(ethn == "Hispanic", "Hispanic", fifelse(race == "", "Unknown", race))),
     SmokingStatus = relevel(factor(SmokingStatus, levels = c("Never", "Past", "Current", "Unknown")), ref = "Never"),
     bmi_verbose   = factor(fcase(
@@ -107,14 +127,7 @@ mgi_cov[, `:=` (
                           levels = tmp_age_cat[["group"]])
 )]
 ## ukb
-ukb_demo[, `:=` (
-    race_eth = fcase(
-        ethn %in% c("Asian", "Chinese"), "Asian",
-        ethn %in% c("Mixed"), "More than one population",
-        ethn %in% c("Do not know", "Prefer not to answer"), "Unknown",
-        ethn %in% c("Other ethnic group"), "Other",
-        ethn == "White", "White",
-        ethn == "Black", "Black"),
+ukb[, `:=` (
     age_verbose = factor(cut(age,
                             breaks = c(0, tmp_age_cat[["upper"]]),
                             labels = tmp_age_cat[["group"]],
@@ -123,34 +136,39 @@ ukb_demo[, `:=` (
                           )
     ]
 
-# summarize demo data ----------------------------------------------------------
-# mgi_demo_summary <- lqsum(
-#   mgi_cov,
-#   vars = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-#            "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus", "Drinker")
-# )
-# 
-# ukb_demo_summary <- lqsum(
-#   ukb_demo,
-#   vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-#            "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
-# )
-# ukb_demo_summary_ip <- lqsum(
-#   ukb_demo[in_phenome == 1, ],
-#   vars = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-#            "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")
-# )
-
-(mgi_demo_summary <- mgi_cov[id %in% unique(mgi_full_phe[, id]), ] |>
+# unweighted demographics summary ----------------------------------------------
+(mgi_demo_summary <- mgi[id %in% unique(mgi_full_phe[, id]), ] |>
     summarizer(col_names = c("age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
                              "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus")))
+(ukb_demo_summary <- ukb[in_phenome == 1, ] |>
+    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
 
-(ukb_demo_summary <- ukb_demo |>
-    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
-(ukb_demo_summary_ip <- ukb_demo[id %in% unique(ukb_full_phe[, id]), ] |>
-    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
-                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
+# weighted demographics summary ------------------------------------------------
+(mgi_demo_summary_ip <- weighted_summary_wrapper(
+    mgi,
+    weight = "ip_selection_c",
+    vars = c(
+        "age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+        "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus"
+    )
+))
+(mgi_demo_summary_ps <- weighted_summary_wrapper(
+    mgi,
+    weight = "ps_selection_c",
+    vars = c(
+        "age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
+        "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus"
+    )
+))
+(ukb_demo_summary_w <- weighted_summary_wrapper(
+    data = ukb[in_phenome == 1, ],
+    weight = "ip_weight",
+    vars = c(
+        "age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+        "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker"
+    )
+))
 
 # summarize ehr data -----------------------------------------------------------
 (mgi_ehr_summary <- phecode_dsb_summarizer(mgi_full_phe))
@@ -166,10 +184,6 @@ ukb_demo[, `:=` (
     ukb_demo_summary,
     ukb_ehr_summary
 ), use.names = TRUE, fill = TRUE))
-(ukb_stacked_summary_ip <- rbindlist(list(
-  ukb_demo_summary_ip,
-  ukb_ehr_summary
-), use.names = TRUE, fill = TRUE))
 
 # save -------------------------------------------------------------------------
 fwrite(
@@ -178,12 +192,22 @@ fwrite(
     sep  = "\t"
 )
 fwrite(
+    x    = mgi_demo_summary_ip,
+    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demo_summary_ip.txt"),
+    sep  = "\t"
+)
+fwrite(
+    x    = mgi_demo_summary_ps,
+    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demo_summary_ps.txt"),
+    sep  = "\t"
+)
+fwrite(
     x    = ukb_stacked_summary,
     file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_ehr_summary.txt"),
     sep  = "\t"
 )
 fwrite(
-  x    = ukb_stacked_summary_ip,
-  file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_ehr_summary_ip.txt"),
-  sep  = "\t"
+    x    = ukb_demo_summary_w,
+    file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_summary_w.txt"),
+    sep  = "\t"
 )

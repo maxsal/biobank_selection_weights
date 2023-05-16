@@ -100,10 +100,10 @@ for (i in names(comorbid)) {
 }
 close(pb)
 
-pb <- txtProgressBar(max = length(names(comobird)), width = 50, style = 3)
+pb <- txtProgressBar(max = length(names(comorbid)), width = 50, style = 3)
 for (i in names(comorbid)) {
   set(MGIcohort, j = i, value = fifelse(MGIcohort[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
-  pb <- setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+  setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
 }
 close(pb)
 
@@ -144,4 +144,4 @@ for (i in c("MGI", "MGI-MEND", "MIPACT", "MHB2")) {
   save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"))
 }
 
-message("script success! see {.path {out_path}} for output files")
+message(paste0("script success! see ", out_path, " for output files"))
