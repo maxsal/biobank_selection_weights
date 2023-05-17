@@ -23,7 +23,7 @@ phenome_partial_correlation_neoqgraph <- function(
     plot_key      = FALSE
 ) {
     # prepare neoplasm phecodes
-    pheinfo <- fread("https://gitlab.com/maxsal/public_data/-/raw/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+    pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
                     colClasses = "character",
                     showProgress = FALSE)
     if (no_leafs) { pheinfo <- pheinfo[leaf == 0, ] }

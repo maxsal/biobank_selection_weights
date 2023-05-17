@@ -1,5 +1,6 @@
 suppressPackageStartupMessages({
   library(data.table)
+  library(cli)
 })
 
 calculate_prevalences <- function(
@@ -39,35 +40,35 @@ calculate_prevalences <- function(
     female_pim_data <- pim_data[which(pim_data[[pim_id_var]] %in% female_ids), ]
 
     # fill out count and length
-    if (progress) pb <- txtProgressBar(max = length(both), width = 50, style = 3)
+    if (progress) cli_progress_bar("Both sex phecodes", length(both))
     for (i in both) {
         out[phecode == i, `:=` (
             n = sum(pim_data[[i]], na.rm = TRUE),
             N = length(na.omit(pim_data[[i]]))
         )]
-        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+        if (progress) cli_progress_update()
     }
-    if (progress) close(pb)
+    if (progress) cli_progress_done()
 
-    if (progress) pb <- txtProgressBar(max = length(male), width = 50, style = 3)
+    if (progress) cli_progress_bar("Male phecodes", length(male))
     for (i in male) {
         out[phecode == i, `:=` (
             n = sum(male_pim_data[[i]], na.rm = TRUE),
             N = length(na.omit(male_pim_data[[i]]))
         )]
-        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+        if (progress) cli_progress_update()
     }
-    if (progress) close(pb)
+    if (progress) cli_progress_done()
 
-    if (progress) pb <- txtProgressBar(max = length(female), width = 50, style = 3)
+    if (progress) cli_progress_bar("Female phecodes", length(female))
     for (i in female) {
         out[phecode == i, `:=` (
             n = sum(female_pim_data[[i]], na.rm = TRUE),
             N = length(na.omit(female_pim_data[[i]]))
         )]
-        if (progress) setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+        if (progress) cli_progress_update()
     }
-    if (progress) close(pb)
+    if (progress) cli_progress_done()
 
     # calculate prevalence
     out <- out[phecode %in% names(pim_data)][]
