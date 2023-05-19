@@ -11,13 +11,14 @@ suppressPackageStartupMessages({
 
 # load data --------------------------------------------------------------------
 mgi <- qread("~/Downloads/mgi_prevs.qs")
-setnames(mgi, c("n", "N", "prev"), c("mgi_n", "mgi_N", "mgi_prev"))
+setnames(mgi, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("mgi_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
 
 ukb <- qread("~/Downloads/ukb_prevs.qs")
-setnames(ukb, c("n", "N", "prev"), c("ukb_n", "ukb_N", "ukb_prev"))
+setnames(ukb, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("ukb_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
 
-aou <- qread("~/Downloads/aou_20230309_prevalences.qs")
-setnames(aou, c("n", "N", "prev"), c("aou_n", "aou_N", "aou_prev"))
+aou <- qread("~/Downloads/aou_prevs.qs")
+setnames(aou, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("aou_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
+
 
 # process data -----------------------------------------------------------------
 merged <- Reduce(
@@ -26,21 +27,21 @@ merged <- Reduce(
 )
 
 merged[, `:=`(
-  mgi_aou = mgi_prev / aou_prev,
-  ukb_aou = ukb_prev / aou_prev
+  mgi_aou = mgi_prev_unweighted / aou_prev_unweighted,
+  ukb_aou = ukb_prev_unweighted / aou_prev_unweighted
 )]
 
 plot_dat <- merged[
   aou_n >= 20 & ukb_n >= 10 & mgi_n >= 10
 ][
   !is.na(mgi_aou) & !is.na(ukb_aou),
-  .(phecode, mgi_prev, ukb_prev, aou_prev, mgi_aou, ukb_aou)
+  .(phecode, mgi_prev_unweighted, ukb_prev_unweighted, aou_prev_unweighted, mgi_aou, ukb_aou)
 ]
-pheinfo <- fread("https://gitlab.com/maxsal/public_data/-/raw/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character", showProgress = FALSE
 )
 
-phe_groups <- fread("https://gitlab.com/maxsal/public_data/-/raw/main/phewas/phecat_alt_colors.txt")
+phe_groups <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/phecat_alt_colors.txt")
 phe_group_cols <- phe_groups[, color]
 names(phe_group_cols) <- phe_groups[, group]
 
@@ -53,7 +54,7 @@ plot_dat <- merge.data.table(
 (full_plot <- plot_dat |>
   ggplot(aes(
     x = mgi_aou, y = ukb_aou, color = group, label = phecode,
-    label1 = mgi_prev, label2 = ukb_prev, label3 = aou_prev,
+    label1 = mgi_prev_unweighted, label2 = ukb_prev_unweighted, label3 = aou_prev_unweighted,
     label4 = description
   )) +
   annotate(
@@ -220,8 +221,8 @@ prevalence_ratio_plot <- function(prevalence_data,
 
   out <- as_tibble(plot_dat) |>
     mutate(
-      mgi_ukb = mgi_prev / ukb_prev,
-      aou_ukb = aou_prev / ukb_prev
+      mgi_ukb = mgi_prev_unweighted / ukb_prev_unweighted,
+      aou_ukb = aou_prev_unweighted / ukb_prev_unweighted
     ) |>
     select(phecode, mgi_aou, ukb_aou, mgi_ukb, aou_ukb) |>
     pivot_longer(cols = -1) |>

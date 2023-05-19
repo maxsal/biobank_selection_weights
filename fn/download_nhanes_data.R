@@ -27,7 +27,7 @@ download_nhanes_data <- function(wave_letter = "J",
 
   # download
   out <- list()
-  cli_progress_bar(name = "Downloading NHANES data", total = length(url_paths)
+  cli_progress_bar(name = "Downloading NHANES data", total = length(url_paths))
   for (i in seq_along(url_paths)) {
     out[[i]] <- read_xpt(url_paths[i]) |>
       as.data.table()
