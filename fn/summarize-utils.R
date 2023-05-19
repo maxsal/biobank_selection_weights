@@ -2,8 +2,8 @@
 suppressPackageStartupMessages({
   library(data.table)
   library(survey)
+  library(cli)
 })
-library(data.table)
 
 summarizer_bin <- function(x, var_name = NULL) {
   if (!is.numeric(x)) stop("variable must be numeric to use summarizer_bin()")
@@ -211,7 +211,7 @@ weighted_summary_wrapper <- function(data,
     data2 <- data[!is.na(get(weight)), ]
     post <- nrow(data2)
     if (pre != post) {
-      message(paste0("Dropped ", pre - post, " rows due to missingness in ", weight))
+      cli_alert_warning(paste0("Dropped ", pre - post, "(", round((pre - post)*100/pre, 1), "%) rows due to missingness in ", weight))
     }
     dsn <- svydesign(
       id = ~1,
