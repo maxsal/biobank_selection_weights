@@ -1,6 +1,7 @@
 suppressPackageStartupMessages({
   library(data.table)
   library(survey)
+  library(cli)
 })
 
 calculate_weighted_prevalences <- function(
@@ -13,7 +14,7 @@ calculate_weighted_prevalences <- function(
     male_val     = "M",
     female_val   = "F",
     pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
-    progress     = TRUE,
+    verbose      = TRUE,
     n_cores      = detectCores() / 4
 ) {
     
@@ -53,7 +54,7 @@ calculate_weighted_prevalences <- function(
     female_pim_data <- pim_data[which(pim_data[[pim_id_var]] %in% female_ids), ]
 
     # fill out count and length
-    message("phecodes for both sexes...")
+    if (verbose) cli_alert("phecodes for both sexes...")
     both_design <- svydesign(ids = ~1, data = pim_data, weights = ~ get(weight_var))
     both_out <- mclapply(
         both,
@@ -72,7 +73,7 @@ calculate_weighted_prevalences <- function(
         mc.cores = n_cores
     )
 
-    message("phecodes for males...")
+    if (verbose) cli_alert("phecodes for males...")
     male_design <- svydesign(ids = ~1, data = male_pim_data, weights = ~get(weight_var))
     male_out <- mclapply(
         male,
@@ -91,7 +92,7 @@ calculate_weighted_prevalences <- function(
         mc.cores = n_cores
     )
 
-    message("phecodes for females...")
+    if (verbose) cli_alert("phecodes for females...")
     female_design <- svydesign(ids = ~1, data = female_pim_data, weights = ~get(weight_var))
     female_out <- mclapply(
         female,

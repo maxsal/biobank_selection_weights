@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   require(data.table)
   require(haven)
   require(glue)
+  library(cli)
 })
 
 download_nhanes_data <- function(wave_letter = "J",
@@ -26,13 +27,13 @@ download_nhanes_data <- function(wave_letter = "J",
 
   # download
   out <- list()
-  pb <- txtProgressBar(max = length(url_paths), width = 50, style = 3)
+  cli_progress_bar(name = "Downloading NHANES data", total = length(url_paths)
   for (i in seq_along(url_paths)) {
     out[[i]] <- read_xpt(url_paths[i]) |>
       as.data.table()
-    setTxtProgressBar(pb, i)
+    cli_progress_update()
   }
-  close(pb)
+  cli_progress_done()
 
   # merge and output
   Reduce(\(x, y) merge.data.table(x, y, all = TRUE, by = "SEQN"), out)
