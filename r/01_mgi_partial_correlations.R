@@ -89,7 +89,7 @@ if (opt$use_geno == TRUE) {
 # MGI Partial Correlations -----------------------------------------------------
 sub_pim <- sub_pim[, 2:ncol(sub_pim)]
 message("identifying pairwise combinations...")
-combos <- combn(names(sub_pim), 2, simplify = FALSE)
+# combos <- combn(names(sub_pim), 2, simplify = FALSE)
 
 message("calculating pairwise partial correlations....")
 res_list <- partial_corr_veloce(
