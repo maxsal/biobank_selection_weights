@@ -78,7 +78,7 @@ phenome_partial_correlation_network <- function(
             width    = out_width,
             height   = out_height
         )
-        cli_alert_success(glue("plot saved to {.path {savefile}}"))
+        cli_alert_success("plot saved to {.path {savefile}}")
     }
 
     return(p)
