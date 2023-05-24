@@ -7,6 +7,7 @@ suppressPackageStartupMessages({
   library(cowplot)
   library(htmlwidgets)
   library(plotly)
+  library(patchwork)
 })
 
 # load data --------------------------------------------------------------------
@@ -28,19 +29,21 @@ merged <- Reduce(
 
 merged[, `:=`(
   mgi_aou = mgi_prev_unweighted / aou_prev_unweighted,
-  ukb_aou = ukb_prev_unweighted / aou_prev_unweighted
+  mgi_ukb = mgi_prev_unweighted / ukb_prev_unweighted,
+  ukb_aou = ukb_prev_unweighted / aou_prev_unweighted,
+  aou_ukb = aou_prev_unweighted / ukb_prev_unweighted,
+  mgi_pr  = mgi_prev_weighted / mgi_prev_unweighted,
+  ukb_pr  = ukb_prev_weighted / ukb_prev_unweighted,
+  aou_pr  = aou_prev_weighted / aou_prev_unweighted
 )]
 
 plot_dat <- merged[
-  aou_n >= 20 & ukb_n >= 10 & mgi_n >= 10
-][
-  !is.na(mgi_aou) & !is.na(ukb_aou),
-  .(phecode, mgi_prev_unweighted, ukb_prev_unweighted, aou_prev_unweighted, mgi_aou, ukb_aou)
-]
+  aou_n >= 20 & ukb_n >= 20 & mgi_n >= 20
+][!is.na(mgi_aou) & !is.na(aou_ukb) & !is.na(mgi_ukb), ]
+
 pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character", showProgress = FALSE
 )
-
 phe_groups <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/phecat_alt_colors.txt")
 phe_group_cols <- phe_groups[, color]
 names(phe_group_cols) <- phe_groups[, group]
@@ -185,46 +188,29 @@ ggsave(
   device = cairo_pdf
 )
 
-full_plotly <- full_plot |>
-  ggplotly(tooltip = c(
-    "label", "x", "y",
-    "label1", "label2", "label3", "label4"
-  ))
+# full_plotly <- full_plot |>
+#   ggplotly(tooltip = c(
+#     "label", "x", "y",
+#     "label1", "label2", "label3", "label4"
+#   ))
 
-htmlwidgets::saveWidget(
-  widget = full_plotly, # the plotly object
-  file = "~/Downloads/full_prevalence_plot.html", # the path & file name
-  selfcontained = TRUE # creates a single html file
-)
+# htmlwidgets::saveWidget(
+#   widget = full_plotly, # the plotly object
+#   file = "~/Downloads/full_prevalence_plot.html", # the path & file name
+#   selfcontained = TRUE # creates a single html file
+# )
 
 # prevalence ratio plots -------------------------------------------------------
 prevalence_ratio_plot <- function(prevalence_data,
                                   ratio_var,
-                                  alt_title_text = NULL,
-                                  alt_x_text = NULL,
                                   breaks = 1 * 10^c(-2, -1, 0, 1, 3),
                                   savefile = NULL,
+                                  title_text,
+                                  y_axis_label = "Prevalence ratio",
                                   out_height = 7) {
-  coh1 <- toupper(strsplit(ratio_var, "_")[[1]][1])
-  coh2 <- toupper(strsplit(ratio_var, "_")[[1]][2])
-
-  full_coh1 <- ifelse(coh1 == "MGI", "Michigan Genomics Initiative",
-    ifelse(coh1 == "UKB", "UK Biobank",
-      ifelse(coh1 == "AOU", "All of Us")
-    )
-  )
-  full_coh2 <- ifelse(coh2 == "MGI", "Michigan Genomics Initiative",
-    ifelse(coh2 == "UKB", "UK Biobank",
-      ifelse(coh2 == "AOU", "All of Us")
-    )
-  )
 
   out <- as_tibble(plot_dat) |>
-    mutate(
-      mgi_ukb = mgi_prev_unweighted / ukb_prev_unweighted,
-      aou_ukb = aou_prev_unweighted / ukb_prev_unweighted
-    ) |>
-    select(phecode, mgi_aou, ukb_aou, mgi_ukb, aou_ukb) |>
+    select(phecode, mgi_aou, ukb_aou, mgi_ukb, aou_ukb, mgi_pr, ukb_pr, aou_pr) |>
     pivot_longer(cols = -1) |>
     filter(name == ratio_var) |>
     left_join(
@@ -249,11 +235,8 @@ prevalence_ratio_plot <- function(prevalence_data,
     coord_cartesian(ylim = c(min(breaks), max(breaks))) +
     labs(
       x = "",
-      y = paste0("Prevalence ratios (", coh1, " / ", coh2, ")"),
-      title = str_wrap(paste0(
-        "Boxplots of phecode prevalence ratios in ",
-        full_coh1, " and ", full_coh2
-      ), width = 75)
+      y = y_axis_label,
+      title = str_wrap(title_text, width = 75)
     ) +
     theme_half_open() +
     theme(
@@ -274,22 +257,90 @@ prevalence_ratio_plot <- function(prevalence_data,
   return(out)
 }
 
-prevalence_ratio_plot(
+mgi_aou_plot <- prevalence_ratio_plot(
   prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode unweighted prevalence ratios in Michigan Genomics Initiative and All of Us",
+  y_axis_label = "Prevelance ratio (MGI / AOU)",
   ratio_var = "mgi_aou",
   savefile = "~/Downloads/mgi_aou_prevalence_plot.pdf"
 )
 
-prevalence_ratio_plot(
+aou_ukb_plot <- prevalence_ratio_plot(
   prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode unweighted prevalence ratios in All of Us and UK Biobank",
+  y_axis_label = "Prevelance ratio (AOU / UKB)",
   ratio_var = "aou_ukb",
-  breaks = 1 * 10^c(-2, -1, 0, 1, 3),
+  breaks = 1 * 10^c(-3, -2, -1, 0, 1, 3),
   savefile = "~/Downloads/aou_ukb_prevalence_plot.pdf"
 )
 
-prevalence_ratio_plot(
+mgi_ukb_plot <- prevalence_ratio_plot(
   prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode unweighted prevalence ratios in Michigan Genomics Initiative and UK Biobank",
+  y_axis_label = "Prevelance ratio (MGI / UKB)",
   ratio_var = "mgi_ukb",
   breaks = 1 * 10^c(-1, 0, 1, 3),
   savefile = "~/Downloads/mgi_ukb_prevalence_plot.pdf"
+)
+
+patched <- (mgi_aou_plot + labs(title = "MGI / AOU") + theme(axis.text.x = element_blank())) /
+  (aou_ukb_plot + labs(title = "AOU / UKB") + theme(axis.text.x = element_blank())) /
+  (mgi_ukb_plot + labs(title = "MGI / UKB"))
+
+patched2 <- patched +
+  plot_annotation(
+    # title = "Boxplots of unweighted phecode prevalence ratios in All of Us, the Michigan Genomics Initiative, and UK Biobank",
+    tag_levels = "A"
+  )
+
+ggsave(
+  plot = patched2,
+  filename = "~/Downloads/patched_unweighted_pr_plot.pdf",
+  width = 7, height = 7 * 1.68,
+  device = cairo_pdf
+)
+
+
+mgi_pr_plot <- prevalence_ratio_plot(
+  prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode weighted / unweighted prevalence ratios in Michigan Genomics Initiative",
+  y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
+  ratio_var = "mgi_pr",
+  breaks = 1 * 10^c(-1, 0, 1),
+  savefile = "~/Downloads/mgi_w_prevalence_plot.pdf"
+)
+
+ukb_pr_plot <- prevalence_ratio_plot(
+  prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode weighted / unweighted prevalence ratios in UK Biobank",
+  y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
+  ratio_var = "ukb_pr",
+  breaks = 1 * 10^c(-1, 0, 1),
+  savefile = "~/Downloads/ukb_w_prevalence_plot.pdf"
+)
+
+aou_pr_plot <- prevalence_ratio_plot(
+  prevalence_data = plot_dat,
+  title_text = "Boxplots of phecode weighted / unweighted prevalence ratios in All of Us",
+  y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
+  ratio_var = "aou_pr",
+  breaks = 1 * 10^c(-1, 0, 1),
+  savefile = "~/Downloads/aou_w_prevalence_plot.pdf"
+)
+
+patched3 <- (aou_pr_plot + labs(title = "All of Us") + theme(axis.text.x = element_blank())) /
+  (mgi_pr_plot + labs(title = "Michigan Genomics Initiative") + theme(axis.text.x = element_blank())) /
+  (ukb_pr_plot + labs(title = "UK Biobank"))
+
+patched4 <- patched3 +
+  plot_annotation(
+    # title = "Boxplots of weighted vs unweighted phecode prevalence ratios in All of Us, the Michigan Genomics Initiative, and UK Biobank",
+    tag_levels = "A"
+  )
+
+ggsave(
+  plot = patched4,
+  filename = "~/Downloads/patched_weighted_pr_plot.pdf",
+  width = 7, height = 7 * 1.68,
+  device = cairo_pdf
 )
