@@ -1,6 +1,8 @@
 suppressPackageStartupMessages({
   library(ggnetwork)
   library(network)
+  library(data.table)
+  library(cli)
 })
 
 phenome_partial_correlation_network <- function(
@@ -8,34 +10,42 @@ phenome_partial_correlation_network <- function(
     from_var   = "phe1",
     to_var     = "phe2",
     cor_var    = "estimate",
+    prev_var   = "prev_unweighted",
     thresh     = 0.3,
     savefile   = NULL,
     out_width  = 12,
     out_height = 8,
     plot_title = NULL,
-    prevs) {
+    prevs
+) {
     # initialize
-    vars <- c(from_var, to_var, cor_var)
-    edges <- as.data.table(x)[, ..vars]
+    vars         <- c(from_var, to_var, cor_var)
+    edges        <- as.data.table(x)[, ..vars]
     names(edges) <- c("from", "to", "Freq")
-    edges <- as.data.frame(edges[!is.na(Freq), ][abs(Freq) >= thresh, ])
-    message(paste0("plotting correlations with absolute value >= ", thresh, " (n = ", nrow(edges), ")"))
-    edges[, 1] = as.character(edges[, 1])
-    edges[, 2] = as.character(edges[, 2])
-    if (is.null(plot_title)) { plot_title <- "Correlations" }
+    edges        <- as.data.frame(edges[!is.na(Freq), ][abs(Freq) >= thresh, ])
+    cli_alert_info(paste0("plotting correlations with absolute value >= ", thresh, " (n = ", nrow(edges), ")"))
+    edges[, 1] <- as.character(edges[, 1])
+    edges[, 2] <- as.character(edges[, 2])
+    if (is.null(plot_title)) plot_title <- "Correlations"
 
-    net = network(edges, directed = FALSE, matrix.type = 'edgelist')
+    net <- network(edges, directed = FALSE, matrix.type = 'edgelist')
     network::set.edge.attribute(net, "Correlation", edges$Freq)
-    nodecol = groupcol = prevcol = cormag = vertexnames= codenames=c()
-    phecode_info <- PheWAS::pheinfo
-    for(i in 1:length(net$val)){
-        code = net$val[[i]]$vertex.names
-        nodecol = c(nodecol, phecode_info[paste0('X',phecode_info$phecode) == code,]$color)
-        groupcol = c(groupcol, phecode_info[paste0('X',phecode_info$phecode) == code,]$group)
-        prevcol = c(prevcol, prevs[phecode == code, prev])
-        vertexnames = c(vertexnames,phecode_info$description[paste0('X', phecode_info$phecode) == code])
-        codenames = c(codenames,code)
+    nodecol = groupcol = prevcol = cormag = vertexnames = codenames = c()
+    phecode_info <- as.data.table(PheWAS::pheinfo)[, !c("color")]
+    alt_phe_cols <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/phecat_alt_colors.txt",
+                          showProgress = FALSE)
+    phecode_info <- merge.data.table(phecode_info, alt_phe_cols, by = "group", all.x = TRUE)
+    cli_progress_bar(name = "preparing data for network plot", total = length(net$val))
+    for(i in seq_along(net$val)){
+        code        <- net$val[[i]]$vertex.names
+        nodecol     <- c(nodecol, phecode_info[paste0('X', phecode_info$phecode) == code, ]$color)
+        groupcol    <- c(groupcol, phecode_info[paste0('X', phecode_info$phecode) == code, ]$group)
+        prevcol     <- c(prevcol, prevs[phecode == code, get(prev_var)])
+        vertexnames <- c(vertexnames, phecode_info$description[paste0('X', phecode_info$phecode) == code])
+        codenames   <- c(codenames, code)
+        cli_progress_update()
     }
+    cli_progress_done()
 
     net %v% "Category"    <- groupcol
     net %v% "colors"      <- nodecol
@@ -47,7 +57,7 @@ phenome_partial_correlation_network <- function(
         geom_edges(color = "grey50" ) +
         #geom_edges(aes(size =edgeval/100), show.legend= FALSE) +
         geom_nodes(mapping = aes(color = Category, size =  Prevalence)) +
-        scale_color_manual(values=unique(nodecol))+
+        scale_color_manual(values = unique(nodecol))+
         labs(
             color   = "Disease Category",
             title   = plot_title,
@@ -68,7 +78,7 @@ phenome_partial_correlation_network <- function(
             width    = out_width,
             height   = out_height
         )
-        message(paste0("plot saved to ", savefile))
+        cli_alert_success(glue("plot saved to {.path {savefile}}"))
     }
 
     return(p)

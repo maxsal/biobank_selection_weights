@@ -3,6 +3,8 @@
 # author:   max salvatore
 # date:     20230418
 
+options(stringsAsFactors = FALSE)
+
 suppressPackageStartupMessages({
   library(data.table)
   library(qs)
@@ -53,7 +55,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_ver
 # data
 mgi <- read_qs(glue(
   "data/private/mgi/{opt$mgi_version}/",
-  "mgi_phenome_partial_correlations_w_geno_pcs_{opt$mgi_version}.qs"
+  "mgi_phenome_partial_correlations_{opt$mgi_version}.qs"
 ))
 mgi_pim <- fread(gsub("_0", "", file_paths[["mgi"]][["pim0_file"]]))
 mgi_cov <- fread(file_paths[["mgi"]][["cov_file"]])
@@ -64,10 +66,11 @@ ukb <- read_qs(glue(
   "data/private/ukb/{opt$ukb_version}/",
   "ukb_phenome_partial_correlations_{opt$ukb_version}.qs"
 ))
-ukb_pim     <- fread(file_paths[["ukb"]][["pim0_file"]])
-ukb_cov     <- fread(file_paths[["ukb"]][["demo_file"]])
-ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSelectionWeights.tab")[, .(id = f.eid, weights = LassoWeight)]
-ukb_pim     <- merge.data.table(ukb_pim, ukb_weights, by.x = "IID", by.y = "id")
+ukb_pim     <- read_qs(file_paths[["ukb"]][["pim0_file"]])
+ukb_cov     <- read_qs(file_paths[["ukb"]][["demo_file"]])
+ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSelectionWeights.tab",
+                     colClasses = "character")[, .(id = f.eid, weights = as.numeric(LassoWeight))]
+ukb_pim     <- merge.data.table(ukb_pim, ukb_weights, by = "id")
 
 pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character", showProgress = FALSE
@@ -129,12 +132,14 @@ phenome_partial_correlation_network(
   x          = mgi,
   savefile   = glue("results/mgi/{opt$mgi_version}/MGI_network.pdf"),
   prevs      = mgi_prevs,
+  prev_var   = "prev_unweighted",
   plot_title = "MGI correlations"
 )
 phenome_partial_correlation_network(
   x          = ukb,
   savefile   = glue("results/ukb/{opt$ukb_version}/UKB_network.pdf"),
   prevs      = ukb_prevs,
+  prev_var   = "prev_unweighted",
   plot_title = "UKB correlations"
 )
 
