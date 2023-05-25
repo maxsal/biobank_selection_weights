@@ -1,3 +1,11 @@
+if (!"ms" %in% as.data.frame(installed.packages())[["Package"]]) remotes::install_github("maxsal/ms")
+suppressPackageStartupMessages({
+  library(ms)
+  library(data.table)
+  library(ggplot2)
+  library(scales)
+})
+
 stacked_pca_plot <- function(x, cohort = "mgi") {
   
   if (!is.data.table(x)) {
@@ -20,12 +28,15 @@ stacked_pca_plot <- function(x, cohort = "mgi") {
     geom_label(data = plot_data[stat == "cum_prop"][order(pc)][value > 0.99][1, ],
                aes(x = pc, y = 0.3, label = paste0("99%: ", format(pc, big.mark = ","))), color = "darkred") +
     geom_line(linewidth = 1) +
+    scale_x_continuous(labels = scales::comma) +
     labs(
       title = "Cumulative proportion of variance explained",
-      x = "Principal component",
-      y = "Variance explained"
+      x     = "Principal component",
+      y     = "Variance explained",
+      caption = paste0("N PCs: ", format(max(plot_data[, pc], na.rm = TRUE), big.mark = ","))
     ) +
-    theme_minimal()
+    theme_ms(font_family = "sans")
+    # theme_minimal()
   
   proportion_plot <- plot_data[stat == "prop"][value > 0.01] |>
     ggplot(aes(x = pc, y = value)) +
@@ -37,10 +48,11 @@ stacked_pca_plot <- function(x, cohort = "mgi") {
       y = "Variance explained",
       caption = "Only showing PCs that explain at least 1% of variance"
     ) +
-    theme_minimal() +
-    theme(
-      plot.caption = element_text(hjust = 0)
-    )
+    theme_ms(font_family = "sans")
+    # theme_minimal() +
+    # theme(
+    #   plot.caption = element_text(hjust = 0)
+    # )
   
   patched <- proportion_plot / cumulative_plot
   
@@ -50,7 +62,7 @@ stacked_pca_plot <- function(x, cohort = "mgi") {
     tag_levels = 'A') &
     theme(
       plot.tag.position = c(0, 0.98),
-      plot.tag = element_text(hjust = 0.5, vjust = 0.5)
+      plot.tag = element_text(hjust = 0.5, vjust = 0.5, face = "bold")
     )
   
 }
