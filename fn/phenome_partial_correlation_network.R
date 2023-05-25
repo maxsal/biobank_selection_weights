@@ -16,7 +16,9 @@ phenome_partial_correlation_network <- function(
     out_width  = 12,
     out_height = 8,
     plot_title = NULL,
-    prevs
+    prevs,
+    show_color_legend = NULL,
+    show_size_legend  = NULL
 ) {
     # initialize
     vars         <- c(from_var, to_var, cor_var)
@@ -57,7 +59,10 @@ phenome_partial_correlation_network <- function(
         geom_edges(color = "grey50" ) +
         #geom_edges(aes(size =edgeval/100), show.legend= FALSE) +
         geom_nodes(mapping = aes(color = Category, size =  Prevalence)) +
-        scale_color_manual(values = unique(nodecol))+
+        scale_color_manual(values = unique(nodecol)) +
+        guides(
+            col = show_color_legend
+        ) +
         labs(
             color   = "Disease Category",
             title   = plot_title,
