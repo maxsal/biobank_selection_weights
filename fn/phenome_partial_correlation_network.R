@@ -61,7 +61,8 @@ phenome_partial_correlation_network <- function(
         geom_nodes(mapping = aes(color = Category, size =  Prevalence)) +
         scale_color_manual(values = unique(nodecol)) +
         guides(
-            col = show_color_legend
+            col  = show_color_legend,
+            size = show_size_legend
         ) +
         labs(
             color   = "Disease Category",
