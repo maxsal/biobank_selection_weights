@@ -108,7 +108,7 @@ ggsave(
 
 ## ukb
 ### calculate
-ukb_pca <- prcomp(short_ukb_pim, center = FALSE, scale. = FALSE)
+ukb_pca     <- prcomp(short_ukb_pim, center = FALSE, scale. = FALSE)
 ukb_pca_sum <- summary(ukb_pca)$importance
 ### save data
 save_qs(
