@@ -17,7 +17,6 @@ set.seed(61787)
 
 for (i in list.files("fn/", full.names = TRUE)) source(i)
 
-
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome",
@@ -47,10 +46,10 @@ option_list <- list(
     )
   ),
   make_option("--weights",
-    type = "character", default = "all",
+    type = "character", default = "selection",
     help = glue(
       "Weighting variable to use for weighted analyses - ",
-      "no_cancer_ipw, cancer_indirect_ipw, no_cancer_postw, cancer_postw or all [default = %default]"
+      "selection, all, or list of named weight variables [default = %default]"
     )
   )
 )
@@ -87,13 +86,15 @@ mgi_covariates <- read_qs(glue(
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_{opt$mgi_cohort}.qs"))
 
 ## phenome
-pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
-  colClasses = "character"
+pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+  colClasses = "character", showProgress = FALSE
 )
 
 # weights ----------------------------------------------------------------------
 if (opt$weights == "all") {
   weight_vars <- names(mgi_weights)[!names(mgi_weights) %in% c("id", "DeID_PatientID")]
+} else if (opt$weights == "selection") {
+  weight_vars <- grep("selection_c", names(mgi_weights), value = TRUE)
 } else {
   weight_vars <- unlist(strsplit(opt$weights, ","))
 }
@@ -101,7 +102,7 @@ if (opt$weights == "all") {
 # cooccurrence analysis --------------------------------------------------------
 out <- list()
 for (w in seq_along(weight_vars)) {
-  message(glue("cooccurrence using {weight_vars[w]}..."))
+  cli_alert(glue("cooccurrence using {weight_vars[w]} [{w}/{length(weight_vars)}]..."))
 
   out[[w]] <- lapply(
     seq_along(time_thresholds),

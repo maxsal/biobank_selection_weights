@@ -12,11 +12,12 @@ suppressPackageStartupMessages({
   library(qs)
   library(optparse)
   library(EValue)
+  library(cli)
 })
 
 set.seed(61787)
 
-for (i in list.files("fn/", full.names = TRUE)) source(i)
+for (i in list.files("./fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
@@ -106,14 +107,14 @@ ukb_covariates <- read_qs(
 )
 
 ## phenome
-pheinfo <- fread("data/public/Phecode_Definitions_FullTable_Modified.txt",
-  colClasses = "character"
+pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
+  colClasses = "character", showProgress = FALSE
 )
 
 # cooccurrence analysis --------------------------------------------------------
 ## mgi
 mgi_results <- list()
-pb <- txtProgressBar(max = length(time_thresholds), width = 50, style = 3)
+cli_progress_bar(name = "MGI PheWAS", total = length(time_thresholds))
 for (i in seq_along(time_thresholds)) {
   mgi_results[[i]] <- output_cooccurrence_results(
     pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
@@ -124,14 +125,14 @@ for (i in seq_along(time_thresholds)) {
     model_type   = opt$mod_type,
     parallel     = TRUE
   )
-  setTxtProgressBar(pb, i)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 names(mgi_results) <- glue("t{time_thresholds}")
 
 ## ukb
 ukb_results <- list()
-pb <- txtProgressBar(max = length(time_thresholds), width = 50, style = 3)
+cli_progress_bar(name = "UKB PheWAS", total = length(time_thresholds))
 for (i in seq_along(time_thresholds)) {
   ukb_results[[i]] <- output_cooccurrence_results(
     pim_data     = ukb_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
@@ -142,9 +143,9 @@ for (i in seq_along(time_thresholds)) {
     model_type   = opt$mod_type,
     parallel     = TRUE
   )
-  setTxtProgressBar(pb, i)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 names(ukb_results) <- glue("t{time_thresholds}")
 
 # save results -----------------------------------------------------------------
@@ -171,3 +172,5 @@ for (i in seq_along(time_thresholds)) {
     )
   )
 }
+
+cli_alert_success("script complete! 🎉🎉🎉")
