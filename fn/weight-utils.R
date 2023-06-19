@@ -198,12 +198,12 @@ poststratification <- function(
   }
   
   # smoking prevalence by age (us)
-  # https://www.cdc.gov/nchs/fastats/heart-disease.htm
+  # https://www.cdc.gov/tobacco/data_statistics/fact_sheets/adult_data/cig_smoking/index.htm
   # youngest group will have no people, no number provided in documentation
   if ("smoke" %in% covs) {
     smoke_prevalence <- age_grp_table(
       lower_ages   = c(0, 18, 25, 45, 65),
-      num_vec      = c(0.01, 0.074, 0.141, 0.149, 0.09),
+      num_vec      = c(0, 0.053, 0.126, 0.149, 0.083),
       num_var_name = "prevalence"
     )
     
