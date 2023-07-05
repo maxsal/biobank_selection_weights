@@ -33,6 +33,7 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     ukb_pim0_file        <- "/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/20221117/UKB_PHENOME_PIM0_20221117.qs"
     ukb_phecode_dsb_file <- "/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/20221117/UKB_PHECODE_DSB_MAPPED_20221117.qs"
     ukb_demo_file        <- "/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/20221117/UKB_PHENOME_COV_20221117.qs"
+    ukb_weights_file     <- "/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSelectionWeights.tab"
   }
 
   mgi_out <- list(
@@ -56,7 +57,8 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     "ukb" = list(
       pim0_file          = ukb_pim0_file,
       icd_phecode_file   = ukb_phecode_dsb_file,
-      demo_file          = ukb_demo_file
+      demo_file          = ukb_demo_file,
+      weight_file        = ukb_weights_file
     )
   )
 }

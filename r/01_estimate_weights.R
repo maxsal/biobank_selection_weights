@@ -13,6 +13,7 @@ suppressPackageStartupMessages({
   library(simplexreg)
   library(data.table)
   library(glue)
+  library(cli)
   library(qs)
   library(optparse)
 })
@@ -62,8 +63,8 @@ data_path <- glue("data/private/mgi/{opt$cohort_version}/")
 for (i in list.files("fn", full.names = TRUE)) source(i)
 
 # load data --------------------------------------------------------------------
-message("loading data...")
-mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))
+cli_alert("loading data...")
+mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, nhw := nhanes_nhw]
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
 nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
@@ -74,7 +75,7 @@ nhanes_merged <- download_nhanes_data(
 )
 
 keep_vars <- c(
-  "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "MCQ220",
+  "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
   "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020"
 )
@@ -107,7 +108,7 @@ stacked <- rbindlist(list(
 ), use.names = TRUE, fill = TRUE)
 
 # estimate ipw and postratification weights ------------------------------------
-message("estimating ipw weights...")
+cli_alert("estimating ipw weights...")
 
 ip_weights_list <- list(
   "simple" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
@@ -145,40 +146,46 @@ ip_weights_list <- list(
 )
 
 ip_weights <- list()
-pb <- txtProgressBar(max = length(names(ip_weights_list)), width = 50, style = 3)
+cli_progress_bar(name = "estimating ipw weights", total = length(names(ip_weights_list)))
 for (i in seq_along(names(ip_weights_list))) {
   tmp_weights <- ipw(stacked_data = stacked,
                      covs = ip_weights_list[[names(ip_weights_list)[i]]])
   setnames(tmp_weights, "ip_weight", paste0("ip_", names(ip_weights_list)[i]))
   ip_weights[[i]] <- tmp_weights
-  setTxtProgressBar(pb, i)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 
 ipws <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), ip_weights)
 
-message("estimating poststratification weights...")
+cli_alert("estimating poststratification weights...")
 post_weights_list <- list(
-  "selection"    = c("smoke", "cad", "diabetes"),
-  "selection_c"  = c("smoke", "cad", "diabetes", "cancer"),
-  "selection_f"  = c("smoke", "cad", "diabetes", "cancer", "female"),
-  "nhw"          = c("smoke", "cad", "diabetes", "cancer", "nhw"),
-  "nhw_f"        = c("smoke", "cad", "diabetes", "cancer", "nhw", "female"),
-  "depression"   = c("smoke", "cad", "diabetes", "cancer", "depression"),
-  "diabetes"     = c("smoke", "cad", "diabetes", "cancer", "diabetes"),
-  "hypertension" = c("smoke", "cad", "diabetes", "cancer", "hypertension")
+  "selection"    = c("smoker", "cad", "diabetes"),
+  "selection_c"  = c("smoker", "cad", "diabetes", "cancer"),
+  "selection_f"  = c("smoker", "cad", "diabetes", "cancer", "female"),
+  "nhw"          = c("smoker", "cad", "diabetes", "cancer", "nhw"),
+  "nhw_f"        = c("smoker", "cad", "diabetes", "cancer", "nhw", "female"),
+  "depression"   = c("smoker", "cad", "diabetes", "cancer", "depression"),
+  "diabetes"     = c("smoker", "cad", "diabetes", "cancer", "diabetes"),
+  "hypertension" = c("smoker", "cad", "diabetes", "cancer", "hypertension")
 )
 
 post_weights <- list()
-pb <- txtProgressBar(max = length(names(post_weights_list)), width = 50, style = 3)
+cli_progress_bar(name = "estimating poststratification weights", total = length(names(post_weights_list)))
 for (i in seq_along(names(post_weights_list))) {
-  tmp_weights <- poststratification(mgi_data = mgi, chop = TRUE, nhw_var = "nhanes_nhw",
-                                    covs = post_weights_list[[names(post_weights_list)[i]]])
+  tmp_weights <- poststrat_nhanes(
+    int_data       = mgi,
+    nhanes_data    = prepped_nhanes,
+    chop           = TRUE,
+    age_bin        = TRUE,
+    age_bin_breaks = c(seq(0, 80, 10), 150),
+    covs           = post_weights_list[[names(post_weights_list)[i]]]
+  )
   setnames(tmp_weights, "ps_weight", paste0("ps_", names(post_weights_list)[i]))
   post_weights[[i]] <- tmp_weights
-  setTxtProgressBar(pb, i)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 
 posts <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), post_weights)
 
@@ -186,7 +193,7 @@ weights <- merge.data.table(ipws, posts, by = "id")
 merged  <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, ipws, posts))
 
 # estimate cancer~female log(OR) -----------------------------------------------
-message("estimating cancer~female log(OR) as sanity check...")
+cli_alert("estimating cancer~female log(OR) as sanity check...")
 
 extract_estimates <- function(
   outcome,
@@ -237,6 +244,7 @@ extract_estimates <- function(
 
 est_out <- list()
 weight_vars <- names(weights)[names(weights) != "id"]
+cli_progress_bar(name = "estimating cancer~female log(OR)", total = length(weight_vars))
 pb <- txtProgressBar(max = length(weight_vars),
                      width = 50, style = 3)
 for (i in seq_along(weight_vars)) {
@@ -246,9 +254,10 @@ for (i in seq_along(weight_vars)) {
     data     = merged,
     weights  = weight_vars[i]
   )
-  setTxtProgressBar(pb, i)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
+
 est_out[[i+1]] <- extract_estimates(
         outcome  = "cancer",
         exposure = 'as.numeric(Sex == "F")',
@@ -269,4 +278,4 @@ save_qs(
   file = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
 )
 
-message(glue("script success! see {data_path} and suffix {opt$mgi_cohort}"))
+cli_alert_success("script success! see {.path {data_path}} and suffix {opt$mgi_cohort} 🥳")

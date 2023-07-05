@@ -78,15 +78,15 @@ file_paths <- get_files(
 )
 
 ## check that outcome exists in both datasets
-message("checking that outcome exists in both phenomes...")
+cli_alert("checking that outcome exists in both phenomes...")
 mgi_pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
-ukb_pim0 <- fread(file_paths[["ukb"]][["pim0_file"]])
+ukb_pim0 <- qread(file_paths[["ukb"]][["pim0_file"]])
 
 if (paste0("X", gsub("X", "", opt$outcome)) %in% names(mgi_pim0) &
   paste0("X", gsub("X", "", opt$outcome)) %in% names(ukb_pim0)) {
-  message("outcome exists! procceeding...")
+  cli_alert_success("outcome exists! procceeding...")
 } else {
-  message("outcome does not exist in both datasets! stopping...")
+  cli_alert_danger()("outcome does not exist in both datasets! stopping...")
   stop(paste0(
     "outcome phecode ", opt$outcome, " does not exist in ",
     fcase(
@@ -103,8 +103,8 @@ setnames(mgi_pim0,
   new = c("id", "outcome")
 )
 setnames(ukb_pim0,
-  old = c("IID", paste0("X", gsub("X", "", opt$outcome))),
-  new = c("id", "outcome")
+  old = paste0("X", gsub("X", "", opt$outcome)),
+  new = "outcome"
 )
 
 ## confirm file structure for a given outcome exists - if not, create paths
@@ -124,7 +124,7 @@ check_folder_structure(
 
 # 4. read data -----------------------------------------------------------------
 ## mgi
-message("loading mgi data...")
+cli_alert("loading mgi data...")
 ### demographics
 mgi_cov <- read_qs(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.qs"))
 setnames(mgi_cov,
@@ -150,26 +150,14 @@ mgi_first_phe <- mgi_full_phe[
 ]
 
 ## ukb
-message("loading ukb data...")
+cli_alert("loading ukb data...")
 ### demographics
-ukb_demo <- fread(file_paths[["ukb"]][["demo_file"]],
-  na.strings = c("", "NA", "."),
-  colClass = "character"
-)
-ukb_demo <- ukb_demo[, .(
-  id   = as.character(id),
-  dob  = as.Date(dob),
-  age  = floor(as.numeric(as.Date("2022-11-17") - as.Date(dob)) / 365.25),
-  ethn = ethnicity,
-  sex
-)]
+ukb_demo <- qread(file_paths[["ukb"]][["demo_file"]])
+ukb_demo <- ukb_demo[, .(id, age = age_at_consent, ethn = race_eth, sex)]
 ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
 
 ### icd-phecode data
-ukb_full_phe <- fread(file_paths[["ukb"]][["icd_phecode_file"]])
-if ("IID" %in% names(ukb_full_phe)) setnames(ukb_full_phe, "IID", "id")
-if ("DaysSinceBirth" %in% names(ukb_full_phe)) setnames(ukb_full_phe, "DaysSinceBirth", "dsb")
-ukb_full_phe[, id := as.character(id)]
+ukb_full_phe <- qread(file_paths[["ukb"]][["icd_phecode_file"]])
 ukb_first_phe <- ukb_full_phe[
   ukb_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
 ]
@@ -185,14 +173,14 @@ ukb_case_ids <- ukb_case[, unique(id)]
 
 # 6. calculate diagnostic metrics ----------------------------------------------
 ## mgi
-message("calculating diagnostic metrics in mgi...")
+cli_alert("calculating diagnostic metrics in mgi...")
 mgi_cov[, `:=`(
   female = as.numeric(sex == "F"),
   case = fifelse(id %in% mgi_case_ids, 1, 0)
 )]
 
 ## ukb
-message("calculating diagnostic metrics in ukb...")
+cli_alert("calculating diagnostic metrics in ukb...")
 ukb_diag_metrics <- get_icd_phecode_metrics(
   full_phe_data = ukb_first_phe
 )[, id := as.character(id)]
@@ -204,7 +192,7 @@ ukb_matching_cov <- merge.data.table(
 
 # 7. perform matching ----------------------------------------------------------
 ## mgi
-message(glue(
+cli_alert(glue(
   "performing 1:{opt$matching_ratio} case:non-case ",
   "matching in mgi..."
 ))
@@ -275,7 +263,7 @@ save_qs(
 )
 
 ## ukb
-message(glue(
+cli_alert(glue(
   "performing 1:{opt$matching_ratio} case:non-case ",
   "matching in ukb..."
 ))
@@ -337,7 +325,7 @@ save_qs(
 
 # 8. create time-restricted phenomes -------------------------------------------
 ## mgi
-message("constructing time-restricted phenomes in mgi...")
+cli_alert("constructing time-restricted phenomes in mgi...")
 mgi_matched_phe <- merge.data.table(
   mgi_first_phe[id %in% mgi_post_match_cov[, id]],
   mgi_post_match_cov,
@@ -367,7 +355,7 @@ for (i in 1:length(mgi_pims)) {
 }
 
 ## ukb
-message("constructing time-restricted phenomes in ukb...")
+cli_alert("constructing time-restricted phenomes in ukb...")
 ukb_matched_phe <- merge.data.table(
   ukb_first_phe[id %in% ukb_post_match_cov[, id]],
   ukb_post_match_cov,
@@ -395,4 +383,4 @@ for (i in 1:length(ukb_pims)) {
   )
 }
 
-message("script success!")
+cli_alert("script success! 🎉")
