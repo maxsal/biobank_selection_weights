@@ -20,8 +20,8 @@ calculate_weighted_prevalences <- function(
 ) {
     
     # initialize
-    if (!is.data.table(pim_data)) { pim_data <- as.data.table(pim_data) }
-    if (!is.data.table(cov_data)) { cov_data <- as.data.table(cov_data) }
+    if (!is.data.table(pim_data)) pim_data <- as.data.table(pim_data)
+    if (!is.data.table(cov_data)) cov_data <- as.data.table(cov_data)
     if (!weight_var %in% names(pim_data)) {
         message(paste0(weight_var), " not found in pim_data. looking in cov_data")
         if (!weight_var %in% names(cov_data)) {
@@ -56,7 +56,7 @@ calculate_weighted_prevalences <- function(
 
     # fill out count and length
     if (verbose) cli_alert("phecodes for both sexes...")
-    both_design <- svydesign(ids = ~1, data = pim_data, weights = ~ get(weight_var))
+    both_design <- svydesign(ids = ~1, data = pim_data, weights = ~get(weight_var))
     both_out <- mclapply(
         both,
         \(x) {
