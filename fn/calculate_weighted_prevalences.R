@@ -16,7 +16,7 @@ calculate_weighted_prevalences <- function(
     female_val   = "F",
     pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
     verbose      = TRUE,
-    n_cores      = detectCores() / 4
+    n_cores      = parallelly::availableCores() / 4
 ) {
     
     # initialize
