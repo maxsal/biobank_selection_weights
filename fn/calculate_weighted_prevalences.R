@@ -3,6 +3,10 @@ suppressPackageStartupMessages({
   library(survey)
   library(cli)
   library(parallel)
+  library(future)
+  library(parallelly)
+  library(doFuture)
+  library(foreach)
 })
 
 calculate_weighted_prevalences <- function(
@@ -16,7 +20,8 @@ calculate_weighted_prevalences <- function(
     female_val   = "F",
     pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
     verbose      = TRUE,
-    n_cores      = parallelly::availableCores() / 4
+    n_cores      = parallelly::availableCores() / 4,
+    parallelize  = NULL
 ) {
     
     # initialize
@@ -36,7 +41,7 @@ calculate_weighted_prevalences <- function(
     pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
     # identify sex specific phecodes
     both   <- pheinfo[sex == "Both", paste0("X", phecode)]
-    male   <- pheinfo[sex == "Male", paste0("X", phecode)]
+    male <- pheinfo[sex == "Male", paste0("X", phecode)]
     female <- pheinfo[sex == "Female", paste0("X", phecode)]
 
     # list ids by sex
@@ -57,60 +62,139 @@ calculate_weighted_prevalences <- function(
     # fill out count and length
     if (verbose) cli_alert("phecodes for both sexes...")
     both_design <- svydesign(ids = ~1, data = pim_data, weights = ~get(weight_var))
-    both_out <- mclapply(
-        both,
-        \(x) {
-            if (!x %in% names(pim_data)) {
-                data.table()
-            } else {
+    if (is.null(parallelize)) {
+        both <- both[both %in% names(pim_data)]
+        both_out <- list()
+        cli_progress_bar(total = length(both), name = "both sexes")
+        for (i in seq_along(both)) {
+            tmp <- svymean(as.formula(paste0("~`", both[i], "`")), design = both_design, na.rm = TRUE)
+            both_out[[i]] <- data.table(
+                phecode = both[i],
+                prev    = tmp[1],
+                se      = SE(tmp)[1]
+            )
+            cli_progress_update()
+        }
+        cli_progress_done()
+    } else if (parallelize %in% c("parallel", "mclapply")) {
+        both_out <- mclapply(
+            both,
+            \(x) {
+                if (!x %in% names(pim_data)) {
+                    data.table()
+                } else {
+                tmp <- svymean(as.formula(paste0("~`", x, "`")), design = both_design, na.rm = TRUE)
+                data.table(
+                    phecode = x,
+                    prev    = tmp[1],
+                    se      = SE(tmp)[1]
+                )
+                }
+            },
+            mc.cores = n_cores
+        )
+    } else if (parallelize %in% c("foreach", "future")) {
+        plan(multisession, workers = n_cores)
+        both <- both[both %in% names(pim_data)]
+        both_out <- foreach(x = both) %dofuture% {
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = both_design, na.rm = TRUE)
             data.table(
                 phecode = x,
                 prev    = tmp[1],
                 se      = SE(tmp)[1]
             )
-            }
-        },
-        mc.cores = n_cores
-    )
+        }
+    }
 
     if (verbose) cli_alert("phecodes for males...")
     male_design <- svydesign(ids = ~1, data = male_pim_data, weights = ~get(weight_var))
-    male_out <- mclapply(
-        male,
-        \(x) {
-            if (!x %in% names(pim_data)) {
-                data.table()
-            } else {
-                tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
-                data.table(
-                    phecode = x,
-                    prev    = tmp[1],
-                    se      = SE(tmp)[1]
-                )
-            }
-        },
-        mc.cores = n_cores
-    )
+    if (is.null(parallelize)) {
+        male <- male[male %in% names(pim_data)]
+        male_out <- list()
+        cli_progress_bar(total = length(male), name = "male sex")
+        for (i in seq_along(male)) {
+            tmp <- svymean(as.formula(paste0("~`", male[i], "`")), design = male_design, na.rm = TRUE)
+            male_out[[i]] <- data.table(
+                phecode = male[i],
+                prev    = tmp[1],
+                se      = SE(tmp)[1]
+            )
+            cli_progress_update()
+        }
+        cli_progress_done()
+    } else if (parallelize %in% c("parallel", "mclapply")) {
+        male_out <- mclapply(
+            male,
+            \(x) {
+                if (!x %in% names(pim_data)) {
+                    data.table()
+                } else {
+                    tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
+                    data.table(
+                        phecode = x,
+                        prev    = tmp[1],
+                        se      = SE(tmp)[1]
+                    )
+                }
+            },
+            mc.cores = n_cores
+        )
+    } else if (parallelize %in% c("foreach", "future")) {
+        male <- male[male %in% names(pim_data)]
+        male_out <- foreach(x = male) %dofuture% {
+            tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
+            data.table(
+                phecode = x,
+                prev    = tmp[1],
+                se      = SE(tmp)[1]
+            )
+        }
+    }
 
     if (verbose) cli_alert("phecodes for females...")
     female_design <- svydesign(ids = ~1, data = female_pim_data, weights = ~get(weight_var))
-    female_out <- mclapply(
-        female,
-        \(x) {
-            if (!x %in% names(pim_data)) {
-                data.table()
-            } else {
-                tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
-                data.table(
-                    phecode = x,
-                    prev    = tmp[1],
-                    se      = SE(tmp)[1]
-                )
-            }
-        },
-        mc.cores = n_cores
-    )
+    if (is.null(parallelize)) {
+        female <- female[female %in% names(pim_data)]
+        female_out <- list()
+        cli_progress_bar(total = length(female), name = "female sex")
+        for (i in seq_along(female)) {
+            tmp <- svymean(as.formula(paste0("~`", female[i], "`")), design = female_design, na.rm = TRUE)
+            female_out[[i]] <- data.table(
+                phecode = female[i],
+                prev    = tmp[1],
+                se      = SE(tmp)[1]
+            )
+            cli_progress_update()
+        }
+        cli_progress_done()
+    } else if (parallelize %in% c("parallel", "mclapply")) {
+        female_out <- mclapply(
+            female,
+            \(x) {
+                if (!x %in% names(pim_data)) {
+                    data.table()
+                } else {
+                    tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
+                    data.table(
+                        phecode = x,
+                        prev    = tmp[1],
+                        se      = SE(tmp)[1]
+                    )
+                }
+            },
+            mc.cores = n_cores
+        )
+    } else if (parallelize %in% c("foreach", "future")) {
+        female <- female[female %in% names(pim_data)]
+        female_out <- foreach(x = female) %dofuture% {
+            tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
+            data.table(
+                phecode = x,
+                prev    = tmp[1],
+                se      = SE(tmp)[1]
+            )
+        }
+    }
 
     # calculate prevalence
     out <- rbindlist(list(
