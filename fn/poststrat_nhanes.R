@@ -22,7 +22,7 @@ poststrat_nhanes <- function(
         cli_alert("constructing categorical age variable using breaks: {age_bin_breaks}")
         covs <- unique(c(covs, "age_bin"))
     }
-    cli_alert_info("estimating poststratification weights for covariates: {covs}")
+    cli_alert_info("estimating poststratification weights for covariates: {.field {covs}}")
     if (chop) cli_alert_info("truncating weights to 2.75 and 97.5 percentiles")
 
     # 1. load and prep nhanes data ----------------------------------------------

@@ -2,6 +2,7 @@ suppressPackageStartupMessages({
   library(data.table)
   library(survey)
   library(cli)
+  library(parallel)
 })
 
 calculate_weighted_prevalences <- function(
