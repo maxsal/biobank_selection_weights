@@ -156,7 +156,7 @@ for (i in seq_along(names(ip_weights_list))) {
 }
 cli_progress_done()
 
-ipws <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), ip_weights)
+ipws <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all = TRUE), ip_weights)
 
 cli_alert("estimating poststratification weights...")
 post_weights_list <- list(
@@ -187,10 +187,10 @@ for (i in seq_along(names(post_weights_list))) {
 }
 cli_progress_done()
 
-posts <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), post_weights)
+posts <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all = TRUE), post_weights)
 
 weights <- merge.data.table(ipws, posts, by = "id")
-merged  <- Reduce(\(x, y) merge.data.table(x, y, by = "id"), list(mgi, ipws, posts))
+merged  <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all.x = TRUE), list(mgi, ipws, posts))
 
 # estimate cancer~female log(OR) -----------------------------------------------
 cli_alert("estimating cancer~female log(OR) as sanity check...")

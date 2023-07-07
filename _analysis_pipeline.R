@@ -38,13 +38,16 @@ system(glue("/usr/bin/time -v -o logs/02_unweighted_coccurrence_analysis.txt Rsc
             "02_unweighted_cooccurrence_analysis.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
             "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome}"))
 
-for (w in c("cancer_ipw", "cancer_postw")) {
+for (w in c("ip_selection_c", "ps_nhw_f")) {
   cli_alert_info("running {w} weighted cooccurrence")
   system(glue("/usr/bin/time -v -o logs/02_weighted_cooccurrence_analysis.txt Rscript r/",
               "02_weighted_cooccurrence_analysis.R --mgi_version={mgi_version} ",
               "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome} ",
               "--weights={w}"))
 }
+system(glue("/usr/bin/time -v -o logs/02_ukb_weighted_cooccurrence_analysis.txt Rscript r/",
+            "02_ukb_weighted_cooccurrence_analysis.R --ukb_version={ukb_version} ",
+            "--time_thresholds={paste0(time_thresholds, collapse = ',')} --outcome={outcome}"))
 
 for (i in seq_along(time_thresholds)) {
   cli_alert_info("running random forest at {time_thresholds[i]}")
