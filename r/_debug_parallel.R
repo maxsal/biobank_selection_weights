@@ -2,7 +2,8 @@
 list_of_packages <- c(
     "data.table", "qs", "cli", "glue", "parallelly", "tidyverse",
     "bigrquery", "dplyr", "pracma", "simplexreg", "data.table",
-    "lubridate", "colorblindr", "showtext", "optparse", "parallel", "parallelly"
+    "lubridate", "colorblindr", "showtext", "optparse", "parallel", "parallelly",
+    "tictoc"
 )
 new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[, "Package"])]
 if (length(new_packages)) install.packages(new_packages)
@@ -133,13 +134,20 @@ pim <- merge.data.table(
     by = "person_id"
 )
 
+tic()
 aou_prevs_w <- calculate_weighted_prevalences(
     pim_data    = pim[!is.na(weights), ],
     cov_data    = demo,
+    pim_id_var   = "person_id",
+    cov_id_var   = "id",
+    sex_var = "sex",
+    male_val     = "Male",
+    female_val   = "Female",
     weight      = "weights",
     n_cores     = 2,
     parallelize = "future"
 )
+toc()
 
 print(aou_prevs_w)
 

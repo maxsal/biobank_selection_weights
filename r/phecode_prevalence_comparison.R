@@ -1,23 +1,14 @@
 # libraries --------------------------------------------------------------------
-suppressPackageStartupMessages({
-  library(qs)
-  library(data.table)
-  library(tidyverse)
-  library(glue)
-  library(cowplot)
-  library(htmlwidgets)
-  library(plotly)
-  library(patchwork)
-})
+ms::libri(ms, qs, data.table, tidyverse, glue, cowplot, htmlwidgets, plotly, patchwork)
 
 # load data --------------------------------------------------------------------
-mgi <- qread("~/Downloads/mgi_prevs.qs")
+mgi <- qread("~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/data/mgi_prevs.qs")
 setnames(mgi, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("mgi_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
 
-ukb <- qread("~/Downloads/ukb_prevs.qs")
+ukb <- qread("~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/data/ukb_prevs.qs")
 setnames(ukb, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("ukb_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
 
-aou <- qread("~/Downloads/aou_prevs.qs")
+aou <- qread("~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/data/aou_prevs.qs")
 setnames(aou, c("n", "N", "prev_unweighted", "prev_weighted", "se"), paste0("aou_", c("n", "N", "prev_unweighted", "prev_weighted", "se")))
 
 
@@ -176,14 +167,14 @@ plot_dat <- merge.data.table(
 # save output ------------------------------------------------------------------
 ggsave(
   plot = full_plot,
-  filename = "~/Downloads/full_prev_plot.pdf",
+  filename = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/full_prev_plot.pdf",
   width = 10 * 1.68, height = 10,
   device = cairo_pdf
 )
 
 ggsave(
   plot = zoom_plot,
-  filename = "~/Downloads/zoom_prev_plot.pdf",
+  filename = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/zoom_prev_plot.pdf",
   width = 10 * 1.68, height = 10,
   device = cairo_pdf
 )
@@ -262,7 +253,7 @@ mgi_aou_plot <- prevalence_ratio_plot(
   title_text = "Boxplots of phecode unweighted prevalence ratios in Michigan Genomics Initiative and All of Us",
   y_axis_label = "Prevelance ratio (MGI / AOU)",
   ratio_var = "mgi_aou",
-  savefile = "~/Downloads/mgi_aou_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/mgi_aou_prevalence_plot.pdf"
 )
 
 aou_ukb_plot <- prevalence_ratio_plot(
@@ -271,7 +262,7 @@ aou_ukb_plot <- prevalence_ratio_plot(
   y_axis_label = "Prevelance ratio (AOU / UKB)",
   ratio_var = "aou_ukb",
   breaks = 1 * 10^c(-3, -2, -1, 0, 1, 3),
-  savefile = "~/Downloads/aou_ukb_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/aou_ukb_prevalence_plot.pdf"
 )
 
 mgi_ukb_plot <- prevalence_ratio_plot(
@@ -280,7 +271,7 @@ mgi_ukb_plot <- prevalence_ratio_plot(
   y_axis_label = "Prevelance ratio (MGI / UKB)",
   ratio_var = "mgi_ukb",
   breaks = 1 * 10^c(-1, 0, 1, 3),
-  savefile = "~/Downloads/mgi_ukb_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/mgi_ukb_prevalence_plot.pdf"
 )
 
 patched <- (mgi_aou_plot + labs(title = "MGI / AOU") + theme(axis.text.x = element_blank())) /
@@ -295,7 +286,7 @@ patched2 <- patched +
 
 ggsave(
   plot = patched2,
-  filename = "~/Downloads/patched_unweighted_pr_plot.pdf",
+  filename = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/patched_unweighted_pr_plot.pdf",
   width = 7, height = 7 * 1.68,
   device = cairo_pdf
 )
@@ -307,7 +298,7 @@ mgi_pr_plot <- prevalence_ratio_plot(
   y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
   ratio_var = "mgi_pr",
   breaks = 1 * 10^c(-1, 0, 1),
-  savefile = "~/Downloads/mgi_w_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/mgi_w_prevalence_plot.pdf"
 )
 
 ukb_pr_plot <- prevalence_ratio_plot(
@@ -316,7 +307,7 @@ ukb_pr_plot <- prevalence_ratio_plot(
   y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
   ratio_var = "ukb_pr",
   breaks = 1 * 10^c(-1, 0, 1),
-  savefile = "~/Downloads/ukb_w_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/ukb_w_prevalence_plot.pdf"
 )
 
 aou_pr_plot <- prevalence_ratio_plot(
@@ -325,7 +316,7 @@ aou_pr_plot <- prevalence_ratio_plot(
   y_axis_label = "Prevelance ratio\n(Weighted / Unweighted)",
   ratio_var = "aou_pr",
   breaks = 1 * 10^c(-1, 0, 1),
-  savefile = "~/Downloads/aou_w_prevalence_plot.pdf"
+  savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/aou_w_prevalence_plot.pdf"
 )
 
 patched3 <- (aou_pr_plot + labs(title = "All of Us") + theme(axis.text.x = element_blank())) /
@@ -340,7 +331,7 @@ patched4 <- patched3 +
 
 ggsave(
   plot = patched4,
-  filename = "~/Downloads/patched_weighted_pr_plot.pdf",
+  filename = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/patched_weighted_pr_plot.pdf",
   width = 7, height = 7 * 1.68,
   device = cairo_pdf
 )

@@ -14,7 +14,8 @@ prepare_nhanes_data <- function(
     smoke_ev_var   = "SMQ020",
     smoke_curr_var = "SMQ040",
     diabetes_var   = "DIQ010",
-    race_eth_var   = "RIDRETH1"
+    race_eth_var   = "RIDRETH1",
+    hiv_var        = "LBXHIVC"
 ) {
   
   merged <- nhanes_data
@@ -29,7 +30,7 @@ prepare_nhanes_data <- function(
     get(sex_var) == 2, "Female"
   )]
   
-  yes_no_vars <- c(cancer_var, chd_var, smoke_ev_var)
+  yes_no_vars <- c(cancer_var, chd_var, smoke_ev_var, hiv_var)
   char_vars <- c(smoke_curr_var, diabetes_var, race_eth_var)
   yes_no_recode <- function(x) {
     fcase(
@@ -118,13 +119,14 @@ prepare_nhanes_data <- function(
     female           = as.numeric(merged[, SEX] == "Female"),
     age_cat          = merged[, NHANES_AGECAT],
     race_eth         = merged[, race_eth],
-    nhanes_nhw       = merged[, NHANES_NHW],
+    nhw              = merged[, NHANES_NHW],
     cancer           = as.numeric(merged[, get(cancer_var)] == "Yes"),
     cancer_missing   = as.numeric(is.na(merged[, get(cancer_var)])),
     diabetes         = as.numeric(merged[, DIABETES] == "Yes"),
     diabetes_missing = as.numeric(is.na(merged[, DIABETES])),
     cad              = as.numeric(merged[, get(chd_var)] == "Yes"),
     cad_missing      = as.numeric(is.na(merged[, get(chd_var)])),
+    hiv              = merged[, get(hiv_var)],
     bmi              = merged[, BMXBMI],
     bmi_cat          = merged[, bmi_cat],
     bmi_under        = as.numeric(merged[, NHANES_BMICAT] == 1),
