@@ -139,7 +139,7 @@ wres_list <- ms::fcor(
   verbose  = TRUE
 )
 
-cli_alert_success("wweighted correlation complete! creating output table...")
+cli_alert_success("weighted correlation complete! creating output table...")
 if (is.data.table(res_list)) {
   wres_table <- wres_list
 } else {
