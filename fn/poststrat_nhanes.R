@@ -36,7 +36,7 @@ poststrat_nhanes <- function(
         smoker = ifelse(smoking_former == 1 | smoking_current == 1, 1, 0),
         age_bin = cut(age, c(seq(0, 80, by = 10), 150), right = FALSE)
     )]
-    setnames(phanes, "nhanes_nhw", "nhw")
+    setnames(phanes, "nhanes_nhw", "nhw", skip_absent = TRUE)
 
     if (age_bin == TRUE) {
         phanes[, age_bin := cut(age, age_bin_breaks, right = FALSE)]

@@ -46,7 +46,7 @@ option_list <- list(
     )
   ),
   make_option("--weights",
-    type = "character", default = "selection",
+    type = "character", default = "ps_nhw_f",
     help = glue(
       "Weighting variable to use for weighted analyses - ",
       "selection, all, or list of named weight variables [default = %default]"

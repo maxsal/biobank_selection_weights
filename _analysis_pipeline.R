@@ -1,6 +1,5 @@
 # aim one analysis pipeline
-library(glue)
-library(cli)
+ms::libri(maxsal/ms, glue, cli)
 
 mgi_version     <- "20220822"
 ukb_version     <- "20221117"
@@ -18,11 +17,6 @@ system(glue("/usr/bin/time -v -o logs/00_prepare_mgi_data.txt Rscript r/",
 system(glue("/usr/bin/time -v -o logs/01_pca_analysis.txt Rscript r/",
             "01_pca_analysis.R"))
 
-## calculate partial correlations in MGI
-system(glue("/usr/bin/time -v -o logs/01_mgi_partial_correlations.txt Rscript r/",
-            "01_mgi_partial_correlations.R --mgi_version={mgi_version} ",
-            "--use_geno={use_geno_pcs}"))
-
 ## prepare time-restricted phenomes in MGI and UKB #
 system(glue("/usr/bin/time -v -o logs/01_prepare_phenomes.txt Rscript r/",
             "01_prepare_phenomes.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",
@@ -33,6 +27,13 @@ system(glue("/usr/bin/time -v -o logs/01_estimate_weights.txt Rscript r/",
             "01_estimate_weights.R --cohort_version={mgi_version}"))
 
 ## phase 2 scripts -------------------------------------------------------------
+## calculate partial correlations in MGI
+system(glue(
+  "/usr/bin/time -v -o logs/02_mgi_partial_correlations.txt Rscript r/",
+  "02_mgi_partial_correlations.R --mgi_version={mgi_version} ",
+  "--use_geno={use_geno_pcs}"
+))
+
 cli_alert("running unweighted cooccurrence")
 system(glue("/usr/bin/time -v -o logs/02_unweighted_coccurrence_analysis.txt Rscript r/",
             "02_unweighted_cooccurrence_analysis.R --mgi_version={mgi_version} --ukb_version={ukb_version} ",

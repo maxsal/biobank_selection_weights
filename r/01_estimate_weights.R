@@ -5,18 +5,10 @@
 # date:     20230418
 
 # libraries --------------------------------------------------------------------
-suppressPackageStartupMessages({
-  library(haven)
-  library(survey)
-  library(dplyr)
-  library(pracma)
-  library(simplexreg)
-  library(data.table)
-  library(glue)
-  library(cli)
-  library(qs)
-  library(optparse)
-})
+ms::libri(
+  maxsal/ms, haven, survey, dplyr, pracma, simplexreg, data.table,
+  glue, cli, qs, optparse
+)
 
 # optparse list ---
 option_list <- list(
@@ -46,7 +38,7 @@ option_list <- list(
   ),
   make_option("--nhanes_survey_names",
     type = "character",
-    default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ",
+    default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ,HIV",
     help = glue(
       "NHANES wave years corresponding to wave ",
       "[default = %default]"
@@ -64,7 +56,11 @@ for (i in list.files("fn", full.names = TRUE)) source(i)
 
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
-mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, nhw := nhanes_nhw]
+mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, `:=` (
+  nhw = nhanes_nhw,
+  smoking_current = as.numeric(SmokingStatus == "Current"),
+  smoking_former  = as.numeric(SmokingStatus == "Former")
+  )]
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
 nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
@@ -77,7 +73,7 @@ nhanes_merged <- download_nhanes_data(
 keep_vars <- c(
   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020"
+  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
 )
 
 if ("WTMECPRP" %in% names(nhanes_merged)) {
@@ -112,37 +108,37 @@ cli_alert("estimating ipw weights...")
 
 ip_weights_list <- list(
   "simple" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former", "bmi_under",
-               "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+               "smoking_current", "smoking_former",
+               "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
   "simple_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former", "bmi_under",
-               "bmi_overweight", "bmi_obese", "nhanes_nhw", "female"),
+                 "smoking_current", "smoking_former", "bmi_under",
+                 "bmi_overweight", "bmi_obese", "nhw", "female"),
   "selection" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
                   "cad", "diabetes", "smoking_current", "smoking_former",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
   "selection_c" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
                   "cad", "diabetes", "smoking_current", "smoking_former",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw",
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
                   "cancer"),
   "selection_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
                   "cad", "diabetes", "smoking_current", "smoking_former",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhanes_nhw",
+                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
                   "female", "cancer"),
   "cancer" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-              "smoking_current", "smoking_former", "bmi_under",
-              "bmi_overweight", "bmi_obese", "nhanes_nhw", "cancer"),
+               "smoking_current", "smoking_former", "bmi_under",
+               "bmi_overweight", "bmi_obese", "nhw", "cancer"),
   "depression" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former", "bmi_under",
-               "bmi_overweight", "bmi_obese", "nhanes_nhw", "depression"),
+                   "smoking_current", "smoking_former", "bmi_under",
+                   "bmi_overweight", "bmi_obese", "nhw", "depression"),
   "cad" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former", "bmi_under",
-               "bmi_overweight", "bmi_obese", "nhanes_nhw", "cad"),
+            "smoking_current", "smoking_former", "bmi_under",
+            "bmi_overweight", "bmi_obese", "nhw", "cad"),
   "diabetes" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-            "smoking_current", "smoking_former", "bmi_under",
-            "bmi_overweight", "bmi_obese", "nhanes_nhw", "diabetes"),
+                 "smoking_current", "smoking_former", "bmi_under",
+                 "bmi_overweight", "bmi_obese", "nhw", "diabetes"),
   "hypertension" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-            "smoking_current", "smoking_former", "bmi_under",
-            "bmi_overweight", "bmi_obese", "nhanes_nhw", "hypertension")
+                     "smoking_current", "smoking_former", "bmi_under",
+                     "bmi_overweight", "bmi_obese", "nhw", "hypertension")
 )
 
 ip_weights <- list()
@@ -245,8 +241,6 @@ extract_estimates <- function(
 est_out <- list()
 weight_vars <- names(weights)[names(weights) != "id"]
 cli_progress_bar(name = "estimating cancer~female log(OR)", total = length(weight_vars))
-pb <- txtProgressBar(max = length(weight_vars),
-                     width = 50, style = 3)
 for (i in seq_along(weight_vars)) {
   est_out[[i]] <- extract_estimates(
     outcome  = "cancer",
