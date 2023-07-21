@@ -38,12 +38,6 @@ cli_alert("reading data...")
 pim0 <- read_qs(file_paths[["ukb"]][["pim0_file"]])
 
 ## demographics data
-# icd_phecode <- read_qs(file_paths[["ukb"]][["icd_phecode_file"]])
-# icd_phecode <- icd_phecode[ icd_phecode[, .I[which.max(dsb)], by = "id"][["V1"]] ][
-#   ,
-#   .(id, dsb)][
-#     , age_at_last_first := round(dsb / 365.25, 3)][]
-
 demo <- read_qs(file_paths[["ukb"]][["demo_file"]])[
   , .(id, age = age_at_consent, female = as.numeric(sex == "Female"))
 ] |> na.omit()

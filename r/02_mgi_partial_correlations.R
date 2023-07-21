@@ -16,7 +16,7 @@ source("fn/files-utils.R")
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--use_geno",
-    type = "logical", default = TRUE,
+    type = "logical", default = FALSE,
     help = "Adjust for genotype PCs [default = %default]"
   ),
   make_option("--mgi_version",
