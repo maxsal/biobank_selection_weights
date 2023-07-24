@@ -21,7 +21,7 @@ option_list <- list(
     help = "UKB cohort version in /net/junglebook/magic_data/EHRdata/ [default = %default]"
   ),
   make_option("--mgi_weights",
-    type = "character", default = "ps_nhw_f",
+    type = "character", default = "ps_nhw_f,ip_selection_f",
     help = "Name of weight variable to use for MGI [default = %default]"
   )
 )
@@ -54,7 +54,7 @@ mgi_hyper <- rbindlist(list(
 
 ### weights
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
-mgi_weight_vars <- c("id", opt$mgi_weights)
+mgi_weight_vars <- c("id", unlist(stringr::str_split(opt$mgi_weights, ",")))
 
 ### merge
 mgi <- Reduce(
@@ -101,13 +101,15 @@ mod_fn <- function(out, ex, cov = NULL, data, w = NULL) {
         weights = w
     ) |> summary()
     return(data.table(
-        outcome = out,
-        exposure = ex,
+        outcome    = out,
+        exposure   = ex,
         covariates = cov,
-        ex_coef = coef(mod)[ex, 1],
-        ex_se = coef(mod)[ex, 2],
-        ex_p = coef(mod)[ex, 4],
-        weighted = !is.null(w)
+        ex_coef    = coef(mod)[ex, 1],
+        ex_se      = coef(mod)[ex, 2],
+        ex_lower   = coef(mod)[ex, 1] - qnorm(0.975) * coef(mod)[ex, 2],
+        ex_upper   = coef(mod)[ex, 1] + qnorm(0.975) * coef(mod)[ex, 2],
+        ex_p       = coef(mod)[ex, 4],
+        weighted   = !is.null(w)
     ))
 }
 
@@ -141,15 +143,28 @@ mgi_wm1 <- mod_fn(
     out = "hypertension",
     ex = "female",
     data = mgi,
-    w = mgi[[opt$mgi_weights]]
-)[, data := "MGI"]
+    w = mgi[[mgi_weight_vars[2]]]
+)[, `:=` (data = "MGI", weight = mgi_weight_vars[2])]
 mgi_wm2 <- mod_fn(
     out = "hypertension",
     ex = "female",
     cov = "age",
     data = mgi,
-    w = mgi[[opt$mgi_weights]]
-)[, data := "MGI"]
+    w = mgi[[mgi_weight_vars[2]]]
+)[, `:=` (data = "MGI", weight = mgi_weight_vars[2])]
+mgi_wm3 <- mod_fn(
+    out = "hypertension",
+    ex = "female",
+    data = mgi,
+    w = mgi[[mgi_weight_vars[3]]]
+)[, `:=` (data = "MGI", weight = mgi_weight_vars[3])]
+mgi_wm4 <- mod_fn(
+    out = "hypertension",
+    ex = "female",
+    cov = "age",
+    data = mgi,
+    w = mgi[[mgi_weight_vars[3]]]
+)[, `:=` (data = "MGI", weight = mgi_weight_vars[3])]
 ukb_wm1 <- mod_fn(
     out = "hypertension",
     ex = "female",
@@ -168,7 +183,7 @@ ukb_wm2 <- mod_fn(
 combined <- rbindlist(
     list(
         mgi_um1, mgi_um2, ukb_um1, ukb_um2,
-        mgi_wm1, mgi_wm2, ukb_wm1, ukb_wm2
+        mgi_wm1, mgi_wm2, mgi_wm3, mgi_wm4, ukb_wm1, ukb_wm2
     ),
     use.names = TRUE, fill = TRUE
 )

@@ -1,0 +1,46 @@
+fcor                    package:ms                     R Documentation
+
+_P_e_r_f_o_r_m _r_a_p_i_d (_p_a_r_a_l_l_e_l) _u_n_w_e_i_g_h_t_e_d _a_n_d _w_e_i_g_h_t_e_d (_p_a_r_t_i_a_l) _c_o_r_r_e_l_a_t_i_o_n_s
+_o_n _a _m_a_t_r_i_x
+
+_D_e_s_c_r_i_p_t_i_o_n:
+
+     Perform rapid (parallel) unweighted and weighted (partial)
+     correlations on a matrix
+
+_U_s_a_g_e:
+
+     fcor(x, covs = NULL, covs_alt = NULL, w = NULL, n_cores = 1, verbose = FALSE)
+     
+_A_r_g_u_m_e_n_t_s:
+
+       x: matrix of variables over which to calculate pairwise
+          correlations
+
+    covs: matrix of variables that serve as covariates
+
+covs_alt: alternate matrix of variables that serve as covariates when
+          pairwise correlation is not complete
+
+       w: vector of weights
+
+ n_cores: number of cores over which to parallelize
+
+ verbose: logical; report what correlations are being calculate
+
+_V_a_l_u_e:
+
+     data.table of pairwise correlations
+
+_E_x_a_m_p_l_e_s:
+
+     ## Not run:
+     
+     data <- data.frame(matrix(rnorm(100 * 50), ncol = 50))
+     covs <- data.frame(matrix(rnorm(100 * 2), ncol = 2))
+     wgt <- 1/runif(100)
+     
+     fcor(x = data, covs = covs, w = wgt, n_cores = 1)
+     ## End(Not run)
+     
+
