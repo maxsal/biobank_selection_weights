@@ -335,3 +335,21 @@ ggsave(
   width = 7, height = 7 * 1.68,
   device = cairo_pdf
 )
+
+# top row
+patched5 <- 
+  ((mgi_aou_plot + labs(title = "A. MGI / AOU") + theme(axis.text.x = element_blank())) + (aou_pr_plot + labs(title = "D. All of Us") + theme(axis.text.x = element_blank()))) /
+
+# middle row
+((aou_ukb_plot + labs(title = "B. AOU / UKB") + theme(axis.text.x = element_blank())) + (mgi_pr_plot + labs(title = "E. Michigan Genomics Initiative") + theme(axis.text.x = element_blank()))) /
+
+# bottom row
+((mgi_ukb_plot + labs(title = "C. MGI / UKB")) + (ukb_pr_plot + labs(title = "F. UK Biobank")))
+
+
+ggsave(
+  plot = patched5,
+  filename = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/patched_weighted_pr_plots.pdf",
+  width = 14, height = (14/2) * 1.68,
+  device = cairo_pdf
+)
