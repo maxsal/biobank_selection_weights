@@ -5,24 +5,12 @@
 
 options(stringsAsFactors = FALSE)
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(qs)
-  library(tidyverse)
-  library(GGally)
-  library(ggnetwork)
-  library(network)
-  library(scales)
-  library(gridExtra)
-  library(qgraph)
-  library(igraph)
-  library(circlize)
-  library(ComplexHeatmap)
-  library(PheWAS)
-  library(glue)
-  library(survey)
-  library(optparse)
-})
+ms::libri(
+  ms, data.table, qs, tidyverse, GGally,
+  ggnetwork, network, scales, gridExtra,
+  qgraph, igraph, circlize, ComplexHeatmap,
+  PheWAS, glue, survey, optparse
+)
 
 option_list <- list(
   make_option("--mgi_version",
@@ -72,9 +60,7 @@ ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSele
                      colClasses = "character")[, .(id = f.eid, weights = as.numeric(LassoWeight))]
 ukb_pim     <- merge.data.table(ukb_pim, ukb_weights, by = "id")
 
-pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
-  colClasses = "character", showProgress = FALSE
-)
+pheinfo <- ms::pheinfo
 
 # calculate prevalences --------------------------------------------------------
 ## unweighted

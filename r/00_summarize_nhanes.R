@@ -6,13 +6,9 @@
 # date:     20230418
 
 # libraries --------------------------------------------------------------------
-suppressPackageStartupMessages({
-    library(haven)
-    library(survey)
-    library(data.table)
-    library(glue)
-    library(optparse)
-})
+ms::libri(
+    ms, haven, survey, data.table, glue, optparse, cli, qs
+)
 
 # optparse list ---
 option_list <- list(
@@ -42,7 +38,7 @@ option_list <- list(
     ),
     make_option("--nhanes_survey_names",
         type = "character",
-        default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ",
+        default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ,HIV",
         help = glue(
             "NHANES wave years corresponding to wave ",
             "[default = %default]"
@@ -68,7 +64,7 @@ nhanes_merged <- download_nhanes_data(
 keep_vars <- c(
   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020"
+  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
 )
 
 if ("WTMECPRP" %in% names(nhanes_merged)) {

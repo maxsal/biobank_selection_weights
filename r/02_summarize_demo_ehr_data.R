@@ -4,16 +4,10 @@
 # date:     20230220
 
 # libraries, functions, and options --------------------------------------------
-suppressPackageStartupMessages({
-    library(data.table)
-    library(MatchIt)
-    library(logistf)
-    library(glue)
-    library(qs)
-    library(optparse)
-    library(purrr)
-})
-options(datatable.print.class = TRUE)
+ms::libri(
+    data.table, MatchIt, logistf, glue, qs, optparse, purrr,
+    ms, cli
+)
 
 set.seed(61787)
 
@@ -38,6 +32,7 @@ file_paths <- get_files(mgi_version = opt$mgi_version,
                         ukb_version = opt$ukb_version)
 
 # read data --------------------------------------------------------------------
+cli_alert("loading mgi data...")
 ## mgi
 ### demographics
 mgi_cov <- read_qs(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.qs"))
@@ -52,6 +47,7 @@ setnames(mgi_cov,
 mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
 if ("IID" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "IID", "id")
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "DaysSinceBirth", "dsb")
+mgi_full_phe <- mgi_full_phe[id %in% mgi_cov[, unique(id)], ]
 
 ### weights data
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
@@ -64,7 +60,7 @@ mgi <- merge.data.table(
 )
 
 ## ukb
-message("loading ukb data...")
+cli_alert("loading ukb data...")
 ### demographics
 ukb_demo <- read_qs(file_paths[["ukb"]][["demo_file"]])
 ukb_demo <- ukb_demo[, .(
@@ -147,7 +143,7 @@ ukb[, `:=` (
 # weighted demographics summary ------------------------------------------------
 (mgi_demo_summary_ip <- weighted_summary_wrapper(
     mgi,
-    weight = "ip_selection_c",
+    weight = "ip_selection_f",
     vars = c(
         "age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
         "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus"
@@ -155,7 +151,7 @@ ukb[, `:=` (
 ))
 (mgi_demo_summary_ps <- weighted_summary_wrapper(
     mgi,
-    weight = "ps_selection_c",
+    weight = "ps_nhw_f",
     vars = c(
         "age_at_last_diagnosis", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
         "cancer", "diabetes", "cad", "anxiety", "depression", "SmokingStatus"
@@ -211,3 +207,4 @@ fwrite(
     file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_summary_w.txt"),
     sep  = "\t"
 )
+

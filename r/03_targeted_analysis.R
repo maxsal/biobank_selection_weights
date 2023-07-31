@@ -35,6 +35,14 @@ file_paths <- get_files(
   ukb_version = opt$ukb_version
 )
 
+# function
+merge_list <- function(..., all.x = FALSE, all.y = FALSE, by = NULL) {
+    Reduce(
+        \(x, y) merge.data.table(x, y, all.x = all.x, all.y = all.y, by = by),
+        list(...)
+    )
+}
+
 # data
 ## mgi
 ### demo
@@ -57,14 +65,18 @@ mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi
 mgi_weight_vars <- c("id", unlist(stringr::str_split(opt$mgi_weights, ",")))
 
 ### merge
-mgi <- Reduce(
-    \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
-    list(
+mgi <- merge_list(
         mgi_demo[, .(id, female, age = round(Enrollment_DaysSinceBirth / 365.25, 1))],
-        mgi_hyper[, .(id, hypertension)],
         mgi_weights[, ..mgi_weight_vars]
-    )
 )
+# mgi <- Reduce(
+#     \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
+#     list(
+#         mgi_demo[, .(id, female, age = round(Enrollment_DaysSinceBirth / 365.25, 1))],
+#         mgi_hyper[, .(id, hypertension)],
+#         mgi_weights[, ..mgi_weight_vars]
+#     )
+# )
 
 ## ukb
 ### demo
@@ -80,14 +92,18 @@ ukb_weights <- fread(file_paths[["ukb"]][["weight_file"]], colClasses = "charact
     na.omit()
 
 ### merge
-ukb <- Reduce(
-    \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
-    list(
-        ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"))],
-        ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0))],
-        ukb_weights
-    )
+ukb <- merge_list(
+    ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"))],
+    ukb_weights
 )
+# ukb <- Reduce(
+#     \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
+#     list(
+#         ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"))],
+#         ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0))],
+#         ukb_weights
+#     )
+# )
 
 # analysis
 ## function
@@ -113,6 +129,16 @@ mod_fn <- function(out, ex, cov = NULL, data, w = NULL) {
     ))
 }
 
+ukb <- merge.data.table(
+    ukb, ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0), crc = as.numeric(X153 > 0))]
+)
+
+ukb_mods <- targeted_analysis(
+    out = c("hypertension", "crc"),
+    ex = "female",
+    cov = "age",
+    data = ukb
+)
 
 ## unweighted
 mgi_um1 <- mod_fn(
