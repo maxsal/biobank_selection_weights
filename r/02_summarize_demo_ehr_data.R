@@ -44,7 +44,8 @@ setnames(mgi_cov,
                  "sex", "race", "length_followup", "first_dsb", "last_dsb"))
 
 ### icd-phecode data
-mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
+mgi_full_phe <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_FULL_PHECODE_DSB_{opt$mgi_version}.qs"))
+# mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
 if ("IID" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "IID", "id")
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "DaysSinceBirth", "dsb")
 mgi_full_phe <- mgi_full_phe[id %in% mgi_cov[, unique(id)], ]
@@ -88,7 +89,7 @@ ukb_weights <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/UKBSele
     colClasses = "character")[, .(id = f.eid, ip_weight = as.numeric(LassoWeight))]
 
 ukb <- merge.data.table(
-    ukb_demo,
+    ukb_demo[id %in% unique(ukb_full_phe[, id]), ],
     ukb_weights,
     by = "id",
     all.x = TRUE
@@ -208,3 +209,4 @@ fwrite(
     sep  = "\t"
 )
 
+cli_alert_success("done! 🎉")

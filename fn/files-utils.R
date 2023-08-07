@@ -20,7 +20,7 @@ get_files <- function(mgi_version = "20220822", ukb_version = "20221117") {
     mgi_icd9_file         <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD9_Phecodes_Birthyears.Rsav")
     mgi_icd10_file        <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_ICD10_Phecodes_Birthyears.Rsav")
     mgi_phecode_dsb_file  <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phecodes_Birthyears.Rsav")
-    mgi_pim0_file         <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_PEDMASTER_0.txt")
+    mgi_pim0_file         <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{mgi_version}/MGI_PIM0_{mgi_version}.qs")
     mgi_cov_file          <- glue("{mgi_path}MGI_{mgi_version}.txt")
     mgi_phe_overview_file <- glue("{mgi_path}phenomes/UNFILTERED_{mgi_version}/UNFILTERED_{mgi_version}_Phenotype_Overview_All_Phecodes1plus.Rsav")
     mgi_demo_file         <- glue("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/{mgi_version}/Demographics_{as.Date(mgi_version, '%Y%m%d')}.txt")

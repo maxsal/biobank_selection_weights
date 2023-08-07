@@ -10,6 +10,8 @@ suppressPackageStartupMessages({
   library(qs)
   library(parallel)
   library(optparse)
+  library(PheWAS)
+  library(cli)
 })
 
 # optparse list ----
@@ -36,19 +38,96 @@ file_paths <- get_files(mgi_version = opt$mgi_version)
 message("loading data...")
 study <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
 MGIcohort <- fread(file_paths[["mgi"]][["cov_file"]])
-load(file = file_paths[["mgi"]][["phe_overview_file"]])
-load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
+# load(file = file_paths[["mgi"]][["phe_overview_file"]])
+# load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
   colClasses = "character"
 )[[1]]
+
+### subset
+MGIcohort <- merge.data.table(
+  MGIcohort,
+  study,
+  by = "DeID_PatientID"
+)[StudyName != "AOS", ]
+
+### MAP ICD9/ICD10 codes
+mgi_icd9  <- get(load(file_paths[["mgi"]][["icd9_file"]]))
+mgi_icd10 <- get(load(file_paths[["mgi"]][["icd10_file"]]))
+
+mgi_icd <- rbindlist(list(
+  mgi_icd9[, .(IID, vocabulary_id = "ICD9CM", code = DiagnosisCode, DaysSinceBirth)],
+  mgi_icd10[, .(IID, vocabulary_id = "ICD10CM", code = DiagnosisCode, DaysSinceBirth)]
+))
+
+in_demo_and_phenome <- intersect(unique(MGIcohort[, DeID_PatientID]), unique(mgi_icd[, IID]))
+
+rm(mgi_icd9, mgi_icd10)
+
+save_qs(
+  mgi_icd[, .(IID, lexicon = vocabulary_id, DiagnosisCode = code, DaysSinceBirth)],
+  file = glue("{out_path}MGI_ICD_{opt$mgi_version}.qs")
+)
+
+mapped <- mapCodesToPhecodes(
+  input = mgi_icd, vocabulary.map = PheWAS::phecode_map,
+  rollup.map = PheWAS::phecode_rollup_map, make.distinct = TRUE
+)
+
+id.sex <- MGIcohort[, .(
+  IID = DeID_PatientID, sex = Sex
+)]
+
+# remove sex-specific phecodes that are discordant with individual's reported sex at birth
+restrictPhecodesBySex_mod <- function(phenotypes, id.sex, by_var = "person_id", sex_var = "sex") {
+  data <- merge.data.table(
+    as.data.table(phenotypes),
+    as.data.table(id.sex),
+    by = by_var, all.x = TRUE
+  )
+  # Get the restrictions found in the phenotypes data frame
+  current_sex_restriction <- PheWAS::sex_restriction[PheWAS::sex_restriction$phecode %in% unique(data[, phecode]), ] |>
+    as.data.table()
+  # Get male and female-only phenotypes
+  male_only <- current_sex_restriction[current_sex_restriction$male_only, phecode]
+  female_only <- current_sex_restriction[current_sex_restriction$female_only, phecode]
+  # Set row column matches to NA where inds of a sex meet restricted phenotypes
+  data[phecode %in% male_only & sex == "F", phecode := NA]
+  data[phecode %in% female_only & sex == "M", phecode := NA]
+
+  na.omit(data)[, (sex_var) := NULL][]
+}
+
+restricted <- restrictPhecodesBySex_mod(mapped, id.sex, by_var = "IID")
+
+in_demo_and_phenome <- intersect(unique(MGIcohort[, DeID_PatientID]), unique(restricted[, IID]))
+
+restricted <- restricted[IID %in% in_demo_and_phenome, ]
+
+save_qs(restricted, file = glue("{out_path}MGI_FULL_PHECODE_DSB_{opt$mgi_version}.qs"))
+first_restricted <- restricted[ restricted[, .I[which.min(DaysSinceBirth)], by = c("IID", "phecode")][["V1"]] ]
+save_qs(first_restricted, file = glue("{out_path}MGI_FIRST_PHECODE_DSB_{opt$mgi_version}.qs"))
+
+pim <- dcast(
+  first_restricted[, .(IID, phecode = paste0("X", phecode))],
+  IID ~ phecode,
+  value.var = "phecode",
+  fun.aggregate = length,
+  fill = 0
+)
+# collect integer variable names from data.table
+int_vars <- names(pim)[which(sapply(pim, is.integer))]
+pim[, (int_vars) := lapply(.SD, \(x) as.numeric(x > 0)), .SDcols = int_vars]
+
+save_qs(pim, file = glue("{out_path}MGI_PIM0_{opt$mgi_version}.qs"))
 
 ### replace FirstDaySinceBirth and LastDaySinceBirth
 # following a Slack conversation with Lars on 2/21/23, the original values for
 # these variables include ICD codes that cannot be mapped to a phecode and
 # non-ICD code records (e.g., OrderDate_DaysSinceBirth from LabResults)
-MGIcohort <- MGIcohort[, !c("FirstDaySinceBirth", "LastDaySinceBirth")]
+MGIcohort <- MGIcohort[, !c("AgeFirstEntry", "AgeLastEntry", "FirstDaySinceBirth", "LastDaySinceBirth")]
 
-first_dsb <- unique(diagnoses_Phecodes[diagnoses_Phecodes[
+first_dsb <- unique(restricted[restricted[
   ,
   .I[which.min(DaysSinceBirth)],
   "IID"
@@ -60,7 +139,7 @@ first_dsb <- unique(diagnoses_Phecodes[diagnoses_Phecodes[
     age_at_first_diagnosis = round(DaysSinceBirth / 365.25, 1)
   )
 ])
-last_dsb <- unique(diagnoses_Phecodes[diagnoses_Phecodes[, .I[which.max(DaysSinceBirth)], "IID"][["V1"]]][, .(
+last_dsb <- unique(restricted[restricted[, .I[which.max(DaysSinceBirth)], "IID"][["V1"]]][, .(
   DeID_PatientID        = IID,
   LastDaySinceBirth     = DaysSinceBirth,
   age_at_last_diagnosis = round(DaysSinceBirth / 365.25, 1)
@@ -71,12 +150,6 @@ MGIcohort <- Reduce(
   list(MGIcohort, first_dsb, last_dsb)
 )
 ###
-
-MGIcohort <- merge.data.table(
-  MGIcohort,
-  study,
-  by = "DeID_PatientID"
-)[StudyName != "AOS", ]
 
 comorbid <- list(
   "cad"                = list("phecodes" = c("411.4")),
@@ -91,25 +164,30 @@ comorbid <- list(
 )
 
 # identify cases and create indicator variables --------------------------------
-message("identifying cases and creating indicator variables...")
-pb <- txtProgressBar(max = length(names(comorbid)), width = 50, style = 3)
+cli_alert("identifying cases and creating indicator variables...")
+cli_progress_bar("deriving comorbidities", total = length(names(comorbid)))
 for (i in names(comorbid)) {
-  comorbid[[i]][["ids"]] <- diagnoses_Phecodes[phecode %in% comorbid[[i]][["phecodes"]], IID] |>
+  comorbid[[i]][["ids"]] <- restricted[phecode %in% comorbid[[i]][["phecodes"]], IID] |>
     unique()
-  setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 
-pb <- txtProgressBar(max = length(names(comorbid)), width = 50, style = 3)
+cli_progress_bar("deriving comorbidity indicator variables", total = length(names(comorbid)))
 for (i in names(comorbid)) {
   set(MGIcohort, j = i, value = fifelse(MGIcohort[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
-  setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
+  cli_progress_update()
 }
-close(pb)
+cli_progress_done()
 
 MGIcohort[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
-MGIcohort[, nhanes_nhw := fifelse(Ethnicity != "Hispanic" & Race == "Caucasian", 1, 0)]
+MGIcohort[, `:=` (
+  triglycerides = fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1),
+  nhanes_nhw = fifelse(Ethnicity != "Hispanic" & Race == "Caucasian", 1, 0),
+  AgeFirstEntry = age_at_first_diagnosis,
+  AgeLastEntry = age_at_last_diagnosis
+)][, nhw := nhanes_nhw]
 
 MGIcohort[, age_cat := between(AgeLastEntry, 0, 5.99) +
   2 * between(AgeLastEntry, 6, 11.99) +
@@ -137,11 +215,11 @@ MGIcohort[
 MGIcohort[, female := as.numeric(Sex == "F")]
 
 # saving files -----------------------------------------------------------------
-message("saving processed files...")
+cli_alert("saving processed files...")
 
 save_qs(MGIcohort, file = glue("{out_path}data_{opt$mgi_version}_comb.qs"))
 for (i in c("MGI", "MGI-MEND", "MIPACT", "MHB2")) {
   save_qs(MGIcohort[StudyName == i, ], file = glue("{out_path}data_{opt$mgi_version}_{tolower(i)}.qs"))
 }
 
-message(paste0("script success! see ", out_path, " for output files"))
+cli_alert_success("script success! see {.path {out_path}} for output files")

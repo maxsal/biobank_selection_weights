@@ -79,7 +79,7 @@ file_paths <- get_files(
 
 ## check that outcome exists in both datasets
 cli_alert("checking that outcome exists in both phenomes...")
-mgi_pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
+mgi_pim0 <- qread(file_paths[["mgi"]][["pim0_file"]])
 ukb_pim0 <- qread(file_paths[["ukb"]][["pim0_file"]])
 
 if (paste0("X", gsub("X", "", opt$outcome)) %in% names(mgi_pim0) &

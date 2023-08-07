@@ -23,7 +23,7 @@ option_list <- list(
     help = "UKB cohort version in /net/junglebook/magic_data/EHRdata/ [default = %default]"
   ),
   make_option("--mgi_weights",
-    type = "character", default = "ps_nhw_f",
+    type = "character", default = "ip_selection_f",
     help = "Name of weight variable to use for MGI [default = %default]"
   )
 )
@@ -51,7 +51,7 @@ mgi_demo <- read_qs(file_paths[["mgi"]][["cov_processed_file"]])[, .(
 mgi_demo[complete.cases(mgi_demo), ]
 
 ### phecode indicator matrix (PEDMASTER_0)
-mgi_pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
+mgi_pim0 <- qread(file_paths[["mgi"]][["pim0_file"]])
 mgi_pim0 <- merge(
   mgi_pim0,
   data.frame(IID = mgi_demo[, id]),

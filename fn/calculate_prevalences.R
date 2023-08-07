@@ -40,7 +40,7 @@ calculate_prevalences <- function(
     female_pim_data <- pim_data[which(pim_data[[pim_id_var]] %in% female_ids), ]
 
     # fill out count and length
-    if (progress) cli_progress_bar("Both sex phecodes", length(both))
+    if (progress) cli_progress_bar("Both sex phecodes", total = length(both))
     for (i in both) {
         out[phecode == i, `:=` (
             n = sum(pim_data[[i]], na.rm = TRUE),
@@ -50,7 +50,7 @@ calculate_prevalences <- function(
     }
     if (progress) cli_progress_done()
 
-    if (progress) cli_progress_bar("Male phecodes", length(male))
+    if (progress) cli_progress_bar("Male phecodes", total = length(male))
     for (i in male) {
         out[phecode == i, `:=` (
             n = sum(male_pim_data[[i]], na.rm = TRUE),
@@ -60,7 +60,7 @@ calculate_prevalences <- function(
     }
     if (progress) cli_progress_done()
 
-    if (progress) cli_progress_bar("Female phecodes", length(female))
+    if (progress) cli_progress_bar("Female phecodes", total = length(female))
     for (i in female) {
         out[phecode == i, `:=` (
             n = sum(female_pim_data[[i]], na.rm = TRUE),

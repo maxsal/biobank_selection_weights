@@ -2,6 +2,7 @@ suppressPackageStartupMessages({
   library(SPAtest)
   library(logistf)
   library(EValue)
+  library(survey)
 })
 
 ### quick_mod -----------
@@ -12,6 +13,7 @@ quick_cooccur_mod <- function(
     covs       = c("age_at_threshold", "female", "length_followup"),
     ex_code    = "X157",
     mod_type   = "glm",
+    weight_dsn = NULL,
     weight_var = NULL,
     evalue     = TRUE
 ) {
@@ -56,14 +58,14 @@ quick_cooccur_mod <- function(
   
   ### glm
   if (mod_type == "glm") {
-    if (!is.null(weight_var)) {
-      wgts <- dat[[weight_var]]
-      mod <- glm(as.formula(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + "))),
-                 data    = dat,
-                 weights = wgts,
-                 family  = binomial())
+    if (!is.null(weight_dsn)) {
+      mod <- survey::svyglm(
+        as.formula(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + "))),
+        design = weight_dsn,
+        family = quasibinomial()
+      )
     } else {
-      mod <- glm(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat, family = binomial())
+      mod <- glm(paste0("case ~ ", ex_code, " + ", paste0(covs, collapse = " + ")), data = dat, family = quasibinomial())
     }
     est <- summary(mod)$coef[ex_code, c(1, 2)]
     out <- data.table(
@@ -97,17 +99,24 @@ output_cooccurrence_results <- function(
     cov_data,
     covariates,
     t_thresh,
-    all_phecodes = paste0("X", pheinfo[, phecode]),
-    model_type   = "logistf",
-    w_data       = NULL,
-    w_var        = NULL,
-    ncore        = parallel::detectCores() / 4,
-    parallel     = TRUE
+    all_phecodes    = paste0("X", pheinfo[, phecode]),
+    model_type      = "logistf",
+    w_data          = NULL,
+    weighted_design = NULL,
+    w_var           = NULL,
+    ncore           = parallelly::availableCores() / 4,
+    parallel        = TRUE,
+    min_case_count  = 10
     ) {
   
   # 1. identify analytic phecodes
   possible_phecodes    <- names(pim_data)[names(pim_data) %in% all_phecodes]
-  phecodes_to_consider <- melt(pim_data[, ..possible_phecodes][, lapply(.SD, \(x) sum(x, na.rm = TRUE))], variable.name = "phecode", value.name = "n", id.vars = character())[n >= 10, as.character(phecode)]
+  phecodes_to_consider <- melt(
+      pim_data[, ..possible_phecodes][, lapply(.SD, \(x) sum(x, na.rm = TRUE))],
+      variable.name = "phecode",
+      value.name = "n",
+      id.vars = character()
+    )[n >= min_case_count, as.character(phecode)]
   
   # 2. merge covariates
   if (is.null(w_data) | is.null(w_var)) {
@@ -118,9 +127,12 @@ output_cooccurrence_results <- function(
       all.x = TRUE
     )[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
   } else {
-    merged <- Reduce(f = \(x, y) merge.data.table(x, y, by = "id", all.x = TRUE),
-                     x = list(pim_data[, !c("case")], cov_data, w_data)
-                     )[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
+    merged <- merge_list(list(
+      pim_data[, !c("case")],
+      cov_data,
+      w_data
+    ), by_var = "id", join_fn = dplyr::left_join)[, age_at_threshold := round(get(paste0("t", t_thresh, "_threshold")) / 365.25, 1)][]
+    weighted_design <- survey::svydesign(ids = ~1, weights = ~get(w_var), data = merged[!is.na(get(w_var)), ])
   }
   
   # 3. run analyses
@@ -134,6 +146,7 @@ output_cooccurrence_results <- function(
         covs       = covariates,
         ex_code    = phecodes_to_consider[i],
         mod_type   = model_type,
+        weight_dsn = weighted_design,
         weight_var = w_var
       )
       cli_progress_update()
@@ -152,6 +165,7 @@ output_cooccurrence_results <- function(
         covs       = covariates,
         ex_code    = phecodes_to_consider[i],
         mod_type   = model_type,
+        weight_dsn = weighted_design,
         weight_var = w_var
       )
     }

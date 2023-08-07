@@ -4,14 +4,9 @@
 # date:     20230418
 
 # libraries, functions, and options --------------------------------------------
-suppressPackageStartupMessages({
-  library(data.table)
-  library(MatchIt)
-  library(logistf)
-  library(glue)
-  library(qs)
-  library(optparse)
-})
+ms::libri(
+  ms, data.table, MatchIt, glue, qs, cli, optparse
+)
 
 set.seed(61787)
 
@@ -20,7 +15,7 @@ for (i in list.files("fn/", full.names = TRUE)) source(i)
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome",
-    type = "character", default = "157",
+    type = "character", default = "153",
     help = "Outcome phecode [default = %default]"
   ),
   make_option("--mgi_version",
@@ -46,7 +41,7 @@ option_list <- list(
     )
   ),
   make_option("--weights",
-    type = "character", default = "ps_nhw_f",
+    type = "character", default = "ip_selection_f,ps_nhw_f",
     help = glue(
       "Weighting variable to use for weighted analyses - ",
       "selection, all, or list of named weight variables [default = %default]"
@@ -99,30 +94,40 @@ if (opt$weights == "all") {
   weight_vars <- unlist(strsplit(opt$weights, ","))
 }
 
+# merge data -------------------------------------------------------------------
+weight_id <- c("id", weight_vars)
+
+mgi_tr_merged <- lapply(
+  names(mgi_tr_pims),
+  \(x) {
+    merge_list(list(mgi_tr_pims[[x]], mgi_covariates[, !c("case")], mgi_weights[, ..weight_id]), by_var = "id", join_fn = dplyr::left_join)[, `:=` (
+      age_at_threshold = round(get(x) / 365.25, 1)
+    )]
+  }
+)
+names(mgi_tr_merged) <- glue("t{time_thresholds}_threshold")
+
 # cooccurrence analysis --------------------------------------------------------
 out <- list()
 for (w in seq_along(weight_vars)) {
   cli_alert(glue("cooccurrence using {weight_vars[w]} [{w}/{length(weight_vars)}]..."))
-
   out[[w]] <- lapply(
     seq_along(time_thresholds),
-    \(i) output_cooccurrence_results(
-      pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-      t_thresh     = time_thresholds[i],
-      cov_data     = mgi_covariates,
-      covariates   = c("age_at_threshold", "female", "length_followup"),
-      all_phecodes = glue("X{pheinfo[, phecode]}"),
-      model_type   = opt$mod_type,
-      w_data       = mgi_weights,
-      w_var        = weight_vars[w],
-      parallel     = TRUE
-    )
+    \(x) {
+      print(x)
+      cooccurrence_analysis(
+        data       = mgi_tr_merged[[x]],
+        covariates = c("age_at_threshold", "female", "length_followup"),
+        weight_var = weight_vars[w],
+        n_cores    = parallelly::availableCores() / 4,
+        parallel   = TRUE
+      )
+    }
   )
 }
 names(out) <- weight_vars
 
 # save results -----------------------------------------------------------------
-## mgi
 for (w in seq_along(weight_vars)) {
   for (i in seq_along(time_thresholds)) {
     save_qs(
@@ -135,3 +140,5 @@ for (w in seq_along(weight_vars)) {
     )
   }
 }
+
+cli_alert_success("done! 🎉")

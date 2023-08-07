@@ -20,7 +20,7 @@ for (i in list.files("fn/", full.names = TRUE)) source(i)
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome",
-    type = "character", default = "157",
+    type = "character", default = "153",
     help = "Outcome phecode [default = %default]"
   ),
   make_option("--ukb_version",

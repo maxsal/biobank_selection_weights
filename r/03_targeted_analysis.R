@@ -3,7 +3,7 @@
 # date:    20230718
 
 ms::libri(
-    ms, data.table, qs, glue, cli, optparse
+    ms, data.table, qs, glue, cli, optparse, survey
 )
 
 set.seed(61787)
@@ -35,30 +35,14 @@ file_paths <- get_files(
   ukb_version = opt$ukb_version
 )
 
-# function
-merge_list <- function(..., all.x = FALSE, all.y = FALSE, by = NULL) {
-    Reduce(
-        \(x, y) merge.data.table(x, y, all.x = all.x, all.y = all.y, by = by),
-        list(...)
-    )
-}
-
 # data
 ## mgi
 ### demo
 mgi_demo <- read_qs(file_paths[["mgi"]][["cov_processed_file"]])
 setnames(mgi_demo, "DeID_PatientID", "id")
 
-mgi_phecode <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
+mgi_phecode <- read_qs(glue("data/private/mgi/{opt$mgi_version}/MGI_FULL_PHECODE_DSB_{opt$mgi_version}.qs"))
 setnames(mgi_phecode, "IID", "id")
-mgi_hyper <- rbindlist(list(
-    unique(mgi_phecode[phecode == "401", .(id)])[, .(id, hypertension = 1)],
-    data.table(
-        id = setdiff(mgi_phecode[, unique(id)],
-        mgi_phecode[phecode == "401", unique(id)]),
-        hypertension = 0
-    )
-), use.names = TRUE, fill = TRUE)
 
 ### weights
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
@@ -66,21 +50,17 @@ mgi_weight_vars <- c("id", unlist(stringr::str_split(opt$mgi_weights, ",")))
 
 ### merge
 mgi <- merge_list(
-        mgi_demo[, .(id, female, age = round(Enrollment_DaysSinceBirth / 365.25, 1))],
-        mgi_weights[, ..mgi_weight_vars]
+        list(
+            mgi_demo[, .(id, female, age = round(Enrollment_DaysSinceBirth / 365.25, 1), smoker, cancer)],
+            mgi_weights[, ..mgi_weight_vars]
+        ),
+        verbose = TRUE
 )
-# mgi <- Reduce(
-#     \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
-#     list(
-#         mgi_demo[, .(id, female, age = round(Enrollment_DaysSinceBirth / 365.25, 1))],
-#         mgi_hyper[, .(id, hypertension)],
-#         mgi_weights[, ..mgi_weight_vars]
-#     )
-# )
 
 ## ukb
 ### demo
 ukb_demo <- read_qs(file_paths[["ukb"]][["demo_file"]])[in_phenome == 1, ]
+ukb_demo[, smoker := as.numeric(smk_ev == "Ever")]
 
 ### pim
 ukb_pim0 <- read_qs(file_paths[["ukb"]][["pim0_file"]])
@@ -93,28 +73,34 @@ ukb_weights <- fread(file_paths[["ukb"]][["weight_file"]], colClasses = "charact
 
 ### merge
 ukb <- merge_list(
-    ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"))],
-    ukb_weights
+    list(
+        ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"), smoker, cancer)],
+        ukb_weights
+    ),
+    verbose = TRUE
 )
-# ukb <- Reduce(
-#     \(x, y) merge.data.table(x, y, all = FALSE, by = "id"),
-#     list(
-#         ukb_demo[, .(id, age = age_at_consent, female = as.numeric(sex == "Female"))],
-#         ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0))],
-#         ukb_weights
-#     )
-# )
+
 
 # analysis
 ## function
-mod_fn <- function(out, ex, cov = NULL, data, w = NULL) {
+mod_fn <- function(out, ex, cov = NULL, data, w = NULL, verbose = FALSE) {
     comb <- paste0(c(ex, cov), collapse = " + ")
     if (is.null(cov)) cov <- NA_character_
-    mod <- glm(
+    if (sum(is.na(w)) > 0) {
+        if (verbose) cli_alert("Missing weights! subsetting... 🚨")
+        data <- data[!is.na(w)]
+        w    <- w[!is.na(w)]
+    }
+    svydsn <- svydesign(
+        id      = ~1,
+        weights = w,
+        data    = data
+    )
+    mod <- svyglm(
         formula = as.formula(glue("{out} ~ {comb}")),
         family = quasibinomial(),
         data = data,
-        weights = w
+        design = svydsn,
     ) |> summary()
     return(data.table(
         outcome    = out,
@@ -129,88 +115,235 @@ mod_fn <- function(out, ex, cov = NULL, data, w = NULL) {
     ))
 }
 
-ukb <- merge.data.table(
-    ukb, ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0), crc = as.numeric(X153 > 0))]
-)
+# ukb <- merge.data.table(
+#     ukb, ukb_pim0[, .(id, hypertension = ifelse(X401 > 0, 1, 0), crc = as.numeric(X153 > 0))]
+# )
 
-ukb_mods <- targeted_analysis(
-    out = c("hypertension", "crc"),
-    ex = "female",
-    cov = "age",
-    data = ukb
-)
+# ukb_mods <- targeted_analysis(
+#     out = c("hypertension", "crc"),
+#     ex = "female",
+#     cov = "age",
+#     data = ukb
+# )
 
-## unweighted
-mgi_um1 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    data = mgi
-)[, data := "MGI"]
-mgi_um2 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    cov = "age",
-    data = mgi
-)[, data := "MGI"]
-ukb_um1 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    data = ukb
-)[, data := "UKB"]
-ukb_um2 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    cov = "age",
-    data = ukb
-)[, data := "UKB"]
+results <- list()
+outcomes <- c("X401", "X153", "X411.4", "X695.4", "X714.1", "X313.3", "X591", "X280", "X296.2", "X300.1", "X411")
+cli_progress_bar(total = length(outcomes), format = "estimating {outcome} {pb_bar} {pb_percent} | ETA: {pb_eta}")
+for (i in seq_along(outcomes)) {
+        outcome <- outcomes[i]
+        cli_progress_update()
+        tmp_outcome <- c("id", outcome)
+        mgi_out_ids <- mgi_phecode[phecode == gsub("X", "", outcome), unique(id)]
+        mgi_no_out_ids <- setdiff(mgi_phecode[, unique(id)], mgi_out_ids)
+        mgi_out_tmp <- data.table(
+            id      = c(mgi_out_ids, mgi_no_out_ids),
+            outcome = c(rep(1, length(mgi_out_ids)), rep(0, length(mgi_no_out_ids)))
+        )
+        setnames(mgi_out_tmp, "outcome", outcome)
+        mgi_tmp <- merge.data.table(
+            mgi,
+            mgi_out_tmp,
+            by = "id"
+        )
+        mgi_tmp <- mgi_tmp[!is.na(get(outcome))]
 
-## weighted
-mgi_wm1 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    data = mgi,
-    w = mgi[[mgi_weight_vars[2]]]
-)[, `:=` (data = "MGI", weight = mgi_weight_vars[2])]
-mgi_wm2 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    cov = "age",
-    data = mgi,
-    w = mgi[[mgi_weight_vars[2]]]
-)[, `:=` (data = "MGI", weight = mgi_weight_vars[2])]
-mgi_wm3 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    data = mgi,
-    w = mgi[[mgi_weight_vars[3]]]
-)[, `:=` (data = "MGI", weight = mgi_weight_vars[3])]
-mgi_wm4 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    cov = "age",
-    data = mgi,
-    w = mgi[[mgi_weight_vars[3]]]
-)[, `:=` (data = "MGI", weight = mgi_weight_vars[3])]
-ukb_wm1 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    data = ukb,
-    w = ukb[, weight]
-)[, data := "UKB"]
-ukb_wm2 <- mod_fn(
-    out = "hypertension",
-    ex = "female",
-    cov = "age",
-    data = ukb,
-    w = ukb[, weight]
-)[, data := "UKB"]
+        ukb_tmp_out <- c("id", outcome)
+        ukb_pim_tmp <- ukb_pim0[, ..ukb_tmp_out]
+        ukb_pim_tmp[[outcomes[i]]] <- as.numeric(ukb_pim_tmp[[outcomes[i]]] > 0)
+        ukb_tmp <- merge.data.table(
+            ukb,
+            ukb_pim_tmp,
+            by = "id"
+        )
+        ukb_tmp <- ukb_tmp[!is.na(get(outcomes[i]))]
+
+        mgi_um1 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            data = mgi_tmp
+        )[, data := "MGI"]
+        mgi_um2 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            cov = "age",
+            data = mgi_tmp
+        )[, data := "MGI"]
+        ukb_um1 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            data = ukb_tmp
+        )[, data := "UKB"]
+        ukb_um2 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            cov = "age",
+            data = ukb_tmp
+        )[, data := "UKB"]
+
+        ## weighted
+        mgi_wm1 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            data = mgi_tmp,
+            w = mgi_tmp[[mgi_weight_vars[2]]]
+        )[, `:=`(data = "MGI", weight = mgi_weight_vars[2])]
+        mgi_wm2 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            cov = "age",
+            data = mgi_tmp,
+            w = mgi_tmp[[mgi_weight_vars[2]]]
+        )[, `:=`(data = "MGI", weight = mgi_weight_vars[2])]
+        mgi_wm3 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            data = mgi_tmp,
+            w = mgi_tmp[[mgi_weight_vars[3]]]
+        )[, `:=`(data = "MGI", weight = mgi_weight_vars[3])]
+        mgi_wm4 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            cov = "age",
+            data = mgi_tmp,
+            w = mgi_tmp[[mgi_weight_vars[3]]]
+        )[, `:=`(data = "MGI", weight = mgi_weight_vars[3])]
+        ukb_wm1 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            data = ukb_tmp,
+            w = ukb_tmp[, weight]
+        )[, data := "UKB"]
+        ukb_wm2 <- mod_fn(
+            out = outcomes[i],
+            ex = "female",
+            cov = "age",
+            data = ukb_tmp,
+            w = ukb_tmp[, weight]
+        )[, data := "UKB"]
+
+    mgi_results <- rbindlist(list(
+        mgi_um1, mgi_um2, mgi_wm1, mgi_wm2, mgi_wm3, mgi_wm4
+    ), use.names = TRUE, fill = TRUE)
+    ukb_results <- rbindlist(list(
+        ukb_um1, ukb_um2, ukb_wm1, ukb_wm2
+    ), use.names = TRUE, fill = TRUE)
+
+    results[[i]] <- rbindlist(list(
+        mgi_results, ukb_results
+    ), use.names = TRUE, fill = TRUE)
+}
+cli_progress_done()
+
+# results <- list()
+# outcomes <- c("X165", "X165.1", "X411", "X150", "X157", "X250.2", "X362.2")
+# cli_progress_bar("Running models...", total = length(outcomes))
+# for (i in seq_along(outcomes)) {
+#     cli_progress_update()
+#     tmp_outcome <- c("id", outcomes[i])
+#     mgi_out_ids <- mgi_phecode[phecode == gsub("X", "", outcomes[i]), unique(id)]
+#     mgi_no_out_ids <- setdiff(mgi_phecode[, unique(id)], mgi_out_ids)
+#     mgi_out_tmp <- data.table(
+#         id      = c(mgi_out_ids, mgi_no_out_ids),
+#         outcome = c(rep(1, length(mgi_out_ids)), rep(0, length(mgi_no_out_ids)))
+#     )
+#     setnames(mgi_out_tmp, "outcome", outcomes[i])
+#     mgi_tmp <- merge.data.table(
+#         mgi,
+#         mgi_out_tmp,
+#         by = "id"
+#     )
+#     mgi_tmp <- mgi_tmp[!is.na(get(outcomes[i]))]
+
+#     ukb_tmp_out <- c("id", outcomes[i])
+#     ukb_pim_tmp <- ukb_pim0[, ..ukb_tmp_out]
+#     ukb_pim_tmp[[outcomes[i]]] <- as.numeric(ukb_pim_tmp[[outcomes[i]]] > 0)
+#     ukb_tmp <- merge.data.table(
+#         ukb,
+#         ukb_pim_tmp,
+#         by = "id"
+#     )
+#     ukb_tmp <- ukb_tmp[!is.na(get(outcomes[i]))]
+
+#     mgi_um1 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         data = mgi_tmp
+#     )[, data := "MGI"]
+#     mgi_um2 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         cov = "age",
+#         data = mgi_tmp
+#     )[, data := "MGI"]
+#     ukb_um1 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         data = ukb_tmp
+#     )[, data := "UKB"]
+#     ukb_um2 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         cov = "age",
+#         data = ukb_tmp
+#     )[, data := "UKB"]
+
+#     ## weighted
+#     mgi_wm1 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         data = mgi_tmp,
+#         w = mgi_tmp[[mgi_weight_vars[2]]]
+#     )[, `:=`(data = "MGI", weight = mgi_weight_vars[2])]
+#     mgi_wm2 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         cov = "age",
+#         data = mgi_tmp,
+#         w = mgi_tmp[[mgi_weight_vars[2]]]
+#     )[, `:=`(data = "MGI", weight = mgi_weight_vars[2])]
+#     mgi_wm3 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         data = mgi_tmp,
+#         w = mgi_tmp[[mgi_weight_vars[3]]]
+#     )[, `:=`(data = "MGI", weight = mgi_weight_vars[3])]
+#     mgi_wm4 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         cov = "age",
+#         data = mgi_tmp,
+#         w = mgi_tmp[[mgi_weight_vars[3]]]
+#     )[, `:=`(data = "MGI", weight = mgi_weight_vars[3])]
+#     ukb_wm1 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         data = ukb_tmp,
+#         w = ukb_tmp[, weight]
+#     )[, data := "UKB"]
+#     ukb_wm2 <- mod_fn(
+#         out = outcomes[i],
+#         ex = "smoker",
+#         cov = "age",
+#         data = ukb_tmp,
+#         w = ukb_tmp[, weight]
+#     )[, data := "UKB"]
+
+#     mgi_results <- rbindlist(list(
+#         mgi_um1, mgi_um2, mgi_wm1, mgi_wm2, mgi_wm3, mgi_wm4
+#     ), use.names = TRUE, fill = TRUE)
+#     ukb_results <- rbindlist(list(
+#         ukb_um1, ukb_um2, ukb_wm1, ukb_wm2
+#     ), use.names = TRUE, fill = TRUE)
+
+#     results[[i]] <- rbindlist(list(
+#         mgi_results, ukb_results
+#     ), use.names = TRUE, fill = TRUE)
+# }
+# cli_progress_done()
 
 # combine
 combined <- rbindlist(
-    list(
-        mgi_um1, mgi_um2, ukb_um1, ukb_um2,
-        mgi_wm1, mgi_wm2, mgi_wm3, mgi_wm4, ukb_wm1, ukb_wm2
-    ),
+    results,
     use.names = TRUE, fill = TRUE
 )
 

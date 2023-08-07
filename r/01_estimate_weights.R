@@ -57,7 +57,6 @@ for (i in list.files("fn", full.names = TRUE)) source(i)
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
 mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, `:=` (
-  nhw = nhanes_nhw,
   smoking_current = as.numeric(SmokingStatus == "Current"),
   smoking_former  = as.numeric(SmokingStatus == "Former")
   )]
@@ -152,7 +151,7 @@ for (i in seq_along(names(ip_weights_list))) {
 }
 cli_progress_done()
 
-ipws <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all = TRUE), ip_weights)
+ipws <- ms::merge_list(ip_weights, join_fn = dplyr::full_join)
 
 cli_alert("estimating poststratification weights...")
 post_weights_list <- list(
@@ -183,10 +182,10 @@ for (i in seq_along(names(post_weights_list))) {
 }
 cli_progress_done()
 
-posts <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all = TRUE), post_weights)
+posts <- merge_list(post_weights, join_fn = dplyr::full_join)
 
 weights <- merge.data.table(ipws, posts, by = "id")
-merged  <- Reduce(\(x, y) merge.data.table(x, y, by = "id", all.x = TRUE), list(mgi, ipws, posts))
+merged  <- merge_list(list(mgi, weights), by = "id", join_fn = dplyr::full_join)
 
 # estimate cancer~female log(OR) -----------------------------------------------
 cli_alert("estimating cancer~female log(OR) as sanity check...")
@@ -203,12 +202,16 @@ extract_estimates <- function(
       family  = "quasibinomial",
       data    = data)
   } else {
-    mod <- glm(
+    tmp_design <- svydesign(
+      id      = ~1,
+      weights = ~get(weights),
+      data    = data[!is.na(get(weights)), ]
+    )
+    mod <- svyglm(
       as.formula(paste0(outcome, " ~ ", exposure)),
-      family  = "quasibinomial",
-      data    = data,
-      weights = data[[weights]]
-  )
+      family = "quasibinomial",
+      design = tmp_design
+    )
   }
 
   est     <- summary(mod)$coef[exposure, 1:2]

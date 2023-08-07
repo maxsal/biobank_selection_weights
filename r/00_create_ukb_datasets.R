@@ -362,12 +362,12 @@ pheinfo <- merge.data.table(
 )
 
 
-# Gender rules
-gender_restriction <- data.table(PheWAS::gender_restriction)
-gender_restriction <- rbind(
-  data.table("phecode" = gender_restriction[male_only == FALSE & female_only == FALSE, phecode], "sex" = "Both"),
-  data.table("phecode" = gender_restriction[male_only == TRUE, phecode], "sex" = "Male"),
-  data.table("phecode" = gender_restriction[female_only == TRUE, phecode], "sex" = "Female")
+# Sex rules
+sex_restriction <- data.table(PheWAS::sex_restriction)
+sex_restriction <- rbind(
+  data.table("phecode" = sex_restriction[male_only == FALSE & female_only == FALSE, phecode], "sex" = "Both"),
+  data.table("phecode" = sex_restriction[male_only == TRUE, phecode], "sex" = "Male"),
+  data.table("phecode" = sex_restriction[female_only == TRUE, phecode], "sex" = "Female")
 )
 
 # Exclusion / roll up rules
@@ -379,7 +379,7 @@ pheinfo2 <- unique(fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phe
 
 # create one data.table with all criteria
 pheinfo <- merge(pheinfo, pheinfo2, by = "phecode")
-pheinfo <- merge(pheinfo, gender_restriction, by = "phecode")
+pheinfo <- merge(pheinfo, sex_restriction, by = "phecode")
 pheinfo <- pheinfo[, c("phecode", "description", "sex", "rollup", "leaf", "groupnum", "group", "color", "phecode_exclude_range", "phecode_exclude_phenotypes")]
 
 # add phecode information that's missing (collected form earlier versions)
@@ -619,7 +619,10 @@ for (i in names(comorbid)) {
 dob[, triglycerides := fifelse(hypertension == 0 & mixed_hypertension == 0, 0, 1)]
 
 # keep individuals whose sex == genetic_sex as in_phenome
-dob[, in_phenome := fifelse(id %in% ukb_phecode[, unique(id)] | genetic_sex == sex, 1, 0)]
+dob[, `:=` (
+    in_phenome  = fifelse(id %in% ukb_phecode[, unique(id)], 1, 0),
+    in_phenome2 = fifelse(id %in% ukb_phecode[, unique(id)] | genetic_sex == sex, 1, 0)
+  )]
 
 comorbids <- c(names(comorbid), "triglycerides")
 for (i in comorbids) {
@@ -645,15 +648,20 @@ pim <- dcast(
     fun.aggregate = length,
     fill          = 0
   )
+
+# collect integer variable names from data.table
+int_vars <- names(pim)[which(sapply(pim, is.integer))]
+pim[, (int_vars) := lapply(.SD, \(x) as.numeric(x > 0)), .SDcols = int_vars]
+
 save_qs(
   x = pim,
-  file = paste0(out_path, "UKB_PHENOME_PIM_codes_only_", opt$ukb_version, ".qs")
+  file = paste0(out_path, "UKB_PHENOME_PIM0_", opt$ukb_version, ".qs")
 )
 
 pim2 <- rbindlist(
   list(
     pim,
-    dob[!(id %in% pim[, id]) & in_phenome == 1, .(id)]
+    dob[!(id %in% pim[, id]) & in_phenome2 == 1, .(id)]
   ),
   fill = TRUE,
   use.names = TRUE
@@ -661,5 +669,5 @@ pim2 <- rbindlist(
 pim2[is.na(pim2)] <- 0 
 save_qs(
   x = pim2,
-  file = paste0(out_path, "UKB_PHENOME_PIM0_", opt$ukb_version, ".qs")
+  file = paste0(out_path, "UKB_PHENOME_PIM_w_no_codes_", opt$ukb_version, ".qs")
 )

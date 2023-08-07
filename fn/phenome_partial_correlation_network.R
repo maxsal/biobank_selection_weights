@@ -7,9 +7,9 @@ suppressPackageStartupMessages({
 
 phenome_partial_correlation_network <- function(
     x,
-    from_var   = "phe1",
-    to_var     = "phe2",
-    cor_var    = "estimate",
+    from_var   = "var1",
+    to_var     = "var2",
+    cor_var    = "cor",
     prev_var   = "prev_unweighted",
     thresh     = 0.3,
     savefile   = NULL,
