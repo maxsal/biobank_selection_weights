@@ -1,9 +1,8 @@
-
 # Calculate simplex regression-based inverse probability weights using NHANES
 # data and postratificatiod-based weights using Census, CDC, and SEER data in
 # MGI
 # author:   max salvatore
-# date:     20230418
+# date:     20230809
 
 # libraries --------------------------------------------------------------------
 ms::libri(
@@ -38,7 +37,7 @@ option_list <- list(
     ),
     make_option("--nhanes_survey_names",
         type = "character",
-        default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ,HIV",
+        default = "DEMO,BMX,SMQ,DIQ,MCQ,DPQ,BPQ,HIV,HIQ",
         help = glue(
             "NHANES wave years corresponding to wave ",
             "[default = %default]"
@@ -46,8 +45,8 @@ option_list <- list(
     )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 data_path <- glue("data/private/mgi/{opt$cohort_version}/")
@@ -62,9 +61,10 @@ nhanes_merged <- download_nhanes_data(
 )
 
 keep_vars <- c(
-  "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
-  "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
+  "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", 
+  "DMDEDUC2", "INDHHIN2", "MCQ220", "BMXBMI", "SMQ040", "SMQ020",
+  "DIQ010", "MCQ160C", "WTMEC2YR", "SDMVSTRA", "SDMVPSU",
+  paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC", "HIQ011"
 )
 
 if ("WTMECPRP" %in% names(nhanes_merged)) {
@@ -107,12 +107,13 @@ prepped_nhanes[, `:=`(
 )]
 
 # estimate weighted NHANES
+# see https://wwwn.cdc.gov/nchs/data/Tutorials/Code/DB303_R.r for reference
 dsn <- svydesign(
-    id = ~psu_nhanes,
-    strata = ~strata_nhanes,
+    id      = ~psu_nhanes,
+    strata  = ~strata_nhanes,
     weights = ~weight_nhanes,
-    data = prepped_nhanes,
-    nest = TRUE
+    data    = prepped_nhanes,
+    nest    = TRUE
 )
 
 (nhanes_demo_summary <- weighted_summary_wrapper(
@@ -129,3 +130,5 @@ fwrite(
     file = glue("data/public/nhanes_weighted_demo_summary.txt"),
     sep  = "\t"
 )
+
+cli_alert_success("Finished! 🎉")

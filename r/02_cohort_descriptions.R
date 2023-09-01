@@ -1,7 +1,7 @@
 # Prepare MGI data including deriving variables for comorbidity status and
 # descriptive variables derived from demographic data
 # author:   max salvatore
-# date:     20230418
+# date:     20230809
 
 options(stringsAsFactors = FALSE)
 
@@ -9,7 +9,8 @@ ms::libri(
   ms, data.table, qs, tidyverse, GGally,
   ggnetwork, network, scales, gridExtra,
   qgraph, igraph, circlize, ComplexHeatmap,
-  PheWAS, glue, survey, optparse
+  PheWAS/PheWAS, glue, survey, optparse,
+  cli
 )
 
 option_list <- list(
@@ -45,14 +46,15 @@ for (i in c(
 file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_version)
 
 # data
+cli_alert("loading data...")
 mgi <- read_qs(glue(
   "data/private/mgi/{opt$mgi_version}/",
   "mgi_phenome_partial_correlations_{opt$mgi_version}.qs"
 ))
-mgi_cov <- qread(file_paths[["mgi"]][["cov_processed_file"]])
-mgi_pim <- qread(file_paths[["mgi"]][["pim0_file"]])[IID %in% mgi_cov[, DeID_PatientID], ]
+mgi_cov     <- qread(file_paths[["mgi"]][["cov_processed_file"]])
+mgi_pim     <- qread(file_paths[["mgi"]][["pim0_file"]])[IID %in% mgi_cov[, DeID_PatientID], ]
 mgi_weights <- read_qs(paste0("data/private/mgi/", opt$mgi_version, "/weights_", opt$mgi_version, "_comb.qs"))
-mgi_pim <- merge.data.table(mgi_pim, mgi_weights[, .(id, weights = ps_selection)], by.x = "IID", by.y = "id", all.x = TRUE)
+mgi_pim     <- merge.data.table(mgi_pim, mgi_weights[, .(id, weights = get(opt$mgi_weight))], by.x = "IID", by.y = "id", all.x = TRUE)
 
 ukb <- read_qs(glue(
   "data/private/ukb/{opt$ukb_version}/",
@@ -68,6 +70,7 @@ ukb_pim     <- merge.data.table(ukb_pim, ukb_weights, by = "id", all.x = TRUE)
 pheinfo <- ms::pheinfo
 
 # calculate prevalences --------------------------------------------------------
+cli_alert("calculating unweighted prevalences...")
 ## unweighted
 mgi_prevs <- calculate_prevalences(
   pim_data = mgi_pim,
@@ -82,6 +85,7 @@ ukb_prevs <- calculate_prevalences(
   female_val = "Female"
 )
 
+cli_alert("calculating weighted prevalences...")
 ## weighted
 mgi_prevs_w <- calculate_weighted_prevalences(
   pim_data = mgi_pim[!is.na(weights), ],
@@ -119,6 +123,7 @@ save_qs(
 )
 
 # network plot
+cli_alert("plotting networks...")
 phenome_partial_correlation_network(
   x          = mgi,
   savefile   = glue("results/mgi/{opt$mgi_version}/MGI_network.pdf"),
@@ -135,6 +140,7 @@ phenome_partial_correlation_network(
 )
 
 # chord diagram
+cli_alert("plotting chord diagrams...")
 phenome_partial_correlation_chord_diagram(
   x = mgi,
   savefile = glue("results/mgi/{opt$mgi_version}/MGI_partialchord.pdf")
@@ -145,6 +151,7 @@ phenome_partial_correlation_chord_diagram(
 )
 
 # neoplasm qgraph
+cli_alert("plotting qgraphs...")
 phenome_partial_correlation_neoqgraph(
   x        = mgi,
   savefile = glue("results/mgi/{opt$mgi_version}/MGI_qgraph.pdf")
@@ -153,3 +160,5 @@ phenome_partial_correlation_neoqgraph(
   x        = ukb,
   savefile = glue("results/ukb/{opt$ukb_version}/ukb_qgraph.pdf")
 )
+
+cli_alert_success("done! 🎉")

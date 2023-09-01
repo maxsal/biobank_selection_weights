@@ -1,9 +1,48 @@
+# loads NHANES data directly from CDC specifying wave letter, years,
+#   and datasets
+# author: max salvatore
+# date:   20230110
 suppressPackageStartupMessages({
   require(data.table)
+  require(haven)
+  require(glue)
+  library(cli)
 })
 
+download_nhanes_data <- function(wave_letter = "J",
+                                 wave_years = "2017-2018",
+                                 datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ", "BPQ", "HIV", "HIQ")) {
+  # get urls
+  if (wave_letter == "P") {
+    url_paths <- glue(
+      "https://wwwn.cdc.gov/Nchs/Nhanes/",
+      "{wave_years}/{wave_letter}_{datasets}.xpt"
+    )
+  } else {
+    url_paths <- glue(
+      "https://wwwn.cdc.gov/Nchs/Nhanes/",
+      "{wave_years}/{datasets}_{wave_letter}.xpt"
+    )
+  }
+
+  # download
+  out <- list()
+  cli_progress_bar(name = "Downloading NHANES data", total = length(url_paths))
+  for (i in seq_along(url_paths)) {
+    out[[i]] <- read_xpt(url_paths[i]) |>
+      as.data.table()
+    cli_progress_update()
+  }
+  cli_progress_done()
+
+  # merge and output
+  Reduce(\(x, y) merge.data.table(x, y, all = TRUE, by = "SEQN"), out)
+}
+
+# prepare downloaded NHANES data
+
 prepare_nhanes_data <- function(
-    nhanes_data,
+    nhanes_data    = NULL,
     age_var        = "RIDAGEYR",
     mec_wt_var     = "WTMEC2YR",
     psu_var        = "SDMVPSU",
@@ -15,10 +54,18 @@ prepare_nhanes_data <- function(
     smoke_curr_var = "SMQ040",
     diabetes_var   = "DIQ010",
     race_eth_var   = "RIDRETH1",
-    hiv_var        = "LBXHIVC"
+    hiv_var        = "LBXHIVC",
+    educ_var       = "DMDEDUC2",
+    inc_var        = "INDHHIN2",
+    health_ins_var = "HIQ011"
 ) {
   
-  merged <- nhanes_data
+  if (is.null(nhanes_data)) {
+    cli_alert("{.field nhanes_data} not supplied. downloading default NHANES data...")
+    merged <- download_nhanes_data()
+  } else {
+    merged <- nhanes_data
+  }
   
   merged <- merged[get(age_var) >= 12, ]
   merged <- merged[get(mec_wt_var) != 0, ]
@@ -103,14 +150,39 @@ prepare_nhanes_data <- function(
     default = NA_real_
   )]
 
-  merged[, race_eth := fcase(
+  # race/ethnicity
+  merged[, race_eth := relevel(factor(fcase(
     RIDRETH3 %in% c(1, 2), "Hispanic",
     RIDRETH3 == 3, "Non-Hispanic White",
     RIDRETH3 == 4, "Non-Hispanic Black",
     RIDRETH3 == 6, "Non-Hispanic Asian",
-    RIDRETH3 == 7, "Other",
-    default = NA_character_
+    RIDRETH3 == 7, "Other/Unknown",
+    default = NA_character_), ref = "Non-Hispanic White")
   )]
+
+  # education
+  merged[, education := relevel(factor(fcase(
+    get(educ_var) %in% c(1, 2), "Less than high school graduate",
+    get(educ_var) == 3, "High school graduate or GED",
+    get(educ_var) %in% c(4, 5), "At least some college",
+    get(educ_var) %in% c(7, 9, NA), "Unknown"
+  )), ref = "High school graduate or GED")]
+
+  # income
+  merged[, income := relevel(factor(fcase(
+    get(inc_var) %in% c(1, 2, 3, 4, 5, 6, 13), "Less than 35k",
+    get(inc_var) %in% c(7, 8, 9, 10), "35k-75k",
+    get(inc_var) == 14, "75k-100k",
+    get(inc_var) == 15, "$100,000 or more",
+    get(inc_var) %in% c(12, 77, 99, NA), "Unknown"
+  )), ref = "Less than 35k")]
+
+  # health insurance
+  merged[, insurance_status := relevel(factor(fcase(
+    get(health_ins_var) == 1, "Yes",
+    get(health_ins_var) == 2, "No",
+    get(health_ins_var) %in% c(7, 9, NA), "Unknown"
+  )), ref = "Yes")]
   
   tidy_table <- data.table(
     dataset          = rep("NHANES", nrow(merged)),
@@ -119,6 +191,9 @@ prepare_nhanes_data <- function(
     female           = as.numeric(merged[, SEX] == "Female"),
     age_cat          = merged[, NHANES_AGECAT],
     race_eth         = merged[, race_eth],
+    education        = merged[, education],
+    income           = merged[, income],
+    health_ins       = merged[, insurance_status],
     nhw              = merged[, NHANES_NHW],
     cancer           = as.numeric(merged[, get(cancer_var)] == "Yes"),
     cancer_missing   = as.numeric(is.na(merged[, get(cancer_var)])),

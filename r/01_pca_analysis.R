@@ -1,6 +1,6 @@
 # Conduct principal components analysis of the phecode indicator matrix in MGI
 # author:  max salvatore
-# date:    20220418
+# date:    20220809
 
 # 1. libraries, functions, and options -----------------------------------------
 ms::libri(
@@ -28,8 +28,8 @@ option_list <- list(
   )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 # 2. specifications ------------------------------------------------------------
@@ -48,7 +48,7 @@ mgi_demo <- read_qs(file_paths[["mgi"]][["cov_processed_file"]])[, .(
   age = Age,
   sex = Sex
 )]
-mgi_demo[complete.cases(mgi_demo), ]
+mgi_demo <- mgi_demo[complete.cases(mgi_demo), ]
 
 ### phecode indicator matrix (PEDMASTER_0)
 mgi_pim0 <- qread(file_paths[["mgi"]][["pim0_file"]])
@@ -60,13 +60,14 @@ mgi_pim0 <- merge(
 )
 
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
-weight_vars <- c("id", opt$mgi_weights)
+setnames(mgi_weights, old = opt$mgi_weights, new = "weight")
+mgi_weights <- mgi_weights[!is.na(weight), ]
+weight_vars <- c("id", "weight")
 mgi_weights <- merge.data.table(
   mgi_pim0[, .(id = IID)],
   mgi_weights[, ..weight_vars],
   by = "id"
 )
-setnames(mgi_weights, old = opt$mgi_weights, new = "weight")
 
 short_mgi_pim <- mgi_pim0[, !c("IID")]
 short_mgi_pim[is.na(short_mgi_pim)] <- 0
@@ -106,6 +107,7 @@ ukb_pim0 <- merge(
 ukb_weights <- fread(file_paths[["ukb"]][["weight_file"]], colClasses = "character")[
   , .(id = f.eid, weight = as.numeric(LassoWeight))
 ]
+ukb_weights <- ukb_weights[!is.na(weight), ]
 
 short_ukb_pim <- ukb_pim0[, !c("id")]
 short_ukb_pim[is.na(short_ukb_pim)] <- 0
@@ -215,4 +217,4 @@ ggsave(
   height = 6
 )
 
-cli_alert_success("script complete! 🎉🎉🎉")
+cli_alert_success("script complete! 🎉")

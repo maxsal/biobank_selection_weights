@@ -24,7 +24,7 @@ option_list <- list(
     help = "Version of MGI data [default = %default]"
   ),
   make_option("--weights",
-    type = "character", default = "ps_nhw_f",
+    type = "character", default = "ip_selection_f",
     help = glue(
       "Weighting variable to use for weighted analyses - ",
       "selection, all, or list of named weight variables [default = %default]"
@@ -47,11 +47,11 @@ n_cores    <- availableCores() * opt$core_prop
 # 3. read data -----------------------------------------------------------------
 cli_alert("reading data...")
 ## phecode indicator matrix (PEDMASTER_0)
-pim0 <- fread(file_paths[["mgi"]][["pim0_file"]])
+pim0 <- qread(file_paths[["mgi"]][["pim0_file"]])
 setnames(pim0, old = "IID", new = "id")
 
 ## demographics data
-demo <- fread(file_paths[["mgi"]][["cov_file"]])[, .(
+demo <- qread(file_paths[["mgi"]][["cov_processed_file"]])[, .(
   id       = DeID_PatientID,
   age      = Age,
   alive    = as.numeric(AliveYN == "Y"),
@@ -90,6 +90,7 @@ sub_pim[id %in% female_ids, (male_vars) := lapply(.SD, \(x) NA), .SDcols = male_
 
 mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weights_{opt$mgi_version}_comb.qs"))
 weight_vars <- c("id", opt$weights)
+mgi_weights <- mgi_weights[!is.na(get(opt$weights)), ..weight_vars]
 mgi_weights <- merge.data.table(
   sub_pim[, .(id)],
   mgi_weights[, ..weight_vars],
@@ -129,6 +130,19 @@ if (is.data.table(res_list)) {
   res_table <- rbindlist(res_list, fill = TRUE)
 }
 
+output_file <- glue(
+  "data/private/mgi/{opt$mgi_version}/",
+  "mgi_phenome_partial_correlations_",
+  "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
+  "{opt$mgi_version}.qs"
+)
+
+save_qs(
+  x    = res_table,
+  file = output_file
+)
+
+
 cli_alert("calculating weighted partial correlations....")
 wres_list <- ms::fcor(
   x        = sub_pim[windex, ],
@@ -145,19 +159,6 @@ if (is.data.table(res_list)) {
 } else {
   wres_table <- rbindlist(wres_list, fill = TRUE)
 }
-
-# save results -----------------------------------------------------------------
-output_file <- glue(
-  "data/private/mgi/{opt$mgi_version}/",
-  "mgi_phenome_partial_correlations_",
-  "{ifelse(opt$use_geno == TRUE, 'w_geno_pcs_', '')}",
-  "{opt$mgi_version}.qs"
-)
-
-save_qs(
-  x    = res_table,
-  file = output_file
-)
 
 woutput_file <- glue(
   "data/private/mgi/{opt$mgi_version}/",

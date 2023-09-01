@@ -4,14 +4,7 @@
 # date:     20230418
 
 # libraries, functions, and options --------------------------------------------
-suppressPackageStartupMessages({
-  library(data.table)
-  library(MatchIt)
-  library(logistf)
-  library(glue)
-  library(qs)
-  library(optparse)
-})
+ms::libri(data.table, MatchIt, logistf, glue, qs, cli, optparse, ms)
 
 set.seed(61787)
 
@@ -93,6 +86,19 @@ pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phew
 # weights ----------------------------------------------------------------------
 weight_vars <- unlist(strsplit(opt$weights, ","))
 
+weight_id <- c("id", weight_vars)
+
+ukb_tr_merged <- lapply(
+  names(ukb_tr_pims),
+  \(x) {
+    merge_list(list(ukb_tr_pims[[x]], ukb_covariates[, !c("case")], ukb_weights[, ..weight_id]), by_var = "id", join_fn = dplyr::left_join)[, `:=`(
+      age_at_threshold = round(get(x) / 365.25, 1)
+    )]
+  }
+)
+names(ukb_tr_merged) <- glue("t{time_thresholds}_threshold")
+
+
 # cooccurrence analysis --------------------------------------------------------
 out <- list()
 for (w in seq_along(weight_vars)) {
@@ -100,17 +106,16 @@ for (w in seq_along(weight_vars)) {
 
   out[[w]] <- lapply(
     seq_along(time_thresholds),
-    \(i) output_cooccurrence_results(
-      pim_data     = ukb_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-      t_thresh     = time_thresholds[i],
-      cov_data     = ukb_covariates,
-      covariates   = c("age_at_threshold", "female", "length_followup"),
-      all_phecodes = glue("X{pheinfo[, phecode]}"),
-      model_type   = opt$mod_type,
-      w_data       = ukb_weights,
-      w_var        = weight_vars[w],
-      parallel     = TRUE
-    )
+    \(i) {
+      cli_alert_info("{i}")
+        cooccurrence_analysis(
+          data       = ukb_tr_merged[[i]],
+          covariates = c("age_at_threshold", "female", "length_followup"),
+          weight_var = weight_vars[w],
+          n_cores    = parallelly::availableCores() / 4,
+          parallel   = TRUE
+        )
+    }
   )
 }
 names(out) <- weight_vars

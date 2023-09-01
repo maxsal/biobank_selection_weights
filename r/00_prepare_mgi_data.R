@@ -1,18 +1,12 @@
 # Prepare MGI data including deriving variables for comorbidity status and
 # descriptive variables derived from demographic data
 # author:   max salvatore
-# date:     20230418
+# date:     20230809
 
 # libraries, paths, and such ---------------------------------------------------
-suppressPackageStartupMessages({
-  library(data.table)
-  library(glue)
-  library(qs)
-  library(parallel)
-  library(optparse)
-  library(PheWAS)
-  library(cli)
-})
+ms::libri(
+  data.table, glue, qs, parallel, optparse, PheWAS/PheWAS, cli, ms
+)
 
 # optparse list ----
 option_list <- list(
@@ -22,11 +16,11 @@ option_list <- list(
   )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
-message(glue("using cohort version {opt$mgi_version}; see /net/junglebook/magic_data/EHRdata/"))
+cli_alert(glue("using mgi cohort version {opt$mgi_version}"))
 
 out_path <- glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/mgi/{opt$mgi_version}/")
 if (!dir.exists(out_path)) dir.create(out_path, recursive = TRUE)
@@ -35,11 +29,9 @@ source("fn/files-utils.R")
 file_paths <- get_files(mgi_version = opt$mgi_version)
 
 # load data --------------------------------------------------------------------
-message("loading data...")
+cli_alert("loading data...")
 study <- fread("/net/junglebook/magic_data/Data_Pulls_from_Data_Office/MGI_Study_FirstEnrollment_20221102.txt")
 MGIcohort <- fread(file_paths[["mgi"]][["cov_file"]])
-# load(file = file_paths[["mgi"]][["phe_overview_file"]])
-# load(file = file_paths[["mgi"]][["phecode_dsb_file"]])
 cancer_phecodes <- fread("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/public/cancer_phecodes.txt",
   colClasses = "character"
 )[[1]]

@@ -4,16 +4,9 @@
 # date:     20230220
 
 # libraries, functions, and options --------------------------------------------
-suppressPackageStartupMessages({
-  library(data.table)
-  library(MatchIt)
-  library(logistf)
-  library(glue)
-  library(qs)
-  library(optparse)
-  library(EValue)
-  library(cli)
-})
+ms::libri(
+  data.table, ms, MatchIt, logistf, glue, qs, optparse, EValue, cli
+)
 
 set.seed(61787)
 
@@ -22,7 +15,7 @@ for (i in list.files("./fn/", full.names = TRUE)) source(i)
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome",
-    type = "character", default = "157",
+    type = "character", default = "153",
     help = "Outcome phecode [default = %default]"
   ),
   make_option("--mgi_version",
@@ -85,6 +78,16 @@ mgi_covariates <- read_qs(glue(
   "matched_covariates.qs"
 ))
 
+mgi_tr_merged <- lapply(
+  names(mgi_tr_pims),
+  \(x) {
+    merge_list(list(mgi_tr_pims[[x]], mgi_covariates[, !c("case")]), by_var = "id", join_fn = dplyr::left_join)[, `:=`(
+      age_at_threshold = round(get(x) / 365.25, 1)
+    )]
+  }
+)
+names(mgi_tr_merged) <- glue("t{time_thresholds}_threshold")
+
 ## ukb
 ukb_tr_pims <- lapply(
   seq_along(time_thresholds),
@@ -106,6 +109,16 @@ ukb_covariates <- read_qs(
   )
 )
 
+ukb_tr_merged <- lapply(
+  names(ukb_tr_pims),
+  \(x) {
+    merge_list(list(ukb_tr_pims[[x]], ukb_covariates[, !c("case")]), by_var = "id", join_fn = dplyr::left_join)[, `:=`(
+      age_at_threshold = round(get(x) / 365.25, 1)
+    )]
+  }
+)
+names(ukb_tr_merged) <- glue("t{time_thresholds}_threshold")
+
 ## phenome
 pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
   colClasses = "character", showProgress = FALSE
@@ -116,14 +129,11 @@ pheinfo <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phew
 mgi_results <- list()
 cli_progress_bar(name = "MGI PheWAS", total = length(time_thresholds))
 for (i in seq_along(time_thresholds)) {
-  mgi_results[[i]] <- output_cooccurrence_results(
-    pim_data     = mgi_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-    t_thresh     = time_thresholds[i],
-    cov_data     = mgi_covariates,
-    covariates   = c("age_at_threshold", "female", "length_followup"),
-    all_phecodes = glue("X{pheinfo[, phecode]}"),
-    model_type   = opt$mod_type,
-    parallel     = TRUE
+  mgi_results[[i]] <- cooccurrence_analysis(
+    data       = mgi_tr_merged[[i]],
+    covariates = c("age_at_threshold", "female", "length_followup"),
+    n_cores    = parallelly::availableCores() / 4,
+    parallel   = TRUE
   )
   cli_progress_update()
 }
@@ -134,14 +144,11 @@ names(mgi_results) <- glue("t{time_thresholds}")
 ukb_results <- list()
 cli_progress_bar(name = "UKB PheWAS", total = length(time_thresholds))
 for (i in seq_along(time_thresholds)) {
-  ukb_results[[i]] <- output_cooccurrence_results(
-    pim_data     = ukb_tr_pims[[glue("t{time_thresholds[i]}_threshold")]],
-    t_thresh     = time_thresholds[i],
-    cov_data     = ukb_covariates,
-    covariates   = c("age_at_threshold", "female", "length_followup"),
-    all_phecodes = glue("X{pheinfo[, phecode]}"),
-    model_type   = opt$mod_type,
-    parallel     = TRUE
+  ukb_results[[i]] <- cooccurrence_analysis(
+    data       = ukb_tr_merged[[i]],
+    covariates = c("age_at_threshold", "female", "length_followup"),
+    n_cores    = parallelly::availableCores() / 4,
+    parallel   = TRUE
   )
   cli_progress_update()
 }

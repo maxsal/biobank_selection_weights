@@ -1,7 +1,7 @@
 # Calculate partial correlations in UKB
 # outputs: table of pairwise partial correlations
 # author:  max salvatore
-# date:    20230418
+# date:    20230809
 
 # 1. libraries, functions, and options -----------------------------------------
 options(stringsAsFactors = FALSE)
@@ -153,4 +153,4 @@ save_qs(
   file = woutput_file
 )
 
-cli_alert_success("script success! see {.path {dirname(output_file)}}")
+cli_alert_success("script success! 🎉 see {.path {dirname(output_file)}}")

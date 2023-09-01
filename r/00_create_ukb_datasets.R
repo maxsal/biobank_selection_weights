@@ -1,16 +1,14 @@
 # read and prepare UKB data
-# based almost exclusively on lars' scripts from: https://github.com/umich-cphds/createUKBphenome
+# based on lars' scripts from: https://github.com/umich-cphds/createUKBphenome
 # author: max salvatore
-# date:   20230511
+# date:   20230809
 
 # libraries --------------------------------------------------------------------
-suppressPackageStartupMessages({
-  library(data.table)
-  library(optparse)
-  library(janitor)
-  library(PheWAS)
-})
-options(datatable.print.class = TRUE)
+# install.packages("remotes")
+# remotes::install_github("maxsal/ms")
+ms::libri(
+  data.table, optparse, janitor, PheWAS/PheWAS, cli, qs
+)
 
 # optparse list ----
 option_list <- list(
@@ -20,8 +18,8 @@ option_list <- list(
   )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 source("/net/junglebook/home/mmsalva/projects/ukb_data_explorations/scripts/function.extractUKBdata.r")
@@ -32,17 +30,33 @@ out_path <- paste0("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/d
 
 # pull data --------------------------------------------------------------------
 ## icd9 data
-message("Pulling ICD9 data...")
-icd9 <- reformat_ukb(fields = c(41271, 41281), data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE)
-icd9 <- merge.data.table(icd9$data[[1]], icd9$data[[2]], by.x = c("f.eid", "i.41271"), by.y = c("f.eid", "i.41281"))
+cli_alert("Pulling ICD9 data...")
+icd9 <- reformat_ukb(
+  fields = c(41271, 41281),
+  data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE
+)
+icd9 <- merge.data.table(
+  icd9$data[[1]],
+  icd9$data[[2]],
+  by.x = c("f.eid", "i.41271"),
+  by.y = c("f.eid", "i.41281")
+)
 setnames(icd9, old = c("f.41271", "f.41281"), new = c("diagnosis_code", "date"))
 icd9[, date := as.Date(date)]
 icd9 <- icd9[, .(id = as.character(f.eid), diagnosis_code, date)]
 
 ## icd10 data
-message("Pulling ICD10 data...")
-icd10 <- reformat_ukb(fields = c(41270, 41280), data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE)
-icd10 <- merge.data.table(icd10$data[[1]], icd10$data[[2]], by.x = c("f.eid", "i.41270"), by.y = c("f.eid", "i.41280"))
+cli_alert("Pulling ICD10 data...")
+icd10 <- reformat_ukb(
+  fields = c(41270, 41280),
+  data_coding = FALSE, only_info = FALSE, keep_instances = TRUE, recode = FALSE
+)
+icd10 <- merge.data.table(
+  icd10$data[[1]],
+  icd10$data[[2]],
+  by.x = c("f.eid", "i.41270"),
+  by.y = c("f.eid", "i.41280")
+)
 setnames(icd10, old = c("f.41270", "f.41280"), new = c("diagnosis_code", "date"))
 icd10[, date := as.Date(date)]
 icd10 <- icd10[, .(id = as.character(f.eid), diagnosis_code, date)]
@@ -125,7 +139,7 @@ alc <- merge.data.table(
 )[, .(f.eid, alc_status = c.20117, alc_ev)]
 
 ## ethnic [f.21000] ------------------------------------------------------------
-ethn_coding <- fread("./data/coding/coding1001.tsv")
+ethn_coding <- fread("/net/junglebook/home/mmsalva/projects/ukb_data_explorations/data/coding/coding1001.tsv")
 ethnicity <- list(
     White = c("White", "British", "Irish", "Any other white background"),
     Other = c(
@@ -317,13 +331,13 @@ dob[, id := as.character(id)]
 dob[, consent_date := as.Date(consent_date)]
 
 # process data -----------------------------------------------------------------
-message("Calculating DSB for ICD9 data")
+cli_alert("Calculating DSB for ICD9 data")
 icd9 <- merge.data.table(icd9, dob[, .(id, birth_date)], by = "id", all.x = TRUE)
 icd9[, dsb := round(as.numeric(((date - birth_date))))]
 icd9[, c("date", "birth_date") := NULL][, lexicon := "icd9"]
 print(paste(nrow(icd9), "lines of ICD9 codes for", length(unique(icd9[, id])), "people"))
 
-message("Calculating DSB for ICD10 data")
+cli_alert("Calculating DSB for ICD10 data")
 icd10 <- merge.data.table(icd10, dob[, .(id, birth_date)], by = "id", all.x = TRUE)
 icd10[, dsb := round(as.numeric(((date - birth_date))))]
 icd10[, c("date", "birth_date") := NULL][, lexicon := "icd10"]
@@ -347,7 +361,7 @@ save_qs(
   x = ukb_icd_dsb,
   file = paste0(out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".qs")
 )
-message(paste0("File saved as '", out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".txt/.qs'!"))
+cli_alert(paste0("File saved as '", out_path, "UKB_PHENOME_ICD_DSB_", opt$ukb_version, ".txt/.qs'!"))
 
 # load necessary information for phecode mapping -------------------------------
 # Phecode information
@@ -392,7 +406,7 @@ norollup <- pheinfo$phecode[which(pheinfo$rollup == 0)]
 norollup <- c(norollup, fread("/net/junglebook/home/mmsalva/createUKBphenome/data/no_rollup_extra.txt", colClasses = "character")$phecode)
 
 # map ICD9 codes to phecodes ---------------------------------------------------
-message("Mapping ICD9 codes to phecodes")
+cli_alert("Mapping ICD9 codes to phecodes")
 
 # read PheWAS map (downloaded from https://phewascatalog.org/phecodes; selected "export all" top right corner)
 icd9map <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phecode_icd9_rolled.csv", colClasses = "character")
@@ -403,8 +417,9 @@ codeICD9 <- ICD9codes[, sort(unique(ICD9))]
 
 mappedICD9Codes <- NULL
 icd9map_new <- list()
-pb <- txtProgressBar(max = nrow(icd9map), width = 50, style = 3)
+cli_progress_bar("mapping ICD9 codes", total = nrow(icd9map))
 for (i in seq_len(nrow(icd9map))) {
+  cli_progress_update()
   mapped9 <- grep(icd9map$ICD9[i], codeICD9)
   if (length(mapped9) > 0) {
     mappedICD9Codes <- unique(c(mappedICD9Codes, codeICD9[mapped9]))
@@ -413,9 +428,8 @@ for (i in seq_len(nrow(icd9map))) {
       "ICD9"    = codeICD9[mapped9]
     )
   }
-  setTxtProgressBar(pb, i)
 }
-close(pb)
+cli_progress_done()
 icd9key <- rbindlist(icd9map_new)
 icd9unmapped <- codeICD9[!codeICD9 %in% mappedICD9Codes]
 
@@ -471,7 +485,7 @@ phecode1 <- merge(icd9, icd9key[, .(ICD9, phecode)],
 )
 
 # map ICD10 codes to phecodes --------------------------------------------------
-message("Mapping ICD10 codes to phecodes")
+cli_alert("Mapping ICD10 codes to phecodes")
 
 # read PheWAS map (downloaded from https://phewascatalog.org/phecodes_icd10; selected "export all" top right corner)
 icd10map <- fread("/net/junglebook/home/mmsalva/createUKBphenome/data/phecode_icd10.csv", colClasses = "character")
@@ -487,8 +501,9 @@ ICD10codes <- ICD10codes[, c("ICD10category", "ICD10suffix") := NULL]
 codeICD10 <- ICD10codes[, sort(unique(ICD10))]
 mappedICD10Codes <- NULL
 icd10map_new <- list()
-pb <- txtProgressBar(max = nrow(icd10map), width = 50, style = 3)
+cli_progress_bar("mapping ICD10 codes", total = nrow(icd10map))
 for (i in seq_len(nrow(icd10map))) {
+  cli_progress_update()
   mapped10 <- grep(icd10map$ICD10[i], codeICD10)
   if (length(mapped10) > 0) {
     mappedICD10Codes <- unique(c(mappedICD10Codes, codeICD10[mapped10]))
@@ -497,9 +512,8 @@ for (i in seq_len(nrow(icd10map))) {
       "ICD10" = codeICD10[mapped10]
     )
   }
-  setTxtProgressBar(pb, i)
 }
-close(pb)
+cli_progress_done()
 icd10key <- rbindlist(icd10map_new)
 icd10unmapped <- codeICD10[!codeICD10 %in% mappedICD10Codes]
 
@@ -572,7 +586,7 @@ save_qs(
   x = ukb_phecode,
   file = paste0(out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".qs")
 )
-message(paste0("File saved as '", out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".txt/.qs'!"))
+cli_alert_info(paste0("File saved as '", out_path, "UKB_PHECODE_DSB_MAPPED_", opt$ukb_version, ".txt/.qs'!"))
 
 # save sex data ----------------------------------------------------------------
 first_phe <- ukb_phecode[ukb_phecode[, .I[which.min(dsb)], id]$V1]
@@ -606,7 +620,7 @@ comorbid <- list(
   "cancer"             = list("phecodes" = cancer_phecodes)
 )
 
-message("identifying cases and creating indicator variables...")
+cli_alert("identifying cases and creating indicator variables...")
 for (i in names(comorbid)) {
   comorbid[[i]][["ids"]] <- ukb_phecode[phecode %in% comorbid[[i]][["phecodes"]], id] |>
     unique()
@@ -638,7 +652,7 @@ save_qs(
   x = dob,
   file = paste0(out_path, "UKB_PHENOME_COV_", opt$ukb_version, ".qs")
 )
-message(paste0("File saved as '", out_path, "UKB_PHENOME_COV_", opt$ukv_version, ".txt/.qs'!"))
+cli_alert_info(paste0("File saved as '", out_path, "UKB_PHENOME_COV_", opt$ukv_version, ".txt/.qs'!"))
 
 # save phecode indicator matrix ------------------------------------------------
 pim <- dcast(
@@ -671,3 +685,5 @@ save_qs(
   x = pim2,
   file = paste0(out_path, "UKB_PHENOME_PIM_w_no_codes_", opt$ukb_version, ".qs")
 )
+
+cli_alert_success("Done! 🎉")

@@ -99,7 +99,6 @@ mod_fn <- function(out, ex, cov = NULL, data, w = NULL, verbose = FALSE) {
     mod <- svyglm(
         formula = as.formula(glue("{out} ~ {comb}")),
         family = quasibinomial(),
-        data = data,
         design = svydsn,
     ) |> summary()
     return(data.table(
@@ -127,7 +126,7 @@ mod_fn <- function(out, ex, cov = NULL, data, w = NULL, verbose = FALSE) {
 # )
 
 results <- list()
-outcomes <- c("X401", "X153", "X411.4", "X695.4", "X714.1", "X313.3", "X591", "X280", "X296.2", "X300.1", "X411")
+outcomes <- c("X153")
 cli_progress_bar(total = length(outcomes), format = "estimating {outcome} {pb_bar} {pb_percent} | ETA: {pb_eta}")
 for (i in seq_along(outcomes)) {
         outcome <- outcomes[i]

@@ -1,27 +1,22 @@
 # prepare mgi and ukb data for time-restricted phecode-phecode phewas
 # author:  max salvatore
-# date:    20230418
+# date:    20230809
 
 # 1. libraries, functions, and options (outcome agnostic) ----------------------
 options(stringsAsFactors = FALSE)
 
-suppressPackageStartupMessages({
-  library(data.table)
-  library(qs)
-  library(MatchIt)
-  library(optparse)
-  library(glue)
-})
+ms::libri(
+  data.table, qs, MatchIt, optparse, glue, cli, ms
+)
 
 set.seed(61787)
 
-lapply(list.files("fn/", full.names = TRUE), source) |> # load functions
-  invisible()
+for (i in list.files("fn/", full.names = TRUE)) source(i)
 
 # optparse list ----------------------------------------------------------------
 option_list <- list(
   make_option("--outcome",
-    type = "character", default = "157",
+    type = "character", default = "153",
     help = "Outcome phecode [default = %default]"
   ),
   make_option("--mgi_version",
@@ -61,14 +56,14 @@ option_list <- list(
   )
 )
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args <- parse_args(parser, positional_arguments = 0)
-opt <- args$options
+args   <- parse_args(parser, positional_arguments = 0)
+opt    <- args$options
 print(opt)
 
 # 2. specifications (specifies outcome) --------------------------------------
-time_thresholds <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
+time_thresholds       <- as.numeric(strsplit(opt$time_thresholds, ",")[[1]])
 nearest_matching_vars <- strsplit(opt$nearest_matching_var, ",")[[1]]
-exact_matching_vars <- strsplit(opt$exact_matching_var, ",")[[1]]
+exact_matching_vars   <- strsplit(opt$exact_matching_var, ",")[[1]]
 
 # 3. extra preparations (outcome-specific) -------------------------------------
 ## pull file paths corresponding to the data version specified
@@ -164,11 +159,11 @@ ukb_first_phe <- ukb_full_phe[
 
 # 5. identify cases ------------------------------------------------------------
 ## mgi
-mgi_case <- unique(mgi_first_phe[phecode == opt$outcome])
+mgi_case     <- unique(mgi_first_phe[phecode == opt$outcome])
 mgi_case_ids <- mgi_case[, unique(id)]
 
 ## ukb
-ukb_case <- unique(ukb_first_phe[phecode == opt$outcome])[, id := as.character(id)]
+ukb_case     <- unique(ukb_first_phe[phecode == opt$outcome])[, id := as.character(id)]
 ukb_case_ids <- ukb_case[, unique(id)]
 
 # 6. calculate diagnostic metrics ----------------------------------------------
