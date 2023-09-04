@@ -172,7 +172,7 @@ prepare_nhanes_data <- function(
     get(inc_var) %in% c(1, 2, 3, 4, 5, 6, 13), "Less than 35k",
     get(inc_var) %in% c(7, 8, 9, 10), "35k-75k",
     get(inc_var) == 14, "75k-100k",
-    get(inc_var) == 15, "$100,000 or more",
+    get(inc_var) == 15, "100k+",
     get(inc_var) %in% c(12, 77, 99, NA), "Unknown"
   )), ref = "Less than 35k")]
 
