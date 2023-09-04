@@ -252,6 +252,7 @@ mgi_aou_plot <- prevalence_ratio_plot(
   prevalence_data = plot_dat,
   title_text = "Boxplots of phecode unweighted prevalence ratios in Michigan Genomics Initiative and All of Us",
   y_axis_label = "Prevelance ratio (MGI / AOU)",
+  breaks = 1 * 10^c(-2, -1, 0, 1, 3, 4),
   ratio_var = "mgi_aou",
   savefile = "~/Dropbox (University of Michigan)/projects/dissertation/all_of_us/results/mgi_aou_prevalence_plot.pdf"
 )

@@ -16,21 +16,31 @@ for (i in seq_along(bbs)) {
     names(parcors)[i] <- bbs[i]
 }
 
-setnames(parcors[["mgi"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
-setnames(parcors[["ukb"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(parcors[["mgi"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(parcors[["ukb"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(parcors[["aou"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
 
 wparcors <- list()
-for (i in seq_along(bbs[1:2])) {
-    wparcors[[i]] <- qread(glue("{data_path}{bbs[i]}_phenome_partial_correlations_{bb_dates[i]}.qs"))
+for (i in seq_along(bbs[bbs])) {
+    wparcors[[i]] <- qread(glue("{data_path}{bbs[i]}_phenome_weighted_partial_correlations_{bb_dates[i]}.qs"))
     names(wparcors)[i] <- bbs[i]
 }
-setnames(wparcors[["mgi"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
-setnames(wparcors[["ukb"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(wparcors[["mgi"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(wparcors[["ukb"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
+#setnames(wparcors[["aou"]], c("var1", "var2", "cor"), c("phe1", "phe2", "estimate"))
 
 prevs <- list() 
 for (i in seq_along(bbs)) {
     prevs[[i]] <- qread(glue("{data_path}{bbs[i]}_prevs.qs"))
     names(prevs)[i] <- bbs[i]
+}
+
+common_phecodes <- lapply(prevs, \(x) x[n >= 20, phecode]) |>
+    Reduce(intersect, x = _)
+    
+for (i in seq_along(bbs)) {
+    parcors[[i]] <- parcors[[i]][var1 %in% common_phecodes & var2 %in% common_phecodes]
+    wparcors[[i]] <- wparcors[[i]][var1 %in% common_phecodes & var2 %in% common_phecodes]
 }
 
 # partial correlation graphs ----------------------------------------------
@@ -55,7 +65,7 @@ col_legend <- cowplot::get_legend(
 )
 
 wplots <- list()
-for (i in seq_along(bbs[1:2])) {
+for (i in seq_along(bbs)) {
     wplots[[i]] <- phenome_partial_correlation_network(
         x = wparcors[[i]], prevs = prevs[[i]], savefile = glue("results/{bbs[i]}_wnetwork.pdf"),
         prev_var = "prev_weighted",
@@ -93,23 +103,95 @@ ggsave(
     width = 11.75, height = 15, device = cairo_pdf
 )
 
-wstacked <- ((((wplots[["mgi"]] +
+wstacked <- ((((wplots[["aou"]] +
         labs(
-            title = "A. Michigan Genomics Initiative"
+            title = "A. All of Us"
+        ) + theme(
+            plot.title = element_text(face = "bold")
+        )) /
+        (wplots[["mgi"]] +
+        labs(
+            title = "B. Michigan Genomics Initiative"
         ) + theme(
             plot.title = element_text(face = "bold")
         )) /
     (wplots[["ukb"]] +
         labs(
-            title = "B. UK Biobank"
+            title = "C. UK Biobank"
         ) + theme(
             plot.title = element_text(face = "bold")
         )))) /
     (col_legend)) +
-    plot_layout(heights = c(3, 3, 1))
+    plot_layout(heights = c(3, 3, 3, 1))
 
 ggsave(
     wstacked,
     filename = "results/stacked_wnetworks.pdf",
+    width = 11.75, height = 10, device = cairo_pdf
+)
+
+aou_networks <- ((plots[["aou"]] +
+    labs(
+        title = "A. Unweighted"
+    ) +
+    theme(plot.caption = element_blank())) / (wplots[["aou"]] +
+    labs(
+        title = "B. Weighted"
+    ) +
+    theme(plot.caption = element_blank())) /
+    col_legend) +
+    plot_annotation(
+        title = "Partial correlation networks in All of Us"
+    ) +
+        plot_layout(heights = c(3, 3, 1)) &
+    theme(plot.title = element_text(face = "bold"))
+
+mgi_networks <- ((plots[["mgi"]] +
+    labs(
+        title = "A. Unweighted"
+    ) +
+    theme(plot.caption = element_blank())) / (wplots[["mgi"]] +
+    labs(
+        title = "B. Weighted"
+    ) +
+    theme(plot.caption = element_blank())) /
+    col_legend) +
+    plot_annotation(
+        title = "Partial correlation networks in the Michigan Genomics Initiative"
+    ) +
+    plot_layout(heights = c(3, 3, 1)) &
+    theme(plot.title = element_text(face = "bold"))
+
+ukb_networks <- ((plots[["ukb"]] +
+    labs(
+        title = "A. Unweighted"
+    ) +
+    theme(plot.caption = element_blank())) / (wplots[["ukb"]] +
+    labs(
+        title = "B. Weighted"
+    ) +
+    theme(plot.caption = element_blank())) /
+    col_legend) +
+    plot_annotation(
+        title = "Partial correlation networks in the UK Biobank"
+    ) +
+    plot_layout(heights = c(3, 3, 1)) &
+    theme(plot.title = element_text(face = "bold"))
+
+ggsave(
+    aou_networks,
+    filename = "results/aou_networks.pdf",
+    width = 11.75, height = 10, device = cairo_pdf
+)
+
+ggsave(
+    mgi_networks,
+    filename = "results/mgi_networks.pdf",
+    width = 11.75, height = 10, device = cairo_pdf
+)
+
+ggsave(
+    ukb_networks,
+    filename = "results/ukb_networks.pdf",
     width = 11.75, height = 10, device = cairo_pdf
 )

@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 
 download_nhanes_data <- function(wave_letter = "J",
                                  wave_years = "2017-2018",
-                                 datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ", "BPQ", "HIV", "HIQ")) {
+                                 datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ", "DPQ", "BPQ", "HIV", "HIQ")) {
   # get urls
   if (wave_letter == "P") {
     url_paths <- glue(
@@ -138,11 +138,11 @@ prepare_nhanes_data <- function(
     default = NA_character_
   )]
   
-  dep_cols <- paste0("DPQ0", 1:9, "0")
+  dep_cols <- intersect(paste0("DPQ0", 1:9, "0"), names(merged))
   merged[, (dep_cols) := lapply(.SD, \(x) fifelse(x %in% c(7, 9), NA_real_, x)), .SDcols = dep_cols]
   merged[, phq9_score := rowSums(.SD, na.rm = TRUE), .SDcols = dep_cols]
   merged[, depression := fifelse(phq9_score >= 10, 1, 0)]
-  merged[is.na(DPQ010), depression := NA_real_]
+  if ("DPQ010" %in% names(merged)) merged[is.na(DPQ010), depression := NA_real_]
   
   merged[, hypertension := fcase(
     BPQ020 == 1, 1,
@@ -157,8 +157,7 @@ prepare_nhanes_data <- function(
     RIDRETH3 == 4, "Non-Hispanic Black",
     RIDRETH3 == 6, "Non-Hispanic Asian",
     RIDRETH3 == 7, "Other/Unknown",
-    default = NA_character_), ref = "Non-Hispanic White")
-  )]
+    default = NA_character_)), ref = "Non-Hispanic White")]
 
   # education
   merged[, education := relevel(factor(fcase(
