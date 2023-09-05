@@ -47,8 +47,8 @@ ipw <- function(
               rownames(data.frame(p_internal)) == T)] <- p_nhanes
   temp[which(rownames(data.frame(p_nhanes)) %in%
               rownames(data.frame(p_internal)) == F)] <- NA
-  p_nhanes                     <- temp
-  p_nhanes[which(p_nhanes == 0)] <- 1.921e-05
+  p_nhanes                       <- temp
+  p_nhanes[which(p_nhanes == 0)] <- min(p_nhanes, na.rm = TRUE)
   nhanes_selection        <- p_nhanes * (p_internal / (1 - p_internal))
   ###
   
