@@ -62,40 +62,42 @@ mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))
   )]
 setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
 
-nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
-nhanes_merged <- download_nhanes_data(
-  wave_letter = opt$nhanes_wave_letter,
-  wave_years  = opt$nhanes_wave_years,
-  datasets    = nhanes_datasets
-)
+# nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
+# nhanes_merged <- download_nhanes_data(
+#   wave_letter = opt$nhanes_wave_letter,
+#   wave_years  = opt$nhanes_wave_years,
+#   datasets    = nhanes_datasets
+# )
 
-keep_vars <- c(
-  "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
-  "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-  "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
-)
+# keep_vars <- c(
+#   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
+#   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
+#   "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
+# )
 
-if ("WTMECPRP" %in% names(nhanes_merged)) {
-  setnames(
-    nhanes_merged,
-    "WTMECPRP",
-    "WTMEC2YR"
-  )
-}
-if ("WTINTPRP" %in% names(nhanes_merged)) {
-  setnames(
-    nhanes_merged,
-    "WTINTPRP",
-    "WTINT2YR"
-  )
-}
+# if ("WTMECPRP" %in% names(nhanes_merged)) {
+#   setnames(
+#     nhanes_merged,
+#     "WTMECPRP",
+#     "WTMEC2YR"
+#   )
+# }
+# if ("WTINTPRP" %in% names(nhanes_merged)) {
+#   setnames(
+#     nhanes_merged,
+#     "WTINTPRP",
+#     "WTINT2YR"
+#   )
+# }
 
-nhanes_merged <- nhanes_merged[, ..keep_vars]
+# nhanes_merged <- nhanes_merged[, ..keep_vars]
 
-prepped_nhanes <- prepare_nhanes_data(
-  nhanes_data = nhanes_merged,
-  mec_wt_var = "WTMEC2YR"
-)
+prepped_nhanes <- prepare_nhanes_data()
+prepped_nhanes[, smoker := fcase(
+  smoking_status %in% c("Current", "Former"), 1,
+  smoking_status == "Never", 0,
+  default = NA
+)]
 
 stacked <- rbindlist(list(
   prepped_nhanes,
@@ -107,36 +109,36 @@ cli_alert("estimating ipw weights...")
 
 ip_weights_list <- list(
   "simple" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former",
+               "smoker",
                "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
   "simple_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                 "smoking_current", "smoking_former", "bmi_under",
+                 "smoker", "bmi_under",
                  "bmi_overweight", "bmi_obese", "nhw", "female"),
   "selection" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "cad", "diabetes", "smoker",
                   "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
   "selection_c" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "cad", "diabetes", "smoker",
                   "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
                   "cancer"),
   "selection_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                  "cad", "diabetes", "smoking_current", "smoking_former",
+                  "cad", "diabetes", "smoker",
                   "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
                   "female", "cancer"),
   "cancer" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoking_current", "smoking_former", "bmi_under",
+               "smoker", "bmi_under",
                "bmi_overweight", "bmi_obese", "nhw", "cancer"),
   "depression" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                   "smoking_current", "smoking_former", "bmi_under",
+                   "smoker", "bmi_under",
                    "bmi_overweight", "bmi_obese", "nhw", "depression"),
   "cad" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-            "smoking_current", "smoking_former", "bmi_under",
+            "smoker", "bmi_under",
             "bmi_overweight", "bmi_obese", "nhw", "cad"),
   "diabetes" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                 "smoking_current", "smoking_former", "bmi_under",
+                 "smoker", "bmi_under",
                  "bmi_overweight", "bmi_obese", "nhw", "diabetes"),
   "hypertension" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                     "smoking_current", "smoking_former", "bmi_under",
+                     "smoker", "bmi_under",
                      "bmi_overweight", "bmi_obese", "nhw", "hypertension")
 )
 

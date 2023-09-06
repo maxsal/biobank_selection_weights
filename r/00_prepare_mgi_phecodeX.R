@@ -1,6 +1,6 @@
 # libraries --------------------------------------------------------------------
 ms::libri(
-    ms, qs, data.table, tidyverse, PheWAS/PheWAS, glue, optparse
+    ms, qs, data.table, tidyverse, PheWAS/PheWAS, glue, optparse, cli
 )
 
 # optparse list ---
@@ -64,6 +64,10 @@ restrictPhecodesBySex_mod <- function(phenotypes, id.sex, by_var = "person_id", 
 ## remove sex person-phenotype discordant pairs
 restricted <- restrictPhecodesBySex_mod(mapped, id.sex = id_sex, by_var = "id")
 
+in_demo_and_phenome <- intersect(unique(mgi_demo[, DeID_PatientID]), unique(restricted[, id]))
+
+restricted <- restricted[id %in% in_demo_and_phenome, ]
+
 ## save
 qsave(
     restricted,
@@ -91,6 +95,96 @@ phecodex_n[, prev := N / length(unique(first_restricted$id))]
 qsave(
     phecodex_n,
     file = glue("data/private/mgi/{opt$mgi_version}/MGI_PHECODEX_N_{opt$mgi_version}.qs")
+)
+
+# pim --------------------------------------------------------------------------
+pim <- dcast(
+    first_restricted[, .(id, phecode = phecode)],
+    id ~ phecode,
+    value.var = "phecode",
+    fun.aggregate = length,
+    fill = 0
+)
+
+# collect integer variable names from data.table
+int_vars <- names(pim)[which(sapply(pim, is.integer))]
+pim[, (int_vars) := lapply(.SD, \(x) as.numeric(x > 0)), .SDcols = int_vars]
+
+qsave(
+    pim,
+    file = glue("data/private/mgi/{opt$mgi_version}/MGI_PIM0X_{opt$mgi_version}.qs")
+)
+
+### first and last dsb
+first_dsb <- unique(restricted[restricted[
+  ,
+  .I[which.min(dsb)],
+  "id"
+][["V1"]]][
+  ,
+  .(
+    DeID_PatientID = id,
+    first_dsbx     = dsb,
+    age_at_first_diagnosisx = round(dsb / 365.25, 1)
+  )
+])
+last_dsb <- unique(restricted[restricted[, .I[which.max(dsb)], "id"][["V1"]]][, .(
+    DeID_PatientID = id,
+    last_dsbx     = dsb,
+    age_at_last_diagnosisx = round(dsb / 365.25, 1)
+)])
+
+mgi_demo <- Reduce(
+    \(x, y) merge.data.table(x, y, by = "DeID_PatientID"),
+    list(mgi_demo, first_dsb, last_dsb)
+)
+
+###
+cancer_phecodesx <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/phewas/cancer_phecodesx.csv")[
+    keep == 1, phecode
+]
+
+comorbid <- list(
+    "cadx"                = list("phecodes" = c("CV_404.2")),
+    "diabetesx"           = list("phecodes" = c("EM_202")),
+    "hypertensionx"       = list("phecodes" = c("CV_401")),
+    "mixed_hypertensionx" = list("phecodes" = c("EM_239.3")),
+    "vitamin_dx"          = list("phecodes" = c("EM_232.4")),
+    "depressionx"         = list("phecodes" = c("MB_286.2")),
+    "anxietyx"            = list("phecodes" = c("MB_288")),
+    "bipolarx"            = list("phecodes" = c("MB_286.1")),
+    "cancerx"              = list("phecodes" = cancer_phecodesx)
+)
+
+# identify cases and create indicator variables --------------------------------
+cli_alert("identifying cases and creating indicator variables...")
+cli_progress_bar("deriving comorbidities", total = length(names(comorbid)))
+for (i in names(comorbid)) {
+    comorbid[[i]][["ids"]] <- restricted[phecode %in% comorbid[[i]][["phecodes"]], id] |>
+        unique()
+    cli_progress_update()
+}
+cli_progress_done()
+
+cli_progress_bar("deriving comorbidity indicator variables", total = length(names(comorbid)))
+for (i in names(comorbid)) {
+    set(mgi_demo, j = i, value = fifelse(mgi_demo[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
+    cli_progress_update()
+}
+cli_progress_done()
+
+mgi_demo[, triglyceridesx := fifelse(hypertensionx == 0 & mixed_hypertensionx == 0, 0, 1)]
+
+mgi_demo[, age_catx := between(age_at_last_diagnosisx, 0, 5.99) +
+    2 * between(age_at_last_diagnosisx, 6, 11.99) +
+    3 * between(age_at_last_diagnosisx, 12, 19.99) +
+    4 * between(age_at_last_diagnosisx, 20, 39.99) +
+    5 * between(age_at_last_diagnosisx, 40, 59.99) +
+    6 * between(age_at_last_diagnosisx, 60, 150.99)]
+
+qsave(
+    mgi_demo,
+    file = glue("data/private/mgi/{opt$mgi_version}/datax_{opt$mgi_version}_comb.qs")
 )
 
 cli_alert_success("Finished! 🎉")

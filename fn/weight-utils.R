@@ -7,7 +7,8 @@ ipw <- function(
   covs         = c("as.numeric(age_cat == 5)",
                    "as.numeric(age_cat == 6)", "cad", "diabetes",
                    "smoking_current", "smoking_former", "bmi_under",
-                   "bmi_overweight", "bmi_obese", "nhanes_nhw")
+                   "bmi_overweight", "bmi_obese", "nhanes_nhw"),
+  chop         = TRUE
   ) {
   
   stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
@@ -48,11 +49,11 @@ ipw <- function(
   temp[which(rownames(data.frame(p_nhanes)) %in%
               rownames(data.frame(p_internal)) == F)] <- NA
   p_nhanes                       <- temp
-  p_nhanes[which(p_nhanes == 0)] <- min(p_nhanes, na.rm = TRUE)
+  p_nhanes[which(p_nhanes == 0)] <- min(p_nhanes[which(p_nhanes > 0)], na.rm = TRUE)
   nhanes_selection        <- p_nhanes * (p_internal / (1 - p_internal))
   ###
   
-  nhanes_selection <- chopr(nhanes_selection)
+  if (chop) nhanes_selection <- chopr(nhanes_selection)
   nhanes_weight <- 1 / nhanes_selection
   nhanes_weight <- stacked_data[dataset == dataset_name, .N] *
                           nhanes_weight /
@@ -79,8 +80,11 @@ ipw <- function(
                          1 - nhanes_cancer)
     cancer_factor <- (num[stacked_data[, dataset] == dataset_name] /
                         denom[stacked_data[, dataset] == dataset_name])
-    cancer_factor <- chopr(cancer_factor)
-    nhanes_weight <- cancer_factor * nhanes_weight
+    if (chop) {
+      nhanes_weight <- chopr(cancer_factor * nhanes_weight)
+    } else {
+      nhanes_weight <- cancer_factor * nhanes_weight
+    }
     nhanes_weight <- stacked_data[dataset == dataset_name, .N] *
                                   nhanes_weight /
                                   sum(nhanes_weight, na.rm = TRUE)

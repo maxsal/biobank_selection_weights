@@ -81,10 +81,13 @@ poststrat_nhanes <- function(
 
     # 4. merge probabilities into internal data ---------------------------------
     sub_vars <- c(id_var, covs)
+
+    min_pop_prob <- min(population_proportions[, pop_prob][which(population_proportions[, pop_prob] > 0)])
+    population_proportions[pop_prob == 0, pop_prob := min_pop_prob]
+
     merged <- int_data[, ..sub_vars] |>
         merge.data.table(population_proportions, by = covs) |>
         merge.data.table(internal_probabilities, by = covs)
-    
     merged[, ps_weight := pop_prob / int_prob]
 
     # 5. process ----------------------------------------------------------------
