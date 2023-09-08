@@ -56,53 +56,30 @@ for (i in list.files("fn", full.names = TRUE)) source(i)
 
 # load data --------------------------------------------------------------------
 cli_alert("loading data...")
-mgi <- read_qs(glue("{data_path}data_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, `:=` (
+# MGI
+mgi <- read_qs(glue("{data_path}datax_{opt$cohort_version}_{opt$mgi_cohort}.qs"))[, `:=` (
   smoking_current = as.numeric(SmokingStatus == "Current"),
   smoking_former  = as.numeric(SmokingStatus == "Former")
   )]
-setnames(mgi, "DeID_PatientID", "id", skip_absent = TRUE)
+setnames(mgi, c("DeID_PatientID", "age_at_last_diagnosisx"), c("id", "age"), skip_absent = TRUE)
 
-# nhanes_datasets <- unlist(strsplit(opt$nhanes_survey_names, ","))
-# nhanes_merged <- download_nhanes_data(
-#   wave_letter = opt$nhanes_wave_letter,
-#   wave_years  = opt$nhanes_wave_years,
-#   datasets    = nhanes_datasets
-# )
+mgi[, bmi_cat := relevel(factor(fcase(
+  bmi_cat == 1, "Underweight",
+  bmi_cat == 2, "Normal weight",
+  bmi_cat == 3, "Overweight",
+  bmi_cat == 4, "Obese",
+  default = "Unknown"
+)), ref = "Normal weight")]
+mgi[, c("cancer", "diabetes", "cad") := NULL]
+setnames(mgi, c("cancerx", "cadx", "diabetesx"), c("cancer", "cad", "diabetes"))
 
-# keep_vars <- c(
-#   "SEQN", "RIAGENDR", "WTINT2YR", "RIDAGEYR", "RIDRETH1", "RIDRETH3", "MCQ220",
-#   "BMXBMI", "SMQ040", "SMQ020", "DIQ010", "MCQ160C", "WTMEC2YR",
-#   "SDMVSTRA", "SDMVPSU", paste0("DPQ0", 1:9, "0"), "BPQ020", "LBXHIVC"
-# )
-
-# if ("WTMECPRP" %in% names(nhanes_merged)) {
-#   setnames(
-#     nhanes_merged,
-#     "WTMECPRP",
-#     "WTMEC2YR"
-#   )
-# }
-# if ("WTINTPRP" %in% names(nhanes_merged)) {
-#   setnames(
-#     nhanes_merged,
-#     "WTINTPRP",
-#     "WTINT2YR"
-#   )
-# }
-
-# nhanes_merged <- nhanes_merged[, ..keep_vars]
-
+# NHIS
 prepped_nhis <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/prepped_nhis.csv")[, dataset := "NHIS"]
 setnames(prepped_nhis, "chd", "cad")
 prepped_nhis[, samp_WTFA_A := 1/WTFA_A]
+prepped_nhis[, bmi_cat := relevel(factor(bmi_cat), ref = "Normal weight")]
 
-# prepped_nhanes <- prepare_nhanes_data()
-# prepped_nhanes[, smoker := fcase(
-#   smoking_status %in% c("Current", "Former"), 1,
-#   smoking_status == "Never", 0,
-#   default = NA
-# )]
-
+# stack
 stacked <- rbindlist(list(
   prepped_nhis,
   mgi[][, dataset := "MGI"]
@@ -112,49 +89,22 @@ stacked <- rbindlist(list(
 cli_alert("estimating ipw weights...")
 
 ip_weights_list <- list(
-  "simple" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoker",
-               "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
-  "simple_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                 "smoker", "bmi_under",
-                 "bmi_overweight", "bmi_obese", "nhw", "female"),
-  "selection" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
+  "selection" = c("as.numeric(age >= 50)",
                   "cad", "diabetes", "smoker",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw"),
-  "selection_c" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                  "cad", "diabetes", "smoker",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
-                  "cancer"),
-  "selection_f" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                  "cad", "diabetes", "smoker",
-                  "bmi_under", "bmi_overweight", "bmi_obese", "nhw",
-                  "female", "cancer"),
-  "cancer" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-               "smoker", "bmi_under",
-               "bmi_overweight", "bmi_obese", "nhw", "cancer"),
-  "depression" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                   "smoker", "bmi_under",
-                   "bmi_overweight", "bmi_obese", "nhw", "depression"),
-  "cad" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-            "smoker", "bmi_under",
-            "bmi_overweight", "bmi_obese", "nhw", "cad"),
-  "diabetes" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                 "smoker", "bmi_under",
-                 "bmi_overweight", "bmi_obese", "nhw", "diabetes"),
-  "hypertension" = c("as.numeric(age_cat == 5)", "as.numeric(age_cat == 6)",
-                     "smoker", "bmi_under",
-                     "bmi_overweight", "bmi_obese", "nhw", "hypertension")
+                  "bmi_cat", "nhw",
+                  "female", "cancer")
 )
 
 ip_weights <- list()
 cli_progress_bar(name = "estimating ipw weights", total = length(names(ip_weights_list)))
 for (i in seq_along(names(ip_weights_list))) {
   tmp_weights <- ipw(
-    stacked_data = stacked,
+    stacked_data       = stacked,
     weight_outcome_var = "WTFA_A",
-    samp_var = "samp_WTFA_A",
-    external_dataset = "NHISS",
-                     covs = ip_weights_list[[names(ip_weights_list)[i]]])
+    samp_var           = "samp_WTFA_A",
+    external_dataset   = "NHIS",
+    covs               = ip_weights_list[[names(ip_weights_list)[i]]]
+  )
   setnames(tmp_weights, "ip_weight", paste0("ip_", names(ip_weights_list)[i]))
   ip_weights[[i]] <- tmp_weights
   cli_progress_update()
@@ -165,14 +115,7 @@ ipws <- ms::merge_list(ip_weights, join_fn = dplyr::full_join)
 
 cli_alert("estimating poststratification weights...")
 post_weights_list <- list(
-  "selection"    = c("smoker", "cad", "diabetes"),
-  "selection_c"  = c("smoker", "cad", "diabetes", "cancer"),
-  "selection_f"  = c("smoker", "cad", "diabetes", "cancer", "female"),
-  "nhw"          = c("smoker", "cad", "diabetes", "cancer", "nhw"),
-  "nhw_f"        = c("smoker", "cad", "diabetes", "cancer", "nhw", "female"),
-  "depression"   = c("smoker", "cad", "diabetes", "cancer", "depression"),
-  "diabetes"     = c("smoker", "cad", "diabetes", "cancer", "diabetes"),
-  "hypertension" = c("smoker", "cad", "diabetes", "cancer", "hypertension")
+  "selection" = c("smoker", "cad", "diabetes", "cancer", "nhw", "female", "bmi_cat")
 )
 
 post_weights <- list()
@@ -180,10 +123,14 @@ cli_progress_bar(name = "estimating poststratification weights", total = length(
 for (i in seq_along(names(post_weights_list))) {
   tmp_weights <- poststrat_nhanes(
     int_data       = mgi,
-    nhanes_data    = prepped_nhanes,
+    ext_data       = prepped_nhis,
+    psu_var        = "PPSU",
+    strata_var     = "PSTRAT",
+    weight_var     = "WTFA_A",
     chop           = TRUE,
     age_bin        = TRUE,
-    age_bin_breaks = c(seq(0, 80, 10), 150),
+    age_bin_breaks = c(0, 50, 150),
+    not_num_vars = "bmi_cat",
     covs           = post_weights_list[[names(post_weights_list)[i]]]
   )
   setnames(tmp_weights, "ps_weight", paste0("ps_", names(post_weights_list)[i]))
@@ -273,16 +220,17 @@ est_out[[i+1]] <- extract_estimates(
 
 est_out <- rbindlist(est_out)
 
+
 fwrite(
   x    = est_out,
-  file = glue("{data_path}cancer_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.txt"),
+  file = glue("{data_path}cancerx_female_logor_est_{opt$cohort_version}_{opt$mgi_cohort}.txt"),
   sep  = "\t"
 )
 
 # save -------------------------------------------------------------------------
 save_qs(
   x    = weights,
-  file = glue("{data_path}weights_{opt$cohort_version}_{opt$mgi_cohort}.qs")
+  file = glue("{data_path}weightsx_{opt$cohort_version}_{opt$mgi_cohort}.qs")
 )
 
 cli_alert_success("script success! see {.path {data_path}} and suffix {opt$mgi_cohort} 🥳")

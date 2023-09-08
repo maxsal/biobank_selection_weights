@@ -61,7 +61,7 @@ poststrat_nhanes <- function(
     prop.table() |>
     as.data.table()
     setnames(population_proportions, "N", "pop_prob")
-
+    
     if (!is.null(not_num_vars)) {
         num_vars <- setdiff(covs, c(not_num_vars, "age_bin"))
     } else {

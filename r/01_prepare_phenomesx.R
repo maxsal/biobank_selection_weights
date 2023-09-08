@@ -81,6 +81,12 @@ cli_alert("checking that outcome exists in both phenomes...")
 mgi_pim0 <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_PIM0X_{opt$mgi_version}.qs"))
 ukb_pim0 <- qread(glue("data/private/ukb/{opt$ukb_version}/UKB_PIM0X_{opt$ukb_version}.qs"))
 
+# restrict to common phecodes
+common_codes <- fread("data/public/phecodex_20plus.csv")[plus20 == 1, phecode]
+pim_vars <- c("id", common_codes)
+mgi_pim0 <- mgi_pim0[, ..pim_vars]
+ukb_pim0 <- ukb_pim0[, ..pim_vars]
+
 if (
   opt$outcome %in% names(mgi_pim0) &
     opt$outcome %in% names(ukb_pim0)
@@ -145,6 +151,7 @@ setnames(mgi_cov,
 mgi_full_phe <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_FULL_PHECODEX_DSB_{opt$mgi_version}.qs"))
 if ("IID" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "IID", "id")
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "DaysSinceBirth", "dsb")
+mgi_full_phe <- mgi_full_phe[phecode %in% common_codes, ]
 
 mgi_first_phe <- mgi_full_phe[
   mgi_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
@@ -159,6 +166,7 @@ ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
 
 # ### icd-phecode data
 ukb_full_phe <- qread(glue("data/private/ukb/{opt$ukb_version}/UKB_FULL_PHECODEX_DSB_{opt$ukb_version}.qs"))
+ukb_full_phe <- ukb_full_phe[phecode %in% common_codes, ]
 ukb_first_phe <- ukb_full_phe[
   ukb_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
 ]
