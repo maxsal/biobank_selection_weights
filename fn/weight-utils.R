@@ -3,6 +3,7 @@
 ipw <- function(
   stacked_data,
   weight_outcome_var = "weight_nhanes",
+  samp_var = "samp_nhanes",
   external_dataset = "NHANES",
   dataset_name = "MGI",
   id_var       = "id",
@@ -13,7 +14,7 @@ ipw <- function(
   chop         = TRUE
   ) {
   
-  stacked_data[dataset == external_dataset, get(weight_outcome_var) := .N * get(weight_outcome_var) /
+  stacked_data[dataset == external_dataset, (weight_outcome_var) := .N * get(weight_outcome_var) /
                                       sum(get(weight_outcome_var), na.rm = TRUE)]
   
   if ("cancer" %in% covs) {
@@ -25,9 +26,9 @@ ipw <- function(
   select_mod_covs <- paste0(covs, collapse = " + ")
 
   # modeling nhanes sampling weights
-  nhanes_select_mod <- simplexreg(as.formula(paste0("samp_nhanes ~ ",
+  nhanes_select_mod <- simplexreg(as.formula(paste0(samp_var, " ~ ",
                                                     select_mod_covs)),
-                                  data = stacked_data[dataset == 'NHANES', ])
+                                  data = stacked_data[dataset == external_dataset, ])
   
   
   # selection model into internal data
