@@ -4,8 +4,14 @@ ukb_icd <- qread("data/private/ukb/20221117/UKB_PHENOME_ICD_DSB_20221117.qs")
 setnames(ukb_icd, c("lexicon", "diagnosis_code"), c("vocabulary_id", "code"))
 ukb_icd[, vocabulary_id := toupper(vocabulary_id)]
 
-ukb_demo <- qread("data/private/ukb/20221117/UKB_PHENOME_COV_20221117.qs")
+ukb_icd <- ukb_icd[vocabulary_id == "ICD10", ]
+ukb_icd[, ICD10category := gsub("([A-Z][0-9]{2}).+", "\\1", code)]
+ukb_icd[, ICD10suffix := gsub("[A-Z].+", "", gsub("^[A-Z][0-9]{2}", "", code))]
+ukb_icd[, code := paste0(ICD10category, ifelse(ICD10suffix == "", "", "."), ICD10suffix)]
+ukb_icd[, c("ICD10category", "ICD10suffix") := NULL]
+ukb_icd <- unique(ukb_icd)
 
+ukb_demo <- qread("data/private/ukb/20221117/UKB_PHENOME_COV_20221117.qs")
 
 # external
 phecodex_map <- fread("data/public/phecodex/phecodeX_ICD_WHO_map_flat.csv")
