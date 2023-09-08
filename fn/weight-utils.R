@@ -2,6 +2,8 @@
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
 ipw <- function(
   stacked_data,
+  weight_outcome_var = "weight_nhanes",
+  external_dataset = "NHANES",
   dataset_name = "MGI",
   id_var       = "id",
   covs         = c("as.numeric(age_cat == 5)",
@@ -11,8 +13,8 @@ ipw <- function(
   chop         = TRUE
   ) {
   
-  stacked_data[dataset == "NHANES", weight_nhanes := .N * weight_nhanes /
-                                      sum(weight_nhanes, na.rm = TRUE)]
+  stacked_data[dataset == external_dataset, get(weight_outcome_var) := .N * get(weight_outcome_var) /
+                                      sum(get(weight_outcome_var), na.rm = TRUE)]
   
   if ("cancer" %in% covs) {
     cancer_TF <- TRUE
@@ -62,8 +64,8 @@ ipw <- function(
   ## With Cancer
   if (cancer_TF == TRUE) {
     nhanes_cancer_mod <- glm(as.formula(paste0("cancer ~ ", select_mod_covs)),
-                               data = stacked_data[dataset == "NHANES", ],
-                               weights = weight_nhanes, family = quasibinomial())
+                               data = stacked_data[dataset == external_dataset, ],
+                               weights = get(weight_outcome_var), family = quasibinomial())
     
     nhanes_cancer <- predict(nhanes_cancer_mod, type = "response",
                                 newdata = stacked_data)
