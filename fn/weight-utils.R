@@ -1,3 +1,6 @@
+suppressPackageStartupMessages({
+  library(simplexreg)
+})
 # calculate IPW from stacked data
 # ADAPTED FROM: /net/junglebook/home/kundur/EHR/Processed Code/Weighted_using_lauren_code_bb.R
 ipw <- function(
