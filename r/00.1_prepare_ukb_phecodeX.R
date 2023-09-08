@@ -1,33 +1,19 @@
-# libraries --------------------------------------------------------------------
-ms::libri(
-    ms, qs, data.table, tidyverse, PheWAS/PheWAS, glue, optparse, cli
-)
+ms::libri(ms, qs, data.table, PheWAS/PheWAS, glue)
 
-# optparse list ---
-option_list <- list(
-    make_option("--mgi_version",
-        type = "character", default = "20220822",
-        help = "MGI cohort version [default = '20220822']"
-    )
-)
-parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
-args   <- parse_args(parser, positional_arguments = 0)
-opt    <- args$options
-print(opt)
+ukb_icd <- qread("data/private/ukb/20221117/UKB_PHENOME_ICD_DSB_20221117.qs")
+setnames(ukb_icd, c("lexicon", "diagnosis_code"), c("vocabulary_id", "code"))
+ukb_icd[, vocabulary_id := toupper(vocabulary_id)]
 
-# load data --------------------------------------------------------------------
-## internal
-mgi_icd  <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_ICD_{opt$mgi_version}.qs"))
-mgi_demo <- qread(glue("data/private/mgi/{opt$mgi_version}/data_{opt$mgi_version}_comb.qs"))
-setnames(mgi_icd, c("IID", "DiagnosisCode", "lexicon", "DaysSinceBirth"), c("id", "code", "vocabulary_id", "dsb"))
+ukb_demo <- qread("data/private/ukb/20221117/UKB_PHENOME_COV_20221117.qs")
 
-## external
-### mapping table
-phecodex_map <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/phecodeX_R_map.csv",
-                      colClasses = "character")
+
+# external
+phecodex_map <- fread("data/public/phecodex/phecodeX_ICD_WHO_map_flat.csv")
+setnames(phecodex_map, "icd", "code")
 ### rollup map
 phecodex_rollup <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/phecodeX_R_rollup_map.csv",
-                         colClasses = "character")
+    colClasses = "character"
+)
 ### sex restriction map
 phecodex_sex <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/phecodeX_R_sex.csv")
 ### phecodex info
@@ -35,11 +21,11 @@ phecodex_info <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/p
 
 # map phenotypes ---------------------------------------------------------------
 mapped <- mapCodesToPhecodes(
-    input = mgi_icd, vocabulary.map = phecodex_map,
+    input = ukb_icd, vocabulary.map = phecodex_map,
     rollup.map = phecodex_rollup, make.distinct = TRUE
 )
 
-id_sex <- mgi_demo[, .(id = DeID_PatientID, sex = Sex)]
+id_sex <- ukb_demo[, .(id, sex)]
 
 # remove sex-specific phecodes that are discordant with individual's reported sex at birth
 restrictPhecodesBySex_mod <- function(phenotypes, id.sex, by_var = "person_id", sex_var = "sex") {
@@ -64,37 +50,38 @@ restrictPhecodesBySex_mod <- function(phenotypes, id.sex, by_var = "person_id", 
 ## remove sex person-phenotype discordant pairs
 restricted <- restrictPhecodesBySex_mod(mapped, id.sex = id_sex, by_var = "id")
 
-in_demo_and_phenome <- intersect(unique(mgi_demo[, DeID_PatientID]), unique(restricted[, id]))
+in_demo_and_phenome <- intersect(unique(ukb_demo[, id]), unique(restricted[, id]))
 
 restricted <- restricted[id %in% in_demo_and_phenome, ]
 
 ## save
 qsave(
     restricted,
-    file = glue("data/private/mgi/{opt$mgi_version}/MGI_FULL_PHECODEX_DSB_{opt$mgi_version}.qs")
+    file = glue("data/private/ukb/20221117/UKB_FULL_PHECODEX_DSB_20221117.qs")
 )
 
 # get first phecode per person -------------------------------------------------
-first_restricted <- restricted[ restricted[, .I[which.min(dsb)], by = c("id", "phecode")][["V1"]], ]
+first_restricted <- restricted[restricted[, .I[which.min(dsb)], by = c("id", "phecode")][["V1"]], ]
 
 ## save
 qsave(
     first_restricted,
-    file = glue("data/private/mgi/{opt$mgi_version}/MGI_FIRST_PHECODEX_DSB_{opt$mgi_version}.qs")
+    file = glue("data/private/ukb/20221117/UKB_FIRST_PHECODEX_DSB_20221117.qs")
 )
 
 # get phecode info -------------------------------------------------------------
 phecodex_n <- first_restricted[, .N, phecode][order(-N)]
 phecodex_n <- merge.data.table(
-    phecodex_n, phecodex_info, by.x = "phecode", by.y = "phenotype",
+    phecodex_n, phecodex_info,
+    by.x = "phecode", by.y = "phenotype",
     all.x = TRUE
 )[order(-N), ]
-phecodex_n[, prev := N / length(unique(first_restricted$id))]
+phecodex_n[, prev := N / length(unique(restricted$id))]
 
 ## save
 qsave(
     phecodex_n,
-    file = glue("data/private/mgi/{opt$mgi_version}/MGI_PHECODEX_N_{opt$mgi_version}.qs")
+    file = glue("data/private/ukb/20221117/UKB_PHECODEX_N_20221117.qs")
 )
 
 # pim --------------------------------------------------------------------------
@@ -112,31 +99,31 @@ pim[, (int_vars) := lapply(.SD, \(x) as.numeric(x > 0)), .SDcols = int_vars]
 
 qsave(
     pim,
-    file = glue("data/private/mgi/{opt$mgi_version}/MGI_PIM0X_{opt$mgi_version}.qs")
+    file = glue("data/private/ukb/20221117/UKB_PIM0X_20221117.qs")
 )
 
 ### first and last dsb
 first_dsb <- unique(restricted[restricted[
-  ,
-  .I[which.min(dsb)],
-  "id"
+    ,
+    .I[which.min(dsb)],
+    "id"
 ][["V1"]]][
-  ,
-  .(
-    DeID_PatientID = id,
-    first_dsbx     = dsb,
-    age_at_first_diagnosisx = round(dsb / 365.25, 1)
-  )
+    ,
+    .(
+        id,
+        first_dsbx = dsb,
+        age_at_first_diagnosisx = round(dsb / 365.25, 1)
+    )
 ])
 last_dsb <- unique(restricted[restricted[, .I[which.max(dsb)], "id"][["V1"]]][, .(
-    DeID_PatientID = id,
-    last_dsbx     = dsb,
+    id,
+    last_dsbx = dsb,
     age_at_last_diagnosisx = round(dsb / 365.25, 1)
 )])
 
-mgi_demo <- Reduce(
-    \(x, y) merge.data.table(x, y, by = "DeID_PatientID"),
-    list(mgi_demo, first_dsb, last_dsb)
+ukb_demo <- Reduce(
+    \(x, y) merge.data.table(x, y, by = "id"),
+    list(ukb_demo, first_dsb, last_dsb)
 )
 
 ###
@@ -145,15 +132,15 @@ cancer_phecodesx <- fread("https://raw.githubusercontent.com/maxsal/public_data/
 ]
 
 comorbid <- list(
-    "cadx"                = list("phecodes" = c("CV_404.2")),
-    "diabetesx"           = list("phecodes" = c("EM_202")),
-    "hypertensionx"       = list("phecodes" = c("CV_401")),
+    "cadx" = list("phecodes" = c("CV_404.2")),
+    "diabetesx" = list("phecodes" = c("EM_202")),
+    "hypertensionx" = list("phecodes" = c("CV_401")),
     "mixed_hypertensionx" = list("phecodes" = c("EM_239.3")),
-    "vitamin_dx"          = list("phecodes" = c("EM_232.4")),
-    "depressionx"         = list("phecodes" = c("MB_286.2")),
-    "anxietyx"            = list("phecodes" = c("MB_288")),
-    "bipolarx"            = list("phecodes" = c("MB_286.1")),
-    "cancerx"              = list("phecodes" = cancer_phecodesx)
+    "vitamin_dx" = list("phecodes" = c("EM_232.4")),
+    "depressionx" = list("phecodes" = c("MB_286.2")),
+    "anxietyx" = list("phecodes" = c("MB_288")),
+    "bipolarx" = list("phecodes" = c("MB_286.1")),
+    "cancerx" = list("phecodes" = cancer_phecodesx)
 )
 
 # identify cases and create indicator variables --------------------------------
@@ -168,14 +155,14 @@ cli_progress_done()
 
 cli_progress_bar("deriving comorbidity indicator variables", total = length(names(comorbid)))
 for (i in names(comorbid)) {
-    set(mgi_demo, j = i, value = fifelse(mgi_demo[["DeID_PatientID"]] %in% comorbid[[i]][["ids"]], 1, 0))
+    set(ukb_demo, j = i, value = fifelse(ukb_demo[["id"]] %in% comorbid[[i]][["ids"]], 1, 0))
     cli_progress_update()
 }
 cli_progress_done()
 
-mgi_demo[, triglyceridesx := fifelse(hypertensionx == 0 & mixed_hypertensionx == 0, 0, 1)]
+ukb_demo[, triglyceridesx := fifelse(hypertensionx == 0 & mixed_hypertensionx == 0, 0, 1)]
 
-mgi_demo[, age_catx := between(age_at_last_diagnosisx, 0, 5.99) +
+ukb_demo[, age_catx := between(age_at_last_diagnosisx, 0, 5.99) +
     2 * between(age_at_last_diagnosisx, 6, 11.99) +
     3 * between(age_at_last_diagnosisx, 12, 19.99) +
     4 * between(age_at_last_diagnosisx, 20, 39.99) +
@@ -183,8 +170,8 @@ mgi_demo[, age_catx := between(age_at_last_diagnosisx, 0, 5.99) +
     6 * between(age_at_last_diagnosisx, 60, 150.99)]
 
 qsave(
-    mgi_demo,
-    file = glue("data/private/mgi/{opt$mgi_version}/datax_{opt$mgi_version}_comb.qs")
+    ukb_demo,
+    file = glue("data/private/ukb/20221117/datax_20221117_comb.qs")
 )
 
 cli_alert_success("Finished! 🎉")

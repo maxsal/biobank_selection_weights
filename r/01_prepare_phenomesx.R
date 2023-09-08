@@ -79,32 +79,34 @@ file_paths <- get_files(
 ## check that outcome exists in both datasets
 cli_alert("checking that outcome exists in both phenomes...")
 mgi_pim0 <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_PIM0X_{opt$mgi_version}.qs"))
-# ukb_pim0 <- qread(file_paths[["ukb"]][["pim0_file"]])
+ukb_pim0 <- qread(glue("data/private/ukb/{opt$ukb_version}/UKB_PIM0X_{opt$ukb_version}.qs"))
 
-# if (paste0("X", gsub("X", "", opt$outcome)) %in% names(mgi_pim0) &
-#   paste0("X", gsub("X", "", opt$outcome)) %in% names(ukb_pim0)) {
-#   cli_alert_success("outcome exists! procceeding...")
-# } else {
-#   cli_alert_danger()("outcome does not exist in both datasets! stopping...")
-#   stop(paste0(
-#     "outcome phecode ", opt$outcome, " does not exist in ",
-#     fcase(
-#       !(paste0("X", gsub("X", "", opt$outcome)) %in% names(mgi_pim0)) &
-#         !(paste0("X", gsub("X", "", opt$outcome)) %in% names(ukb_pim0)), "mgi and ukb",
-#       !(paste0("X", gsub("X", "", opt$outcome)) %in% names(mgi_pim0)), "mgi",
-#       !(paste0("X", gsub("X", "", opt$outcome)) %in% names(ukb_pim0)), "ukb"
-#     )
-#   ))
-# }
+if (
+  opt$outcome %in% names(mgi_pim0) &
+    opt$outcome %in% names(ukb_pim0)
+) {
+  cli_alert_success("outcome exists! procceeding...")
+} else {
+  cli_alert_danger("outcome does not exist in both datasets! stopping...")
+  stop(paste0(
+    "outcome phecode ", opt$outcome, " does not exist in ",
+    fcase(
+      !(opt$outcome %in% names(mgi_pim0)) &
+        !(opt$outcome %in% names(ukb_pim0)), "mgi and ukb",
+      !(opt$outcome %in% names(mgi_pim0)), "mgi",
+      !(opt$outcome %in% names(ukb_pim0)), "ukb"
+    )
+  ))
+}
 
 setnames(mgi_pim0,
   old = c(opt$outcome),
   new = c("outcome")
 )
-# setnames(ukb_pim0,
-#   old = paste0("X", gsub("X", "", opt$outcome)),
-#   new = "outcome"
-# )
+setnames(ukb_pim0,
+  old = paste0(opt$outcome),
+  new = "outcome"
+)
 
 ## confirm file structure for a given outcome exists - if not, create paths
 ### mgi
@@ -115,11 +117,11 @@ check_folder_structure(
 )
 
 ### ukb
-# check_folder_structure(
-#   cohort          = "ukb",
-#   data_version    = opt$ukb_version,
-#   outcome_phecode = opt$outcome
-# )
+check_folder_structure(
+  cohort          = "ukb",
+  data_version    = opt$ukb_version,
+  outcome_phecode = opt$outcome
+)
 
 # 4. read data -----------------------------------------------------------------
 ## mgi
@@ -151,15 +153,15 @@ mgi_first_phe <- mgi_full_phe[
 # ## ukb
 # cli_alert("loading ukb data...")
 # ### demographics
-# ukb_demo <- qread(file_paths[["ukb"]][["demo_file"]])
-# ukb_demo <- ukb_demo[, .(id, age = age_at_consent, ethn = race_eth, sex)]
-# ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
+ukb_demo <- qread(glue("data/private/ukb/{opt$ukb_version}/datax_{opt$ukb_version}_comb.qs"))
+ukb_demo <- ukb_demo[, .(id, age = age_at_consent, ethn = race_eth, sex)]
+ukb_demo <- ukb_demo[complete.cases(ukb_demo), ]
 
 # ### icd-phecode data
-# ukb_full_phe <- qread(file_paths[["ukb"]][["icd_phecode_file"]])
-# ukb_first_phe <- ukb_full_phe[
-#   ukb_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
-# ]
+ukb_full_phe <- qread(glue("data/private/ukb/{opt$ukb_version}/UKB_FULL_PHECODEX_DSB_{opt$ukb_version}.qs"))
+ukb_first_phe <- ukb_full_phe[
+  ukb_full_phe[, .I[which.min(dsb)], by = c("id", "phecode")]$V1
+]
 
 # 5. identify cases ------------------------------------------------------------
 ## mgi
@@ -167,8 +169,8 @@ mgi_case     <- unique(mgi_first_phe[phecode == opt$outcome])
 mgi_case_ids <- mgi_case[, unique(id)]
 
 # ## ukb
-# ukb_case     <- unique(ukb_first_phe[phecode == opt$outcome])[, id := as.character(id)]
-# ukb_case_ids <- ukb_case[, unique(id)]
+ukb_case     <- unique(ukb_first_phe[phecode == opt$outcome])[, id := as.character(id)]
+ukb_case_ids <- ukb_case[, unique(id)]
 
 # 6. calculate diagnostic metrics ----------------------------------------------
 ## mgi
@@ -178,16 +180,16 @@ mgi_cov[, `:=`(
   case = fifelse(id %in% mgi_case_ids, 1, 0)
 )]
 
-# ## ukb
-# cli_alert("calculating diagnostic metrics in ukb...")
-# ukb_diag_metrics <- get_icd_phecode_metrics(
-#   full_phe_data = ukb_first_phe
-# )[, id := as.character(id)]
-# ukb_matching_cov <- merge.data.table(
-#   ukb_demo[, .(id, age, female = as.numeric(sex == "Female"))],
-#   ukb_diag_metrics,
-#   by = "id"
-# )[, case := fifelse(id %in% ukb_case_ids, 1, 0)]
+## ukb
+cli_alert("calculating diagnostic metrics in ukb...")
+ukb_diag_metrics <- get_icd_phecode_metrics(
+  full_phe_data = ukb_first_phe
+)[, id := as.character(id)]
+ukb_matching_cov <- merge.data.table(
+  ukb_demo[, .(id, age, female = as.numeric(sex == "Female"))],
+  ukb_diag_metrics,
+  by = "id"
+)[, case := fifelse(id %in% ukb_case_ids, 1, 0)]
 
 # 7. perform matching ----------------------------------------------------------
 ## mgi
@@ -261,66 +263,66 @@ save_qs(
   )
 )
 
-# ## ukb
-# cli_alert(glue(
-#   "performing 1:{opt$matching_ratio} case:non-case ",
-#   "matching in ukb..."
-# ))
-# ukb_match_text <- glue(
-#   "matchit(case ~ ",
-#   "{glue_collapse(c(nearest_matching_vars, ",
-#   "exact_matching_vars), sep = ' + ')}, ",
-#   "data = ukb_matching_cov, calclosest = TRUE, ",
-#   "mahvars = c({paste0(sapply(nearest_matching_vars,",
-#   "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
-#   "caliper = {opt$matching_caliper}, ",
-#   "exact = c({paste0(sapply(exact_matching_vars,",
-#   "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
-#   "ratio = {opt$matching_ratio})"
-# )
-# ukb_match <- eval(parse(text = ukb_match_text))
-# ukb_matched <- match.data(ukb_match)
-# ukb_post_match_cov <- merge.data.table(
-#   ukb_matched,
-#   merge.data.table(
-#     ukb_case,
-#     ukb_matched,
-#     by = "id",
-#     all.x = TRUE
-#   )[, .(subclass, case_dsb = dsb)],
-#   by = "subclass"
-# )[, id := as.character(id)]
-# for (i in time_thresholds) {
-#   ukb_post_match_cov[, (glue("t{i}_threshold")) :=
-#     floor(case_dsb - (365.25 * i))]
-# }
-# for (i in time_thresholds) {
-#   ukb_post_match_cov[, (glue("t{i}_indicator")) :=
-#     as.numeric(all(get(glue("t{i}_threshold")) > first_dsb)),
-#   by = subclass
-#   ]
-# }
-# if (!dir.exists(glue(
-#   "data/private/ukb/{opt$ukb_version}/",
-#   "opt$outcome}/",
-#   "time_restricted_phenomes/"
-# ))) {
-#   dir.create(
-#     glue(
-#       "data/private/ukb/{opt$ukb_version}/",
-#       "opt$outcome}/time_restricted_phenomes/"
-#     ),
-#     recursive = TRUE
-#   )
-# }
-### save ukb matching data
-# save_qs(
-#   x = ukb_post_match_cov,
-#   file = glue(
-#     "data/private/ukb/{opt$ukb_version}/",
-#     "X{gsub('X', '', opt$outcome)}/matched_covariates.qs"
-#   )
-# )
+## ukb
+cli_alert(glue(
+  "performing 1:{opt$matching_ratio} case:non-case ",
+  "matching in ukb..."
+))
+ukb_match_text <- glue(
+  "matchit(case ~ ",
+  "{glue_collapse(c(nearest_matching_vars, ",
+  "exact_matching_vars), sep = ' + ')}, ",
+  "data = ukb_matching_cov, calclosest = TRUE, ",
+  "mahvars = c({paste0(sapply(nearest_matching_vars,",
+  "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+  "caliper = {opt$matching_caliper}, ",
+  "exact = c({paste0(sapply(exact_matching_vars,",
+  "\\(x) paste0('\\'', x, '\\'')), collapse = ', ')}), ",
+  "ratio = {opt$matching_ratio})"
+)
+ukb_match <- eval(parse(text = ukb_match_text))
+ukb_matched <- match.data(ukb_match)
+ukb_post_match_cov <- merge.data.table(
+  ukb_matched,
+  merge.data.table(
+    ukb_case,
+    ukb_matched,
+    by = "id",
+    all.x = TRUE
+  )[, .(subclass, case_dsb = dsb)],
+  by = "subclass"
+)[, id := as.character(id)]
+for (i in time_thresholds) {
+  ukb_post_match_cov[, (glue("t{i}_threshold")) :=
+    floor(case_dsb - (365.25 * i))]
+}
+for (i in time_thresholds) {
+  ukb_post_match_cov[, (glue("t{i}_indicator")) :=
+    as.numeric(all(get(glue("t{i}_threshold")) > first_dsb)),
+  by = subclass
+  ]
+}
+if (!dir.exists(glue(
+  "data/private/ukb/{opt$ukb_version}/",
+  "{opt$outcome}/",
+  "time_restricted_phenomes/"
+))) {
+  dir.create(
+    glue(
+      "data/private/ukb/{opt$ukb_version}/",
+      "{opt$outcome}/time_restricted_phenomes/"
+    ),
+    recursive = TRUE
+  )
+}
+## save ukb matching data
+save_qs(
+  x = ukb_post_match_cov,
+  file = glue(
+    "data/private/ukb/{opt$ukb_version}/",
+    "{opt$outcome}/matched_covariates.qs"
+  )
+)
 
 # 8. create time-restricted phenomes -------------------------------------------
 ## mgi
@@ -353,33 +355,33 @@ for (i in 1:length(mgi_pims)) {
   )
 }
 
-# ## ukb
-# cli_alert("constructing time-restricted phenomes in ukb...")
-# ukb_matched_phe <- merge.data.table(
-#   ukb_first_phe[id %in% ukb_post_match_cov[, id]],
-#   ukb_post_match_cov,
-#   by = "id"
-# )
-# ukb_pims <- list()
-# for (i in seq_along(time_thresholds)) {
-#   ukb_pims[[i]] <- generate_restricted_phenome(
-#     phe_data = ukb_matched_phe,
-#     threshold = time_thresholds[i],
-#     cases = ukb_case_ids,
-#     outcome_phe = opt$outcome
-#   )
-# }
-# names(ukb_pims) <- glue("t{time_thresholds}")
-# for (i in 1:length(ukb_pims)) {
-#   save_qs(
-#     x = ukb_pims[[i]],
-#     file = glue(
-#       "data/private/ukb/{opt$ukb_version}/",
-#       "X{gsub('X', '', opt$outcome)}/time_restricted_phenomes/",
-#       "ukb_X{gsub('X', '', opt$outcome)}",
-#       "_{names(ukb_pims)[i]}_{opt$ukb_version}.qs"
-#     )
-#   )
-# }
+## ukb
+cli_alert("constructing time-restricted phenomes in ukb...")
+ukb_matched_phe <- merge.data.table(
+  ukb_first_phe[id %in% ukb_post_match_cov[, id]],
+  ukb_post_match_cov,
+  by = "id"
+)
+ukb_pims <- list()
+for (i in seq_along(time_thresholds)) {
+  ukb_pims[[i]] <- generate_restricted_phenome(
+    phe_data = ukb_matched_phe,
+    threshold = time_thresholds[i],
+    cases = ukb_case_ids,
+    outcome_phe = opt$outcome
+  )
+}
+names(ukb_pims) <- glue("t{time_thresholds}")
+for (i in 1:length(ukb_pims)) {
+  save_qs(
+    x = ukb_pims[[i]],
+    file = glue(
+      "data/private/ukb/{opt$ukb_version}/",
+      "{opt$outcome}/time_restricted_phenomes/",
+      "ukb_{opt$outcome}",
+      "_{names(ukb_pims)[i]}_{opt$ukb_version}.qs"
+    )
+  )
+}
 
 cli_alert("script success! 🎉")
