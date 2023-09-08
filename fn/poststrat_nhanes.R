@@ -9,13 +9,16 @@ suppressPackageStartupMessages({
 # poststrat function -----------------------------------------------------------
 poststrat_nhanes <- function(
     int_data,
-    nhanes_data    = NULL,
+    ext_data       = NULL,
     id_var         = "id",
     age_var        = "AgeLastEntry",
     age_bin        = FALSE,
     age_bin_breaks = c(0, 18, 35, 65, 80, 150),
     covs           = c("age_bin", "cad", "smoker", "diabetes", "female"),
     not_num_vars   = NULL,
+    psu_var        = "psu_nhanes",
+    strata_var     = "strata_nhanes",
+    weight_var     = "weight_nhanes",
     chop = TRUE) {
 
     if (age_bin) {
@@ -23,29 +26,29 @@ poststrat_nhanes <- function(
         covs <- unique(c(covs, "age_bin"))
     }
     cli_alert_info("estimating poststratification weights for covariates: {.field {covs}}")
-    if (chop) cli_alert_info("truncating weights to 2.75 and 97.5 percentiles")
+    if (chop) cli_alert_info("truncating weights to 2.5 and 97.5 percentiles")
 
     # 1. load and prep nhanes data ----------------------------------------------
-    if (is.null(nhanes_data)) {
+    if (is.null(ext_data)) {
         nhanes <- download_nhanes_data(datasets = c("DEMO", "BMX", "SMQ", "DIQ", "MCQ", "BPQ", "DPQ"))
         phanes <- prepare_nhanes_data(nhanes)
     } else {
-        phanes <- copy(nhanes_data)
+        phanes <- copy(ext_data)
     }
-    phanes[, `:=`(
-        smoker = ifelse(smoking_former == 1 | smoking_current == 1, 1, 0),
-        age_bin = cut(age, c(seq(0, 80, by = 10), 150), right = FALSE)
-    )]
-    setnames(phanes, "nhanes_nhw", "nhw", skip_absent = TRUE)
+    # phanes[, `:=`(
+    #     smoker = ifelse(smoking_former == 1 | smoking_current == 1, 1, 0),
+    #     age_bin = cut(age, c(seq(0, 80, by = 10), 150), right = FALSE)
+    # )]
+    # setnames(phanes, "nhanes_nhw", "nhw", skip_absent = TRUE)
 
     if (age_bin == TRUE) {
         phanes[, age_bin := cut(age, age_bin_breaks, right = FALSE)]
     }
 
     nhanes_design <- svydesign(
-        id      = ~psu_nhanes,
-        strata  = ~strata_nhanes,
-        weights = ~weight_nhanes,
+        id      = ~get(psu_var),
+        strata  = ~get(strata_var),
+        weights = ~get(weight_var),
         nest    = TRUE,
         data    = phanes
     )
