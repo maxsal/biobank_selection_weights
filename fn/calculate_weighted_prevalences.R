@@ -5,7 +5,7 @@ suppressPackageStartupMessages({
   library(parallel)
   library(future)
   library(parallelly)
-  library(doFuture)
+  library(doParallel)
   library(foreach)
 })
 
@@ -18,6 +18,7 @@ calculate_weighted_prevalences <- function(
     sex_var      = "Sex",
     male_val     = "M",
     female_val   = "F",
+    pheinfo      = NULL,
     pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
     verbose      = TRUE,
     n_cores      = parallelly::availableCores() / 4,
@@ -38,11 +39,22 @@ calculate_weighted_prevalences <- function(
     }
     
     # load pheinfo
-    pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
+    phe_starts_with_num <- function(x) {
+        suppressWarnings({
+            !is.na(as.numeric(substr(x[1], 1, 1)))
+        })
+    }
+
+    # load pheinfo
+    if (is.null(pheinfo)) {
+        pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
+    }
+    xcode <- phe_starts_with_num(pheinfo[, phecode])
+
     # identify sex specific phecodes
-    both   <- pheinfo[sex == "Both", paste0("X", phecode)]
-    male <- pheinfo[sex == "Male", paste0("X", phecode)]
-    female <- pheinfo[sex == "Female", paste0("X", phecode)]
+    both   <- pheinfo[sex == "Both", paste0(ifelse(xcode, "X", ""), phecode)]
+    male   <- pheinfo[sex == "Male", paste0(ifelse(xcode, "X", ""), phecode)]
+    female <- pheinfo[sex == "Female", paste0(ifelse(xcode, "X", ""), phecode)]
 
     # list ids by sex
     male_ids   <- cov_data[cov_data[[sex_var]] == male_val, ][[cov_id_var]]
@@ -93,10 +105,11 @@ calculate_weighted_prevalences <- function(
             },
             mc.cores = n_cores
         )
-    } else if (parallelize %in% c("foreach", "future")) {
-        plan(multisession, workers = n_cores)
+    } else if (parallelize %in% c("foreach", "doParallel")) {
+        cl <- parallel::makeCluster(n_cores, type = "PSOCK")
+        doParallel::registerDoParallel(cl)
         both <- both[both %in% names(pim_data)]
-        both_out <- foreach(x = both) %dofuture% {
+        both_out <- foreach(x = both) %dopar% {
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = both_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -139,9 +152,9 @@ calculate_weighted_prevalences <- function(
             },
             mc.cores = n_cores
         )
-    } else if (parallelize %in% c("foreach", "future")) {
+    } else if (parallelize %in% c("foreach", "doParallel")) {
         male <- male[male %in% names(pim_data)]
-        male_out <- foreach(x = male) %dofuture% {
+        male_out <- foreach(x = male) %dopar% {
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -184,9 +197,9 @@ calculate_weighted_prevalences <- function(
             },
             mc.cores = n_cores
         )
-    } else if (parallelize %in% c("foreach", "future")) {
+    } else if (parallelize %in% c("foreach", "doParallel")) {
         female <- female[female %in% names(pim_data)]
-        female_out <- foreach(x = female) %dofuture% {
+        female_out <- foreach(x = female) %dopar% {
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -194,6 +207,7 @@ calculate_weighted_prevalences <- function(
                 se      = SE(tmp)[1]
             )
         }
+        parallel::stopCluster(cl)
     }
 
     # calculate prevalence

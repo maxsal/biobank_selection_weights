@@ -11,26 +11,37 @@ calculate_prevalences <- function(
     sex_var      = "Sex",
     male_val     = "M",
     female_val   = "F",
+    pheinfo      = NULL,
     pheinfo_path = "https://raw.githubusercontent.com/maxsal/public_data/main/phewas/Phecode_Definitions_FullTable_Modified.txt",
     progress     = TRUE
 ) {
     if (!is.data.table(pim_data)) { pim_data <- as.data.table(pim_data) }
     if (!is.data.table(cov_data)) { cov_data <- as.data.table(cov_data) }
 
+    phe_starts_with_num <- function(x) {
+        suppressWarnings({
+            !is.na(as.numeric(substr(x[1], 1, 1)))
+        })
+    }
+
     # load pheinfo
-    pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
+    if (is.null(pheinfo)) {
+        pheinfo <- fread(pheinfo_path, colClasses = "character", showProgress = FALSE)
+    }
+    xcode <- phe_starts_with_num(pheinfo[, phecode])
+
     # identify sex specific phecodes
-    both   <- pheinfo[sex == "Both", paste0("X", phecode)]
-    male   <- pheinfo[sex == "Male", paste0("X", phecode)]
-    female <- pheinfo[sex == "Female", paste0("X", phecode)]
+    both   <- pheinfo[sex == "Both", paste0(ifelse(xcode, "X", ""), phecode)]
+    male   <- pheinfo[sex == "Male", paste0(ifelse(xcode, "X", ""), phecode)]
+    female <- pheinfo[sex == "Female", paste0(ifelse(xcode, "X", ""), phecode)]
 
     # list ids by sex
-    male_ids <- cov_data[cov_data[[sex_var]] == male_val, ][[cov_id_var]]
+    male_ids   <- cov_data[cov_data[[sex_var]] == male_val, ][[cov_id_var]]
     female_ids <- cov_data[cov_data[[sex_var]] == female_val, ][[cov_id_var]]
 
     # initialize output
     out <- data.table(
-        phecode = pheinfo[, paste0("X", phecode)],
+        phecode = pheinfo[, paste0(ifelse(xcode, "X", ""), phecode)],
         n = NA_real_,
         N = NA_real_
     )
