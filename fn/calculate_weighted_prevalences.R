@@ -110,6 +110,7 @@ calculate_weighted_prevalences <- function(
         doParallel::registerDoParallel(cl)
         both <- both[both %in% names(pim_data)]
         both_out <- foreach(x = both) %dopar% {
+            library(survey)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = both_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -155,6 +156,7 @@ calculate_weighted_prevalences <- function(
     } else if (parallelize %in% c("foreach", "doParallel")) {
         male <- male[male %in% names(pim_data)]
         male_out <- foreach(x = male) %dopar% {
+            library(survey)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -200,6 +202,7 @@ calculate_weighted_prevalences <- function(
     } else if (parallelize %in% c("foreach", "doParallel")) {
         female <- female[female %in% names(pim_data)]
         female_out <- foreach(x = female) %dopar% {
+            library(survey)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
             data.table(
                 phecode = x,
