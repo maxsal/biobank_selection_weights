@@ -62,7 +62,7 @@ calculate_weighted_prevalences <- function(
 
     # initialize output
     out <- data.table(
-        phecode = pheinfo[, paste0("X", phecode)],
+        phecode = pheinfo[, paste0(ifelse(xcode, "X", ""), phecode)],
         n = NA_real_,
         N = NA_real_
     )
@@ -111,6 +111,7 @@ calculate_weighted_prevalences <- function(
         both <- both[both %in% names(pim_data)]
         both_out <- foreach(x = both) %dopar% {
             library(survey)
+            library(data.table)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = both_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -157,6 +158,7 @@ calculate_weighted_prevalences <- function(
         male <- male[male %in% names(pim_data)]
         male_out <- foreach(x = male) %dopar% {
             library(survey)
+            library(data.table)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = male_design, na.rm = TRUE)
             data.table(
                 phecode = x,
@@ -203,6 +205,7 @@ calculate_weighted_prevalences <- function(
         female <- female[female %in% names(pim_data)]
         female_out <- foreach(x = female) %dopar% {
             library(survey)
+            library(data.table)
             tmp <- svymean(as.formula(paste0("~`", x, "`")), design = female_design, na.rm = TRUE)
             data.table(
                 phecode = x,

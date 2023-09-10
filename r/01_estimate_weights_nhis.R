@@ -73,6 +73,21 @@ mgi[, bmi_cat := relevel(factor(fcase(
 mgi[, c("cancer", "diabetes", "cad") := NULL]
 setnames(mgi, c("cancerx", "cadx", "diabetesx"), c("cancer", "cad", "diabetes"))
 
+mgi[, race_eth := fcase(
+  RaceEthnicity == "Caucasian / Non-Hispanic", "NH White",
+  RaceEthnicity == "African American / Non-Hispanic", "NH Black",
+  RaceEthnicity %in% c(
+      "Asian / Hispanic", "Caucasian / Hispanic", "Native American / Hispanic", "African American / Hispanic"
+  ), "Hispanic",
+  RaceEthnicity == "Asian / Hispanic", "NH Asian",
+  default = "Other/Unknown"
+)]
+
+table(
+  mgi[, race_eth],
+  mgi[, RaceEthnicity4]
+)
+
 # NHIS
 prepped_nhis <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/prepped_nhis.csv")[, dataset := "NHIS"]
 setnames(prepped_nhis, "chd", "cad")
@@ -121,7 +136,7 @@ post_weights_list <- list(
 post_weights <- list()
 cli_progress_bar(name = "estimating poststratification weights", total = length(names(post_weights_list)))
 for (i in seq_along(names(post_weights_list))) {
-  tmp_weights <- poststrat_nhanes(
+  tmp_weights <- psw(
     int_data       = mgi,
     ext_data       = prepped_nhis,
     psu_var        = "PPSU",
@@ -130,7 +145,7 @@ for (i in seq_along(names(post_weights_list))) {
     chop           = TRUE,
     age_bin        = TRUE,
     age_bin_breaks = c(0, 50, 150),
-    not_num_vars = "bmi_cat",
+    not_num_vars   = c("bmi_cat", "race_eth"),
     covs           = post_weights_list[[names(post_weights_list)[i]]]
   )
   setnames(tmp_weights, "ps_weight", paste0("ps_", names(post_weights_list)[i]))
