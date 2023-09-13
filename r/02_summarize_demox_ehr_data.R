@@ -69,8 +69,9 @@ ukb_demo <- ukb_demo[, .(
   dob  = birth_date,
   age  = age_at_consent,
   race_eth,
+  race_eth2 = fcase(race_eth == "White", "White", race_eth == "Black", "Black", race_eth == "Asian", "Asian", race_eth %in% c("Other", "Unknown", NA), "Other/Unknown"),
   sex,
-  smoker = smk_status,
+  smoker = fcase(smk_status %in% c("Previous", "Current"), 1, smk_status == "Never", 0, default = NA),
   bmi = bmi_med,
   bmi_cat = bmi_med_cat,
   drinker = as.numeric(alc_ev == "Ever"),
@@ -143,8 +144,8 @@ ukb[, `:=` (
 (mgi_demo_summary <- mgi[id %in% unique(mgi_full_phe[, id]), ] |>
     summarizer(col_names = c("age_at_last_diagnosisx", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
                              "cancerx", "diabetesx", "cadx", "anxietyx", "depressionx", "smoker")))
-(ukb_demo_summary <- ukb[in_phenome == 1, ] |>
-    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+(ukb_demo_summary <- ukb[id %in% unique(ukb_full_phe[, id]), ] |>
+    summarizer(col_names = c("age", "age_verbose", "sex", "race_eth2", "bmi", "bmi_cat",
                              "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
 
 # weighted demographics summary ------------------------------------------------
@@ -165,10 +166,10 @@ ukb[, `:=` (
     )
 ))
 (ukb_demo_summary_w <- weighted_summary_wrapper(
-    data = ukb[in_phenome == 1, ],
+    data = ukb,
     weight = "ip_weight",
     vars = c(
-        "age", "age_verbose", "sex", "race_eth", "bmi", "bmi_cat",
+        "age", "age_verbose", "sex", "race_eth2", "bmi", "bmi_cat",
         "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker"
     )
 ))
@@ -191,27 +192,27 @@ ukb[, `:=` (
 # save -------------------------------------------------------------------------
 fwrite(
     x    = mgi_stacked_summary,
-    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demo_ehr_summary.txt"),
+    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demox_ehr_summary.txt"),
     sep  = "\t"
 )
 fwrite(
     x    = mgi_demo_summary_ip,
-    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demo_summary_ip.txt"),
+    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demox_summary_ip.txt"),
     sep  = "\t"
 )
 fwrite(
     x    = mgi_demo_summary_ps,
-    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demo_summary_ps.txt"),
+    file = glue("data/private/mgi/{opt$mgi_version}/mgi_demox_summary_ps.txt"),
     sep  = "\t"
 )
 fwrite(
     x    = ukb_stacked_summary,
-    file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_ehr_summary.txt"),
+    file = glue("data/private/ukb/{opt$ukb_version}/ukb_demox_ehr_summary.txt"),
     sep  = "\t"
 )
 fwrite(
     x    = ukb_demo_summary_w,
-    file = glue("data/private/ukb/{opt$ukb_version}/ukb_demo_summary_w.txt"),
+    file = glue("data/private/ukb/{opt$ukb_version}/ukb_demox_summary_w.txt"),
     sep  = "\t"
 )
 

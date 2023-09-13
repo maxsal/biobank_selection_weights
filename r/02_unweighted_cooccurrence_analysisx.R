@@ -31,7 +31,7 @@ option_list <- list(
     help = "Version of UKB data [default = %default]"
   ),
   make_option("--time_thresholds",
-    type = "character", default = "0,0.5,1,2,3,5",
+    type = "character", default = "1",
     help = glue(
       "Time thresholds for the phenome data ",
       "[default = %default]"
@@ -92,42 +92,43 @@ mgi_tr_merged <- lapply(
 )
 names(mgi_tr_merged) <- glue("t{time_thresholds}_threshold")
 
-# ## ukb
-# ukb_tr_pims <- lapply(
-#   seq_along(time_thresholds),
-#   \(x) {
-#     glue(
-#       "data/private/ukb/{opt$ukb_version}/X", "{gsub('X', '', opt$outcome)}/",
-#       "time_restricted_phenomes/ukb_X{gsub('X', '', opt$outcome)}_t",
-#       "{time_thresholds[x]}_{opt$ukb_version}.qs"
-#     ) |>
-#       read_qs()
-#   }
-# )
-# names(ukb_tr_pims) <- glue("t{time_thresholds}_threshold")
+## ukb
+ukb_tr_pims <- lapply(
+  seq_along(time_thresholds),
+  \(x) {
+    glue(
+      "data/private/ukb/{opt$ukb_version}/{opt$outcome}/",
+      "time_restricted_phenomes/ukb_{opt$outcome}_t",
+      "{time_thresholds[x]}_{opt$ukb_version}.qs"
+    ) |>
+      read_qs()
+  }
+)
+names(ukb_tr_pims) <- glue("t{time_thresholds}_threshold")
 
-# ukb_covariates <- read_qs(
-#   glue(
-#     "data/private/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
-#     "matched_covariates.qs"
-#   )
-# )
+ukb_covariates <- read_qs(
+  glue(
+    "data/private/ukb/{opt$ukb_version}/{opt$outcome}/",
+    "matched_covariates.qs"
+  )
+)
 
-# ukb_tr_merged <- lapply(
-#   names(ukb_tr_pims),
-#   \(x) {
-#     merge_list(list(ukb_tr_pims[[x]], ukb_covariates[, !c("case")]), by_var = "id", join_fn = dplyr::left_join)[, `:=`(
-#       age_at_threshold = round(get(x) / 365.25, 1)
-#     )]
-#   }
-# )
-# names(ukb_tr_merged) <- glue("t{time_thresholds}_threshold")
+ukb_tr_merged <- lapply(
+  names(ukb_tr_pims),
+  \(x) {
+    merge_list(list(ukb_tr_pims[[x]], ukb_covariates[, !c("case")]), by_var = "id", join_fn = dplyr::left_join)[, `:=`(
+      age_at_threshold = round(get(x) / 365.25, 1)
+    )]
+  }
+)
+names(ukb_tr_merged) <- glue("t{time_thresholds}_threshold")
 
 ## phenome
-pheinfo <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/phecodeX_R_labels.csv",
-  colClasses = "character", showProgress = FALSE
-)
-setnames(pheinfo, "phenotype", "phecode")
+pheinfo <- ms::pheinfox
+# pheinfo <- fread("https://raw.githubusercontent.com/PheWAS/PhecodeX/main/phecodeX_R_labels.csv",
+#   colClasses = "character", showProgress = FALSE
+# )
+# setnames(pheinfo, "phenotype", "phecode")
 
 # cooccurrence analysis --------------------------------------------------------
 ## mgi
@@ -138,6 +139,7 @@ for (i in seq_along(time_thresholds)) {
     data               = mgi_tr_merged[[i]],
     covariates         = c("age_at_threshold", "female", "length_followup"),
     possible_exposures = pheinfo[, phecode],
+    min_overlap_count  = 10,
     n_cores            = parallelly::availableCores() / 4,
     parallel           = TRUE
   )
@@ -146,20 +148,22 @@ for (i in seq_along(time_thresholds)) {
 cli_progress_done()
 names(mgi_results) <- glue("t{time_thresholds}")
 
-# ## ukb
-# ukb_results <- list()
-# cli_progress_bar(name = "UKB PheWAS", total = length(time_thresholds))
-# for (i in seq_along(time_thresholds)) {
-#   ukb_results[[i]] <- cooccurrence_analysis(
-#     data       = ukb_tr_merged[[i]],
-#     covariates = c("age_at_threshold", "female", "length_followup"),
-#     n_cores    = parallelly::availableCores() / 4,
-#     parallel   = TRUE
-#   )
-#   cli_progress_update()
-# }
-# cli_progress_done()
-# names(ukb_results) <- glue("t{time_thresholds}")
+## ukb
+ukb_results <- list()
+cli_progress_bar(name = "UKB PheWAS", total = length(time_thresholds))
+for (i in seq_along(time_thresholds)) {
+  ukb_results[[i]] <- cooccurrence_analysis(
+    data               = ukb_tr_merged[[i]],
+    covariates         = c("age_at_threshold", "female", "length_followup"),
+    possible_exposures = pheinfo[, phecode],
+    min_overlap_count  = 10,
+    n_cores            = parallelly::availableCores() / 4,
+    parallel           = TRUE
+  )
+  cli_progress_update()
+}
+cli_progress_done()
+names(ukb_results) <- glue("t{time_thresholds}")
 
 # save results -----------------------------------------------------------------
 ## mgi
@@ -174,16 +178,16 @@ for (i in seq_along(time_thresholds)) {
   )
 }
 
-# ## ukb
-# for (i in seq_along(time_thresholds)) {
-#   save_qs(
-#     x = ukb_results[[i]],
-#     file = glue(
-#       "results/ukb/{opt$ukb_version}/X{gsub('X', '', opt$outcome)}/",
-#       "ukb_X{gsub('X', '', opt$outcome)}_t{time_thresholds[i]}_",
-#       "{opt$ukb_version}_results.qs"
-#     )
-#   )
-# }
+## ukb
+for (i in seq_along(time_thresholds)) {
+  save_qs(
+    x = ukb_results[[i]],
+    file = glue(
+      "results/ukb/{opt$ukb_version}/{opt$outcome}/",
+      "ukb_{opt$outcome}_t{time_thresholds[i]}_",
+      "{opt$ukb_version}_results.qs"
+    )
+  )
+}
 
 cli_alert_success("script complete! 🎉🎉🎉")

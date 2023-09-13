@@ -7,7 +7,7 @@
 # libraries --------------------------------------------------------------------
 ms::libri(
   maxsal/ms, haven, survey, dplyr, pracma, simplexreg, data.table,
-  glue, cli, qs, optparse
+  glue, cli, qs, optparse, ggExtra
 )
 
 # optparse list ---
@@ -246,6 +246,41 @@ fwrite(
 save_qs(
   x    = weights,
   file = glue("{data_path}weightsx_{opt$cohort_version}_{opt$mgi_cohort}.qs")
+)
+
+scat_plot <- weights |>
+  ggplot(aes(x = ip_selection, y = ps_selection)) +
+  geom_point(size = 1, alpha = 0.5) +
+  # geom_smooth(formula = "y ~ x", method = "loess", se = FALSE) +
+  labs(title = str_wrap("MGI weight scatterplot with marginal distibution", width = 50), x = "IP weight", y = "PS weight") +
+  theme_ms()
+
+marg_plot <- ggMarginal(scat_plot, type = "violin", margins = "both")
+
+ggsave(
+  plot     = marg_plot,
+  filename = glue("results/mgi/{opt$cohort_version}/mgi_weights_dist.png"),
+  width    = 8,
+  height   = 8,
+  units    = "in",
+  dpi      = 300
+)
+
+mgi_weight_violin_plot <- weights[, .(`IP weight` = ip_selection, `PS weight` = ps_selection)] |>
+  melt() |>
+  ggplot(aes(x = variable, y = value, fill = variable)) +
+  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+  labs(x = "Weight type", y = "Weight value", title = "MGI weight distribution") +
+  scale_fill_ms() +
+  theme_ms() +
+  theme(
+    legend.position = "none"
+  )
+
+ggsave(
+  plot = mgi_weight_violin_plot,
+  filename = glue("results/mgi/{opt$cohort_version}/mgi_weights_violin.pdf"),
+  width = 6, height = 6, device = cairo_pdf
 )
 
 cli_alert_success("script success! see {.path {data_path}} and suffix {opt$mgi_cohort} 🥳")

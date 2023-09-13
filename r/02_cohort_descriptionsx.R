@@ -6,11 +6,10 @@
 options(stringsAsFactors = FALSE)
 
 ms::libri(
-  ms, data.table, qs, tidyverse, GGally,
-  ggnetwork, network, scales, gridExtra,
-  qgraph, igraph, circlize, ComplexHeatmap,
-  PheWAS/PheWAS, glue, survey, optparse,
-  cli
+  ms, data.table, qs, tidyverse, GGally, 
+  scales, gridExtra, PheWAS/PheWAS, glue,
+  survey, optparse, cli, parallelly,
+  doParallel, foreach
 )
 
 option_list <- list(
@@ -33,9 +32,6 @@ opt    <- args$options
 print(opt)
 
 for (i in c(
-  "phecode_partial_correlation_chord_diagram.R",
-  "phenome_partial_correlation_network.R",
-  "phenome_partial_correlation_neoqgraph.R",
   "calculate_prevalences.R",
   "calculate_weighted_prevalences.R",
   "files-utils.R"
@@ -73,14 +69,16 @@ pheinfo <- ms::pheinfox
 cli_alert("calculating unweighted prevalences...")
 ## unweighted
 mgi_prevs <- calculate_prevalences(
-  pim_data = mgi_pim,
-  cov_data = mgi_cov,
-  pheinfo  = ms::pheinfox
+  pim_data   = mgi_pim,
+  cov_data   = mgi_cov,
+  pim_id_var = "id",
+  pheinfo    = ms::pheinfox
 )
 ukb_prevs <- calculate_prevalences(
   pim_data   = ukb_pim,
   cov_data   = ukb_cov,
   pheinfo    = ms::pheinfox,
+  pim_id_var = "id",
   cov_id_var = "id",
   sex_var    = "sex",
   male_val   = "Male",
@@ -90,18 +88,22 @@ ukb_prevs <- calculate_prevalences(
 cli_alert("calculating weighted prevalences...")
 ## weighted
 mgi_prevs_w <- calculate_weighted_prevalences(
-  pim_data = mgi_pim[!is.na(weights), ],
-  cov_data = mgi_cov,
-  pim_id_var = "id",
-  pheinfo = ms::pheinfox,
-  weight   = "weights",
+  pim_data    = mgi_pim[!is.na(weights), ],
+  cov_data    = mgi_cov,
+  pim_id_var  = "id",
+  pheinfo     = ms::pheinfox,
+  weight      = "weights",
   parallelize = "doParallel",
-  n_cores = 8
+  n_cores     = 8
 )
 ukb_prevs_w <- calculate_weighted_prevalences(
   pim_data    = ukb_pim[!is.na(weights), ],
   cov_data    = ukb_cov,
   pim_id_var  = "id",
+  cov_id_var  = "id",
+  sex_var     = "sex",
+  male_val    = "Male",
+  female_val  = "Female",
   pheinfo     = ms::pheinfox,
   weight      = "weights",
   parallelize = "doParallel",
@@ -125,50 +127,11 @@ ukb_merged_prevs <- merge.data.table(
 # save prevalences
 save_qs(
   x    = mgi_merged_prevs,
-  file = glue("results/mgi/{opt$mgi_version}/mgi_prevs.qs")
+  file = glue("results/mgi/{opt$mgi_version}/mgi_prevsx.qs")
 )
 save_qs(
   x    = ukb_merged_prevs,
-  file = glue("results/ukb/{opt$ukb_version}/ukb_prevs.qs")
+  file = glue("results/ukb/{opt$ukb_version}/ukb_prevsx.qs")
 )
-
-# network plot
-# cli_alert("plotting networks...")
-# phenome_partial_correlation_network(
-#   x          = mgi,
-#   savefile   = glue("results/mgi/{opt$mgi_version}/MGI_network.pdf"),
-#   prevs      = mgi_prevs,
-#   prev_var   = "prev_unweighted",
-#   plot_title = "MGI correlations"
-# )
-# phenome_partial_correlation_network(
-#   x          = ukb,
-#   savefile   = glue("results/ukb/{opt$ukb_version}/UKB_network.pdf"),
-#   prevs      = ukb_prevs,
-#   prev_var   = "prev_unweighted",
-#   plot_title = "UKB correlations"
-# )
-
-# chord diagram
-# cli_alert("plotting chord diagrams...")
-# phenome_partial_correlation_chord_diagram(
-#   x = mgi,
-#   savefile = glue("results/mgi/{opt$mgi_version}/MGI_partialchord.pdf")
-# )
-# phenome_partial_correlation_chord_diagram(
-#   x = ukb,
-#   savefile = glue("results/ukb/{opt$ukb_version}/UKB_partialchord.pdf")
-# )
-
-# neoplasm qgraph
-# cli_alert("plotting qgraphs...")
-# phenome_partial_correlation_neoqgraph(
-#   x        = mgi,
-#   savefile = glue("results/mgi/{opt$mgi_version}/MGI_qgraph.pdf")
-# )
-# phenome_partial_correlation_neoqgraph(
-#   x        = ukb,
-#   savefile = glue("results/ukb/{opt$ukb_version}/ukb_qgraph.pdf")
-# )
 
 cli_alert_success("done! 🎉")
