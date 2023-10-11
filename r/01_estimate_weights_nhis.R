@@ -83,11 +83,6 @@ mgi[, race_eth := fcase(
   default = "Other/Unknown"
 )]
 
-table(
-  mgi[, race_eth],
-  mgi[, RaceEthnicity4]
-)
-
 # NHIS
 prepped_nhis <- fread("https://raw.githubusercontent.com/maxsal/public_data/main/prepped_nhis.csv")[, dataset := "NHIS"]
 setnames(prepped_nhis, "chd", "cad")
@@ -104,10 +99,7 @@ stacked <- rbindlist(list(
 cli_alert("estimating ipw weights...")
 
 ip_weights_list <- list(
-  "selection" = c("as.numeric(age >= 50)",
-                  "cad", "diabetes", "smoker",
-                  "bmi_cat", "nhw",
-                  "female", "cancer")
+  "selection" = c("as.numeric(age>= 50)", "female", "nhw", "hypertension", "diabetes", "cancer", "anxiety", "depression", "bmi_cat")
 )
 
 ip_weights <- list()
@@ -130,7 +122,7 @@ ipws <- ms::merge_list(ip_weights, join_fn = dplyr::full_join)
 
 cli_alert("estimating poststratification weights...")
 post_weights_list <- list(
-  "selection" = c("smoker", "cad", "diabetes", "cancer", "nhw", "female", "bmi_cat")
+  "selection" = c("female", "nhw", "hypertension", "diabetes", "cancer", "anxiety", "depression", "bmi_cat")
 )
 
 post_weights <- list()
@@ -234,7 +226,6 @@ est_out[[i+1]] <- extract_estimates(
       )
 
 est_out <- rbindlist(est_out)
-
 
 fwrite(
   x    = est_out,

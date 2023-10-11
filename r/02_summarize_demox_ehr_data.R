@@ -75,6 +75,7 @@ ukb_demo <- ukb_demo[, .(
   bmi = bmi_med,
   bmi_cat = bmi_med_cat,
   drinker = as.numeric(alc_ev == "Ever"),
+  hypertension = hypertensionx,
   cancer, diabetes, cad, anxiety, depression, in_phenome)]
 # cc_vars <- c("id", "age", "ethn", "sex", "smoker", "bmi", "drinker")
 # ukb_demo <- ukb_demo[complete.cases(ukb_demo[, ..cc_vars]), ]
@@ -143,10 +144,10 @@ ukb[, `:=` (
 # unweighted demographics summary ----------------------------------------------
 (mgi_demo_summary <- mgi[id %in% unique(mgi_full_phe[, id]), ] |>
     summarizer(col_names = c("age_at_last_diagnosisx", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-                             "cancerx", "diabetesx", "cadx", "anxietyx", "depressionx", "smoker")))
+                             "cancerx", "diabetesx", "anxietyx", "depressionx", "hypertensionx")))
 (ukb_demo_summary <- ukb[id %in% unique(ukb_full_phe[, id]), ] |>
     summarizer(col_names = c("age", "age_verbose", "sex", "race_eth2", "bmi", "bmi_cat",
-                             "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker")))
+                             "cancer", "diabetes", "anxiety", "depression", "hypertension")))
 
 # weighted demographics summary ------------------------------------------------
 (mgi_demo_summary_ip <- weighted_summary_wrapper(
@@ -154,7 +155,7 @@ ukb[, `:=` (
     weight = "ip_selection",
     vars = c(
         "age_at_last_diagnosisx", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-        "cancerx", "diabetesx", "cadx", "anxietyx", "depressionx", "smoker"
+        "cancerx", "diabetesx", "anxietyx", "depressionx", "hypertensionx"
     )
 ))
 (mgi_demo_summary_ps <- weighted_summary_wrapper(
@@ -162,7 +163,7 @@ ukb[, `:=` (
     weight = "ps_selection",
     vars = c(
         "age_at_last_diagnosisx", "age_verbose", "sex", "race_eth", "bmi", "bmi_verbose",
-        "cancerx", "diabetesx", "cadx", "anxietyx", "depressionx", "smoker"
+        "cancerx", "diabetesx", "anxietyx", "depressionx", "hypertensionx"
     )
 ))
 (ukb_demo_summary_w <- weighted_summary_wrapper(
@@ -170,7 +171,7 @@ ukb[, `:=` (
     weight = "ip_weight",
     vars = c(
         "age", "age_verbose", "sex", "race_eth2", "bmi", "bmi_cat",
-        "cancer", "diabetes", "cad", "anxiety", "depression", "smoker", "drinker"
+        "cancer", "diabetes", "cad", "anxiety", "depression", "hypertension"
     )
 ))
 

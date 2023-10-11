@@ -27,7 +27,7 @@ option_list <- list(
     help = "Cohort of MGI used in weighting (comb, bb, mend, mhb) [default = %default]"
   ),
   make_option("--time_thresholds",
-    type = "character", default = "1",
+    type = "character", default = "0,0.5,1,2,5",
     help = glue(
       "Time thresholds for the phenome data ",
       "[default = %default]"
@@ -115,7 +115,7 @@ for (w in seq_along(weight_vars)) {
   out[[w]] <- lapply(
     seq_along(time_thresholds),
     \(x) {
-      print(x)
+      cli_progress_step("time threshold: {time_thresholds[x]} [x/{length(time_thresholds)}]")
       cooccurrence_analysis(
         data               = mgi_tr_merged[[x]],
         covariates         = c("age_at_threshold", "female", "length_followup"),

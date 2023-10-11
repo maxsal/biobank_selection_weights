@@ -43,19 +43,10 @@ file_paths <- get_files(mgi_version = opt$mgi_version, ukb_version = opt$ukb_ver
 
 # data
 cli_alert("loading data...")
-# mgi <- read_qs(glue(
-#   "data/private/mgi/{opt$mgi_version}/",
-#   "mgi_phenome_partial_correlations_{opt$mgi_version}.qs"
-# ))
 mgi_cov     <- qread(glue("data/private/mgi/{opt$mgi_version}/datax_{opt$mgi_version}_comb.qs"))
 mgi_pim     <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_PIM0X_{opt$mgi_version}.qs"))[id %in% mgi_cov[, DeID_PatientID], ]
-mgi_weights <- read_qs(glue("data/private/mgi/{opt$mgi_version}/weightsx_{opt$mgi_version}_comb.qs"))
+mgi_weights <- qread(glue("data/private/mgi/{opt$mgi_version}/weightsx_{opt$mgi_version}_comb.qs"))
 mgi_pim     <- merge.data.table(mgi_pim, mgi_weights[, .(id, weights = get(opt$mgi_weight))], by.x = "id", by.y = "id", all.x = TRUE)
-
-# ukb <- read_qs(glue(
-#   "data/private/ukb/{opt$ukb_version}/",
-#   "ukb_phenome_partial_correlations_{opt$ukb_version}.qs"
-# ))
 
 ukb_pim     <- read_qs(glue("/net/junglebook/home/mmsalva/projects/dissertation/aim_one/data/private/ukb/{opt$ukb_version}/UKB_PIM0X_{opt$ukb_version}.qs"))
 ukb_cov     <- read_qs(glue("data/private/ukb/{opt$ukb_version}/datax_{opt$ukb_version}_comb.qs"))

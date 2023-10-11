@@ -23,7 +23,7 @@ option_list <- list(
     help = "UKB cohort version in /net/junglebook/magic_data/EHRdata/ [default = %default]"
   ),
   make_option("--mgi_weights",
-    type = "character", default = "ip_selection_f",
+    type = "character", default = "ip_selection",
     help = "Name of weight variable to use for MGI [default = %default]"
   )
 )
