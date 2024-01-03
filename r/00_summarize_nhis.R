@@ -124,7 +124,7 @@ dsn <- svydesign(
     dsn = dsn,
     vars = c(
         "age", "age_verbose", "sex_lab", "race_eth", "bmi_calc", "bmi_cat",
-        "cancer", "diabetes", "cad", "depression", "smoker"
+        "cancer", "diabetes", "anxiety", "depression", "hypertension"
     )
 ))
 
