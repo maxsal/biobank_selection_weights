@@ -1,12 +1,9 @@
 # quickly perform phecode-phecode phewas using MGI data for multiple
 # time-thresholds for a selected outcome variable
-# author:   max salvatore
-# date:     20230220
 
 # libraries, functions, and options --------------------------------------------
 ms::libri(
-    data.table, MatchIt, logistf, glue, qs, optparse, purrr,
-    ms, cli
+    data.table, MatchIt, logistf, glue, qs, optparse, purrr, ms, cli
 )
 
 set.seed(61787)
@@ -45,7 +42,6 @@ setnames(mgi_cov,
 
 ### icd-phecode data
 mgi_full_phe <- qread(glue("data/private/mgi/{opt$mgi_version}/MGI_FULL_PHECODEX_DSB_{opt$mgi_version}.qs"))
-# mgi_full_phe <- get(load(file_paths[["mgi"]][["phecode_dsb_file"]]))
 if ("IID" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "IID", "id")
 if ("DaysSinceBirth" %in% names(mgi_full_phe)) setnames(mgi_full_phe, "DaysSinceBirth", "dsb")
 mgi_full_phe <- mgi_full_phe[id %in% mgi_cov[, unique(id)], ]
@@ -77,8 +73,6 @@ ukb_demo <- ukb_demo[, .(
   drinker = as.numeric(alc_ev == "Ever"),
   hypertension = hypertensionx,
   cancer, diabetes, cad, anxiety, depression, in_phenome)]
-# cc_vars <- c("id", "age", "ethn", "sex", "smoker", "bmi", "drinker")
-# ukb_demo <- ukb_demo[complete.cases(ukb_demo[, ..cc_vars]), ]
 
 ### icd-phecode data
 ukb_full_phe <- read_qs(glue("data/private/ukb/{opt$ukb_version}/UKB_FULL_PHECODEX_DSB_{opt$ukb_version}.qs"))
